@@ -1,0 +1,25 @@
+{
+  "targetUrl": "https://wikipedia.org",
+  "pages": [],
+  "visitCount": 1000,
+  "concurrency": 5,
+  "firstPagePriority": 60,
+  "sessionTimeoutMs": 90000,
+  "pageMinMs": 4000,
+  "snippet": null,
+  "devices": {
+    "desktopChrome": 40,
+    "iphone14": 20,
+    "pixel7": 12,
+    "desktopFirefox": 10,
+    "desktopSafari": 10,
+    "ipadPro": 8
+  },
+  "personas": [
+    { "name": "quick_scanner",  "scrollDepth": 0.3, "clickRate": 0.5, "readTime": [500,  1800], "pageCount": [1,2], "idleChance": 0.04, "resizeChance": 0.0,  "uTurnChance": 0.2  },
+    { "name": "engaged_reader", "scrollDepth": 0.9, "clickRate": 0.7, "readTime": [2000, 5000], "pageCount": [2,4], "idleChance": 0.15, "resizeChance": 0.1,  "uTurnChance": 0.05 },
+    { "name": "form_filler",    "scrollDepth": 0.6, "clickRate": 0.9, "readTime": [1000, 3000], "pageCount": [2,3], "idleChance": 0.10, "resizeChance": 0.05, "uTurnChance": 0.05 },
+    { "name": "window_shopper", "scrollDepth": 0.5, "clickRate": 0.6, "readTime": [800,  2500], "pageCount": [2,5], "idleChance": 0.08, "resizeChance": 0.15, "uTurnChance": 0.3  },
+    { "name": "power_user",     "scrollDepth": 1.0, "clickRate": 0.9, "readTime": [1500, 4000], "pageCount": [3,6], "idleChance": 0.12, "resizeChance": 0.2,  "uTurnChance": 0.1  }
+  ]
+}

@@ -1,0 +1,17 @@
+version: '2.4'
+services:
+  traffic-generator:
+    build: .
+    container_name: traffic_generator
+    shm_size: '512m'
+    mem_limit: 3g
+    cpus: 2.0
+    environment:
+      - NODE_ENV=production
+      - CONCURRENCY=5
+    # Uncomment for host network on Linux (better latency)
+    # network_mode: host
+    # Uncomment to route through a proxy
+    # environment:
+    #   HTTP_PROXY: http://your-proxy:port
+    #   HTTPS_PROXY: http://your-proxy:port
