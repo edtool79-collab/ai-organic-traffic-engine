@@ -1,0 +1,195 @@
+{
+  "id": "site-citedcart-guides",
+  "name": "★ CitedCart: קריאת מדריכים ומחקר AI (15 דפי AdSense)",
+  "description": "קורא בהדרגה את מדריכי CitedCart (/guides/* ו-/research/*), סורק 15 דפים מחוברים ל-AdSense (בלי checkout) עם אפס קליקים על מודעות.",
+  "category": "my_sites",
+  "isBuiltin": true,
+  "config": {
+    "targetUrl": "https://citedcart.com",
+    "pages": [
+      "/",
+      "/about",
+      "/service-check",
+      "/guides/google-ai-visibility",
+      "/guides/chatgpt-search-robots-txt",
+      "/guides/shopify-store-not-showing-in-chatgpt",
+      "/research/product-shipping-returns-markup",
+      "/products/report",
+      "/products/kit",
+      "/products/watch",
+      "/products/watch_year",
+      "/privacy",
+      "/terms.html",
+      "/refunds.html",
+      "/contact.html"
+    ],
+    "visitCount": 5,
+    "minConcurrency": 1,
+    "concurrency": 2,
+    "firstPagePriority": 45,
+    "sessionTimeoutMs": 120000,
+    "pageMinMs": 6000,
+    "headless": false,
+    "engineMode": "crawlee_autoscaled",
+    "taskMode": "hybrid",
+    "taskSteps": [
+      {
+        "type": "goto",
+        "selector": "",
+        "value": "/guides/google-ai-visibility",
+        "assertKind": "text_contains",
+        "label": "פתיחת מדריך Google AI Visibility"
+      },
+      {
+        "type": "wait",
+        "selector": "",
+        "value": "1800",
+        "assertKind": "text_contains",
+        "label": "המתנה לטעינת תוכן ו-AdSense"
+      },
+      {
+        "type": "audit_ads",
+        "selector": "",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "בדיקת נוכחות AdSense (אפס קליק)"
+      },
+      {
+        "type": "read_article",
+        "selector": "",
+        "value": "7500",
+        "assertKind": "text_contains",
+        "label": "קריאה מעמיקה של המדריך"
+      },
+      {
+        "type": "human_browse",
+        "selector": "",
+        "value": "4500",
+        "assertKind": "text_contains",
+        "label": "גלילה חוזרת, ריחוף ובחירת טקסט"
+      },
+      {
+        "type": "goto",
+        "selector": "",
+        "value": "/guides/chatgpt-search-robots-txt",
+        "assertKind": "text_contains",
+        "label": "מעבר למדריך ChatGPT Robots.txt"
+      },
+      {
+        "type": "read_article",
+        "selector": "",
+        "value": "6500",
+        "assertKind": "text_contains",
+        "label": "קריאה אנושית במדריך השני"
+      },
+      {
+        "type": "goto",
+        "selector": "",
+        "value": "/research/product-shipping-returns-markup",
+        "assertKind": "text_contains",
+        "label": "מעבר למחקר Shipping & Returns"
+      },
+      {
+        "type": "scroll",
+        "selector": "",
+        "value": "65",
+        "assertKind": "text_contains",
+        "label": "גלילת מחקר (65%)"
+      },
+      {
+        "type": "screenshot",
+        "selector": "",
+        "value": "CitedCart Guides Audit",
+        "assertKind": "text_contains",
+        "label": "צילום סיכום קריאת המדריכים"
+      }
+    ],
+    "keepBrowserOpenMs": 2000,
+    "snippet": null,
+    "schedule": {
+      "enabled": false,
+      "startHour": "08:00",
+      "endHour": "22:00"
+    },
+    "devices": {
+      "desktopChrome": 45,
+      "iphone14": 25,
+      "pixel7": 15,
+      "desktopFirefox": 8,
+      "desktopSafari": 5,
+      "ipadPro": 2
+    },
+    "personas": [
+      {
+        "name": "engaged_reader",
+        "scrollDepth": 0.95,
+        "clickRate": 0.65,
+        "readTime": [
+          3000,
+          7000
+        ],
+        "pageCount": [
+          2,
+          4
+        ],
+        "idleChance": 0.2,
+        "resizeChance": 0.05,
+        "uTurnChance": 0.15
+      },
+      {
+        "name": "window_shopper",
+        "scrollDepth": 0.65,
+        "clickRate": 0.55,
+        "readTime": [
+          1500,
+          4000
+        ],
+        "pageCount": [
+          2,
+          3
+        ],
+        "idleChance": 0.12,
+        "resizeChance": 0.1,
+        "uTurnChance": 0.25
+      },
+      {
+        "name": "quick_scanner",
+        "scrollDepth": 0.4,
+        "clickRate": 0.35,
+        "readTime": [
+          1000,
+          2500
+        ],
+        "pageCount": [
+          1,
+          2
+        ],
+        "idleChance": 0.05,
+        "resizeChance": 0,
+        "uTurnChance": 0.1
+      }
+    ],
+    "proxy": {
+      "enabled": true,
+      "mode": "round_robin",
+      "servers": [],
+      "countryFilterEnabled": true,
+      "preferredCountries": [
+        "US"
+      ]
+    },
+    "sessionPersistence": {
+      "enabled": false,
+      "returningUserRate": 50,
+      "profilePoolSize": 10
+    },
+    "adSafety": {
+      "avoidAdClicks": false,
+      "dismissOverlays": true,
+      "closePopunders": true,
+      "skipTelemetryHeader": false
+    },
+    "resourceMode": "ultra_lite"
+  },
+  "updatedAt": "2026-11-14T19:45:40.648Z"
+}

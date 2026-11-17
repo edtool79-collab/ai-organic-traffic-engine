@@ -24,11 +24,66 @@ const SESSION_TIMEOUT_MS  = cfg.sessionTimeoutMs   ?? 90_000;
 const PAGE_MIN_MS         = cfg.pageMinMs           ?? 4_000;
 
 const EXTRA_PAGES = (() => {
-  const p = Array.isArray(cfg.pages) ? [...new Set(cfg.pages)] : null;
+  const p = Array.isArray(cfg.pages) ? [...new Set(cfg.pages.map(x => {
+    if (typeof x !== 'string') return '';
+    const trimmed = x.trim();
+    if (!trimmed) return '';
+    return trimmed.startsWith('/') ? trimmed : '/' + trimmed;
+  }).filter(Boolean))] : null;
   return (p && p.length) ? p : ['/'];
 })();
 
 const FIRST_PAGE = EXTRA_PAGES[0];
+
+// Optional proxy rotation configuration
+function parseProxyEntry(raw) {
+  const str = typeof raw === 'string' ? raw.trim() : raw?.server;
+  if (!str) return null;
+  try {
+    const u = new URL(str);
+    const out = { server: `${u.protocol}//${u.hostname}${u.port ? ':' + u.port : ''}` };
+    if (u.username || raw?.username) out.username = raw?.username || decodeURIComponent(u.username);
+    if (u.password || raw?.password) out.password = raw?.password || decodeURIComponent(u.password);
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+const PROXY_SERVERS = (cfg.proxy?.enabled && Array.isArray(cfg.proxy.servers))
+  ? cfg.proxy.servers.map(parseProxyEntry).filter(Boolean)
+  : [];
+const PROXY_MODE = cfg.proxy?.mode === 'random' ? 'random' : 'round_robin';
+
+// Optional session / cookies persistence for returning-user simulation
+const SESSION_PERSISTENCE = Boolean(cfg.sessionPersistence?.enabled);
+const RETURNING_USER_RATE = Math.min(1, Math.max(0, (cfg.sessionPersistence?.returningUserRate ?? 50) / 100));
+const PROFILE_POOL_SIZE   = Math.max(1, parseInt(String(cfg.sessionPersistence?.profilePoolSize ?? 10), 10) || 10);
+const PROFILES_DIR        = path.join(__dirname, 'session-profiles');
+const activeProfileSlots  = new Set();
+
+function acquireSessionProfile() {
+  if (!SESSION_PERSISTENCE) return null;
+  fs.mkdirSync(PROFILES_DIR, { recursive: true });
+  const existingSlots = [];
+  const emptySlots = [];
+  for (let slot = 1; slot <= PROFILE_POOL_SIZE; slot++) {
+    if (activeProfileSlots.has(slot)) continue;
+    const fp = path.join(PROFILES_DIR, `profile_${String(slot).padStart(2, '0')}.json`);
+    if (fs.existsSync(fp)) existingSlots.push({ slot, filePath: fp, isReturning: true });
+    else emptySlots.push({ slot, filePath: fp, isReturning: false });
+  }
+  let chosen = null;
+  if (existingSlots.length && (Math.random() < RETURNING_USER_RATE || !emptySlots.length)) {
+    chosen = existingSlots[Math.floor(Math.random() * existingSlots.length)];
+  } else if (emptySlots.length) {
+    chosen = emptySlots[Math.floor(Math.random() * emptySlots.length)];
+  } else if (existingSlots.length) {
+    chosen = existingSlots[Math.floor(Math.random() * existingSlots.length)];
+  }
+  if (chosen) activeProfileSlots.add(chosen.slot);
+  return chosen;
+}
 
 // Optional snippet injected at the start of every page load.
 // Accepts a raw JS string or a full <script>…</script> block.
@@ -70,6 +125,11 @@ const cfgDevices   = { ...DEFAULT_DEVICE_WEIGHTS, ...(cfg.devices || {}) };
 const DEVICE_CONFIGS = Object.entries(cfgDevices)
   .filter(([k, w]) => DEVICE_MAP[k] && w > 0)
   .map(([k, weight]) => ({ ...DEVICE_MAP[k], weight }));
+
+if (!DEVICE_CONFIGS.length) {
+  console.error('config.json must enable at least one device with weight > 0');
+  process.exit(1);
+}
 
 // ─── Browser pool (shared instances across all visits) ────────────────────────
 
@@ -553,6 +613,20 @@ async function visitSite(i) {
   // Override UA for Chromium configs — use a real stable-release string so the
   // chrome-headless-shell build version doesn't leak through.
   const userAgent = uaPool ? randomChoice(uaPool) : undefined;
+  const selectedProxy = PROXY_SERVERS.length
+    ? (PROXY_MODE === 'random' ? randomChoice(PROXY_SERVERS) : PROXY_SERVERS[i % PROXY_SERVERS.length])
+    : null;
+  const sessionProfile = acquireSessionProfile();
+
+  let validStorageState;
+  if (sessionProfile?.isReturning) {
+    try {
+      JSON.parse(fs.readFileSync(sessionProfile.filePath, 'utf8'));
+      validStorageState = sessionProfile.filePath;
+    } catch {
+      sessionProfile.isReturning = false;
+    }
+  }
 
   let context;
   try {
@@ -563,14 +637,21 @@ async function visitSite(i) {
     context = await browser.newContext({
       ...deviceOptions,
       ...(userAgent ? { userAgent } : {}),
+      ...(selectedProxy ? { proxy: selectedProxy } : {}),
+      ...(validStorageState ? { storageState: validStorageState } : {}),
       ignoreHTTPSErrors: true,
     });
   } catch (err) {
+    if (sessionProfile) activeProfileSlots.delete(sessionProfile.slot);
     console.error(`[${i+1}] Failed to create context:`, err.message);
     return;
   }
 
   const page = await context.newPage();
+  let pageErrors = 0;
+  page.on('pageerror', () => { pageErrors++; });
+  page.on('console', msg => { if (msg.type() === 'error') pageErrors++; });
+
   // Stealth plugin (chromium only) handles all fingerprint patches.
   // We only need to spoof document.referrer, which stealth doesn't touch.
   await page.addInitScript(ref => {
@@ -584,7 +665,12 @@ async function visitSite(i) {
     const entryPath  = (Math.random() < FIRST_PAGE_PRIORITY || !otherPages.length) ? FIRST_PAGE : randomChoice(otherPages);
     const shuffled   = EXTRA_PAGES.filter(p => p !== entryPath).sort(() => 0.5 - Math.random());
 
-    await page.goto(TARGET_URL + entryPath, { waitUntil: 'load', timeout: 25000 });
+    const navStart    = Date.now();
+    const firstResp   = await page.goto(TARGET_URL + entryPath, { waitUntil: 'load', timeout: 25000 });
+    const firstLoadMs = Date.now() - navStart;
+    const firstStatus = firstResp ? firstResp.status() : 'n/a';
+    let pagesVisited  = 1;
+
     await injectSnippet(page);
     let t0 = Date.now();
     await randomInteract(page, device, persona, true);
@@ -599,7 +685,8 @@ async function visitSite(i) {
       // U-turn: visit and immediately go back
       if (Math.random() < persona.uTurnChance) {
         await sleep(randomBetween(300, 700));
-        await page.goto(TARGET_URL + path, { waitUntil: 'load', timeout: 20000 }).catch(() => {});
+        const r = await page.goto(TARGET_URL + path, { waitUntil: 'load', timeout: 20000 }).catch(() => null);
+        if (r) pagesVisited++;
         await injectSnippet(page);
         await sleep(randomBetween(PAGE_MIN_MS, PAGE_MIN_MS + 1500));
         await page.goBack({ timeout: 10000 }).catch(() => {});
@@ -616,7 +703,9 @@ async function visitSite(i) {
       }
 
       await sleep(randomBetween(400, 1500));
-      await page.goto(TARGET_URL + path, { waitUntil: 'load', timeout: 25000 }).catch(() => { return; });
+      const resp = await page.goto(TARGET_URL + path, { waitUntil: 'load', timeout: 25000 }).catch(() => null);
+      if (!resp) continue;
+      pagesVisited++;
       await injectSnippet(page);
       t0 = Date.now();
       await randomInteract(page, device, persona, false);
@@ -624,7 +713,11 @@ async function visitSite(i) {
       if (pageRem > 0) await sleep(pageRem);
     }
 
-    console.log(`[${i+1}] Done — persona: ${persona.name}, device: ${deviceName}`);
+    const sessionTag = sessionProfile
+      ? `, session: ${sessionProfile.isReturning ? 'returning' : 'new'}(#${sessionProfile.slot})`
+      : '';
+    const proxyTag = selectedProxy ? `, proxy: ${selectedProxy.server}` : '';
+    console.log(`[${i+1}] Done — persona: ${persona.name}, device: ${deviceName}, status: ${firstStatus}, load: ${firstLoadMs}ms, pages: ${pagesVisited}, errors: ${pageErrors}${sessionTag}${proxyTag}`);
   } catch (err) {
     if (err.name === 'TimeoutError' || err.message?.includes('timeout')) {
       console.log(`[${i+1}] Timed out, ending session`);
@@ -635,6 +728,10 @@ async function visitSite(i) {
     clearTimeout(killTimer);
     // Give scripts ~2s to flush its final beacon before the context dies
     await sleep(2000).catch(() => {});
+    if (sessionProfile) {
+      await context.storageState({ path: sessionProfile.filePath }).catch(() => {});
+      activeProfileSlots.delete(sessionProfile.slot);
+    }
     await context.close().catch(() => {});
   }
 }

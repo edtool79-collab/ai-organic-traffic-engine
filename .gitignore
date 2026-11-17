@@ -1,2 +1,29 @@
-node_modules/
-.claude/
+﻿node_modules/
+session-profiles/
+storage/
+proxies.txt
+*.secret.json
+*native-pilot*.json
+.env*
+*.log
+
+proxies-fallback.txt
+reports/
+*.bak-*
+*.sqlite
+config.json
+
+# commercial build artefacts - never publish
+runs/
+input.json
+license.key
+.license-keys/
+*.pem
+.docs-capture/
+# personal / frozen systems - never publish
+sideOps/
+tools/google-workspace-account/
+site-profiles/tools-citedcart.json
+
+
+start-side-ops.bat

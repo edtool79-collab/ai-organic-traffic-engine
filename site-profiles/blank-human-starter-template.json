@@ -1,0 +1,199 @@
+{
+  "id": "blank-human-starter-template",
+  "name": "תבנית התאמה עצמאית: התנהגות אנושית + מקום ללחיצה שלך",
+  "description": "נקודת פתיחה נקייה ללימוד עצמי: שנה רק את targetUrl ואת ה-Selector בצעד הלחיצה (צעד 6) לכל כפתור/לינק באתר שלך.",
+  "category": "starter_template",
+  "isBuiltin": true,
+  "config": {
+    "targetUrl": "http://127.0.0.1:4310/demo-site",
+    "pages": [
+      "/"
+    ],
+    "visitCount": 2,
+    "minConcurrency": 1,
+    "concurrency": 1,
+    "firstPagePriority": 100,
+    "sessionTimeoutMs": 90000,
+    "pageMinMs": 4000,
+    "headless": false,
+    "engineMode": "crawlee_autoscaled",
+    "taskMode": "scenario",
+    "taskSteps": [
+      {
+        "type": "goto",
+        "selector": "",
+        "value": "/",
+        "assertKind": "text_contains",
+        "label": "שלב 1: שנה את targetUrl למעלה לכתובת האתר שלך"
+      },
+      {
+        "type": "wait",
+        "selector": "",
+        "value": "1500",
+        "assertKind": "text_contains",
+        "label": "שלב 2: המתנה לטעינת תסריטים בדף"
+      },
+      {
+        "type": "dismiss_overlays",
+        "selector": "",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "שלב 3: סגירה אוטומטית של פופ-אפים חוסמים"
+      },
+      {
+        "type": "read_article",
+        "selector": "",
+        "value": "5000",
+        "assertKind": "text_contains",
+        "label": "שלב 4: קריאה אנושית עם עצירות גלילה"
+      },
+      {
+        "type": "human_browse",
+        "selector": "",
+        "value": "4500",
+        "assertKind": "text_contains",
+        "label": "שלב 5: תנועת עכבר בזייה + ריחוף + בחירת טקסט"
+      },
+      {
+        "type": "click",
+        "selector": "#hero-cta",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "שלב 6: שנה כאן את ה-Selector (או טקסט הכפתור) שלך!"
+      },
+      {
+        "type": "wait",
+        "selector": "",
+        "value": "1200",
+        "assertKind": "text_contains",
+        "label": "שלב 7: המתנה קצרה אחרי הלחיצה"
+      },
+      {
+        "type": "screenshot",
+        "selector": "",
+        "value": "My Custom Flow Result",
+        "assertKind": "text_contains",
+        "label": "שלב 8: צילום הוכחה בסיום"
+      }
+    ],
+    "keepBrowserOpenMs": 2500,
+    "snippet": null,
+    "schedule": {
+      "enabled": false,
+      "startHour": "08:00",
+      "endHour": "22:00"
+    },
+    "devices": {
+      "desktopChrome": 40,
+      "iphone14": 20,
+      "pixel7": 12,
+      "desktopFirefox": 10,
+      "desktopSafari": 10,
+      "ipadPro": 8
+    },
+    "personas": [
+      {
+        "name": "quick_scanner",
+        "scrollDepth": 0.3,
+        "clickRate": 0.5,
+        "readTime": [
+          500,
+          1800
+        ],
+        "pageCount": [
+          1,
+          2
+        ],
+        "idleChance": 0.04,
+        "resizeChance": 0,
+        "uTurnChance": 0.2
+      },
+      {
+        "name": "engaged_reader",
+        "scrollDepth": 0.9,
+        "clickRate": 0.7,
+        "readTime": [
+          2000,
+          5000
+        ],
+        "pageCount": [
+          2,
+          4
+        ],
+        "idleChance": 0.15,
+        "resizeChance": 0.1,
+        "uTurnChance": 0.05
+      },
+      {
+        "name": "form_filler",
+        "scrollDepth": 0.6,
+        "clickRate": 0.9,
+        "readTime": [
+          1000,
+          3000
+        ],
+        "pageCount": [
+          2,
+          3
+        ],
+        "idleChance": 0.1,
+        "resizeChance": 0.05,
+        "uTurnChance": 0.05
+      },
+      {
+        "name": "window_shopper",
+        "scrollDepth": 0.5,
+        "clickRate": 0.6,
+        "readTime": [
+          800,
+          2500
+        ],
+        "pageCount": [
+          2,
+          5
+        ],
+        "idleChance": 0.08,
+        "resizeChance": 0.15,
+        "uTurnChance": 0.3
+      },
+      {
+        "name": "power_user",
+        "scrollDepth": 1,
+        "clickRate": 0.9,
+        "readTime": [
+          1500,
+          4000
+        ],
+        "pageCount": [
+          3,
+          6
+        ],
+        "idleChance": 0.12,
+        "resizeChance": 0.2,
+        "uTurnChance": 0.1
+      }
+    ],
+    "proxy": {
+      "enabled": true,
+      "mode": "round_robin",
+      "servers": [],
+      "countryFilterEnabled": true,
+      "preferredCountries": [
+        "US"
+      ]
+    },
+    "sessionPersistence": {
+      "enabled": false,
+      "returningUserRate": 50,
+      "profilePoolSize": 10
+    },
+    "adSafety": {
+      "avoidAdClicks": false,
+      "dismissOverlays": true,
+      "closePopunders": true,
+      "skipTelemetryHeader": false
+    },
+    "resourceMode": "ultra_lite"
+  },
+  "updatedAt": "2026-11-14T19:19:48.028Z"
+}

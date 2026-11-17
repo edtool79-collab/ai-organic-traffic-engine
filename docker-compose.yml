@@ -1,17 +1,34 @@
-version: '2.4'
 services:
-  traffic-generator:
+  dashboard:
     build: .
-    container_name: traffic_generator
-    shm_size: '512m'
-    mem_limit: 3g
-    cpus: 2.0
+    container_name: wtg-dashboard
+    ports:
+      - "4310:4310"
+    shm_size: "2gb"
     environment:
       - NODE_ENV=production
-      - CONCURRENCY=5
-    # Uncomment for host network on Linux (better latency)
-    # network_mode: host
-    # Uncomment to route through a proxy
-    # environment:
-    #   HTTP_PROXY: http://your-proxy:port
-    #   HTTPS_PROXY: http://your-proxy:port
+      - PORT=4310
+    volumes:
+      - ./config.json:/app/config.json
+      - ./proxies.txt:/app/proxies.txt
+      - ./session-profiles:/app/session-profiles
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: ["node", "src/crawleeRunner.js", "/app/config.json"]
+    shm_size: "2gb"
+    environment:
+      - NODE_ENV=production
+      - CONCURRENCY=10
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - ./proxies.txt:/app/proxies.txt:ro
+      - ./session-profiles:/app/session-profiles
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 2560M
+    profiles:
+      - swarm

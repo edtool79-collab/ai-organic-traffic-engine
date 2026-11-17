@@ -1,0 +1,166 @@
+{
+  "targetUrl": "http://127.0.0.1:4310/demo-site",
+  "pages": [
+    "/"
+  ],
+  "visitCount": 2,
+  "minConcurrency": 1,
+  "concurrency": 1,
+  "firstPagePriority": 0,
+  "sessionTimeoutMs": 75000,
+  "pageMinMs": 0,
+  "headless": true,
+  "engineMode": "crawlee_playwright",
+  "taskMode": "scenario",
+  "referrerMode": "mixed",
+  "taskSteps": [
+    {
+      "type": "goto",
+      "value": "/"
+    }
+  ],
+  "keepBrowserOpenMs": 1000,
+  "interVisitDelayMs": 0,
+  "snippet": null,
+  "schedule": {
+    "enabled": false,
+    "startHour": "08:00",
+    "endHour": "23:00"
+  },
+  "devices": {
+    "desktopChrome": 30,
+    "iphone14": 55,
+    "pixel7": 15,
+    "desktopFirefox": 0,
+    "desktopSafari": 0,
+    "ipadPro": 0
+  },
+  "personas": [
+    {
+      "name": "quick_scanner",
+      "scrollDepth": 0.3,
+      "clickRate": 0.5,
+      "readTime": [
+        500,
+        1800
+      ],
+      "pageCount": [
+        1,
+        2
+      ],
+      "idleChance": 0.04,
+      "resizeChance": 0,
+      "uTurnChance": 0.2
+    },
+    {
+      "name": "engaged_reader",
+      "scrollDepth": 0.9,
+      "clickRate": 0.7,
+      "readTime": [
+        2000,
+        5000
+      ],
+      "pageCount": [
+        2,
+        4
+      ],
+      "idleChance": 0.15,
+      "resizeChance": 0.1,
+      "uTurnChance": 0.05
+    },
+    {
+      "name": "form_filler",
+      "scrollDepth": 0.6,
+      "clickRate": 0.9,
+      "readTime": [
+        1000,
+        3000
+      ],
+      "pageCount": [
+        2,
+        3
+      ],
+      "idleChance": 0.1,
+      "resizeChance": 0.05,
+      "uTurnChance": 0.05
+    },
+    {
+      "name": "window_shopper",
+      "scrollDepth": 0.5,
+      "clickRate": 0.6,
+      "readTime": [
+        800,
+        2500
+      ],
+      "pageCount": [
+        2,
+        5
+      ],
+      "idleChance": 0.08,
+      "resizeChance": 0.15,
+      "uTurnChance": 0.3
+    },
+    {
+      "name": "power_user",
+      "scrollDepth": 1,
+      "clickRate": 0.9,
+      "readTime": [
+        1500,
+        4000
+      ],
+      "pageCount": [
+        3,
+        6
+      ],
+      "idleChance": 0.12,
+      "resizeChance": 0.2,
+      "uTurnChance": 0.1
+    }
+  ],
+  "proxy": {
+    "enabled": false,
+    "mode": "round_robin",
+    "countryFilterEnabled": true,
+    "fallbackToAnyIfEmpty": true,
+    "preferredCountries": [
+      "US",
+      "GB",
+      "NL",
+      "AU"
+    ],
+    "servers": []
+  },
+  "stealthMode": "standard",
+  "resourceMode": "full",
+  "waves": {
+    "enabled": false,
+    "mode": "off",
+    "conversionRate": 25,
+    "childMutationRate": 50,
+    "scanProductsChance": 3,
+    "extraPageChance": 5,
+    "mutateForms": true,
+    "maxProductsPerVisit": 1,
+    "formInputs": []
+  },
+  "ai": {
+    "enabled": false,
+    "autoManage": false,
+    "provider": "ollama_cloud",
+    "commanderModel": "glm-5.3-flash",
+    "workerModel": "deepseek-v4.1-flash",
+    "workerPct": 0,
+    "commanderDirective": ""
+  },
+  "sessionPersistence": {
+    "enabled": false,
+    "returningUserRate": 50,
+    "profilePoolSize": 100
+  },
+  "adSafety": {
+    "avoidAdClicks": true,
+    "dismissOverlays": true,
+    "closePopunders": true,
+    "skipTelemetryHeader": true
+  }
+}

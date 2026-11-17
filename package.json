@@ -1,16 +1,27 @@
 {
   "name": "traffic_generation",
   "version": "1.0.0",
-  "description": "",
+  "description": "Local Playwright and Crawlee dashboard for browser QA",
   "main": "index.js",
   "scripts": {
+    "start": "node dashboard/server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
+    "@lightpanda/browser": "^1.2.0",
+    "@medv/finder": "^4.0.2",
+    "browserless": "^14.1.10",
+    "crawlee": "^3.18.2",
+    "fingerprint-generator": "^2.1.90",
+    "fingerprint-injector": "^2.1.90",
+    "https-proxy-agent": "^9.1.0",
     "playwright": "^1.58.2",
-    "playwright-extra": "^4.3.6"
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "rrweb": "^2.2.2",
+    "socks-proxy-agent": "^10.1.0"
   }
 }

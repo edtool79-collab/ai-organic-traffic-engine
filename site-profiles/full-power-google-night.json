@@ -1,0 +1,525 @@
+{
+  "id": "full-power-google-night",
+  "name": "Full Power Google Organic Night (All Sites except GTA — 50x8)",
+  "description": "פרופיל שיא חובק-אתרים לכל הלילה (50 סשנים, עד 8 דפדפנים מקביליים עם הגנת זיכרון, 22:00–08:00): מדמה כניסה מחיפוש Google לפי מדינת הפרוקסי, גולש ולוחץ על לינקים פנימיים בכל האתרים (CleanTab, CitedCart, Jobs, HirePulse Gateway — ללא gta6.gethirepulse.xyz), חוזר ל-CleanTab וממשיך לגלוש וללחוץ פנימית במצב Hybrid בלי לגעת במודעות.",
+  "category": "tools_ads",
+  "isBuiltin": true,
+  "updatedAt": "2026-11-15T07:04:33.328Z",
+  "config": {
+    "targetUrl": "https://cleantab-lab.hirepulse-commerce-sandbox.workers.dev",
+    "pages": [
+      "/",
+      "/tools",
+      "/tools/link-cleaner",
+      "/tools/prompt-formatter",
+      "/tools/password-entropy",
+      "/guides",
+      "/guides/strip-tracking-parameters-urls",
+      "/guides/prompt-structure-less-hallucination",
+      "/guides/browser-profile-isolation-guide",
+      "/guides/passphrases-vs-complex-passwords",
+      "/guides/clean-markdown-notes-workflow",
+      "/about"
+    ],
+    "visitCount": 50,
+    "minConcurrency": 1,
+    "concurrency": 8,
+    "firstPagePriority": 85,
+    "sessionTimeoutMs": 300000,
+    "pageMinMs": 4000,
+    "headless": true,
+    "engineMode": "crawlee_autoscaled",
+    "taskMode": "hybrid",
+    "referrerMode": "google_organic",
+    "taskSteps": [
+      {
+        "type": "goto",
+        "selector": "",
+        "value": "/",
+        "assertKind": "text_contains",
+        "label": "כניסה ראשונה ל-CleanTab מכיוון חיפוש Google לפי מדינת הפרוקסי",
+        "referer": "google"
+      },
+      {
+        "type": "wait",
+        "selector": "",
+        "value": "1200",
+        "assertKind": "text_contains",
+        "label": "המתנת טעינת דף הבית"
+      },
+      {
+        "type": "dismiss_overlays",
+        "selector": "",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "סגירת Overlays צפים"
+      },
+      {
+        "type": "audit_ads",
+        "selector": "",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "ביקורת סלוטי מודעות (קריאה בלבד — ללא קליק)"
+      },
+      {
+        "type": "read_article",
+        "selector": "",
+        "value": "3500",
+        "assertKind": "text_contains",
+        "label": "קריאה וגלילה ראשונית בדף הבית של CleanTab"
+      },
+      {
+        "type": "scroll_to",
+        "selector": "a[href=\"/tools/link-cleaner\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "גלילה אל כלי Link Cleaner"
+      },
+      {
+        "type": "click",
+        "selector": "div[data-ad-slot-id=\"monetag_vignette\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "לחיצה פנימית אל Link Cleaner"
+      },
+      {
+        "type": "dismiss_overlays",
+        "selector": "",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "סגירת שכבות בכלי"
+      },
+      {
+        "type": "click",
+        "selector": "div[data-ad-slot-id=\"monetag_vignette\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "טעינת URL דוגמה בכלי"
+      },
+      {
+        "type": "click",
+        "selector": "#lc-clean",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "הפעלת Strip Trackers"
+      },
+      {
+        "type": "human_browse",
+        "selector": "",
+        "value": "2800",
+        "assertKind": "text_contains",
+        "label": "בדיקת הפלט וגלילה אנושית"
+      },
+      {
+        "type": "click",
+        "selector": "a[href=\"/tools/prompt-formatter\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "מעבר פנימי אל Prompt Formatter"
+      },
+      {
+        "type": "fill",
+        "selector": "#pf-role",
+        "value": "Technical SEO & Analytics Auditor",
+        "assertKind": "text_contains",
+        "label": "מילוי שדה Role"
+      },
+      {
+        "type": "fill",
+        "selector": "#pf-task",
+        "value": "Validate organic referrer and internal link navigation paths",
+        "assertKind": "text_contains",
+        "label": "מילוי שדה Task"
+      },
+      {
+        "type": "click",
+        "selector": "#pf-build",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "לחיצה על Format Prompt"
+      },
+      {
+        "type": "click",
+        "selector": "a[href=\"/guides/prompt-structure-less-hallucination\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "לחיצה פנימית למדריך Prompt Structure"
+      },
+      {
+        "type": "read_article",
+        "selector": "",
+        "value": "4500",
+        "assertKind": "text_contains",
+        "label": "קריאת מאמר וגלילה"
+      },
+      {
+        "type": "scroll_to",
+        "selector": "a[href=\"/tools/password-entropy\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "גלילה אל קישור Password Entropy"
+      },
+      {
+        "type": "click",
+        "selector": "a[href=\"/tools/password-entropy\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "פתיחת Password Entropy"
+      },
+      {
+        "type": "click",
+        "selector": "#pe-gen",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "יצירת סיסמה אקראית"
+      },
+      {
+        "type": "go_back",
+        "selector": "",
+        "value": "900",
+        "assertKind": "text_contains",
+        "label": "חזרה אחורה בדפדפן"
+      },
+      {
+        "type": "click",
+        "selector": "a[href=\"/guides/strip-tracking-parameters-urls\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "מעבר פנימי למדריך Strip Tracking"
+      },
+      {
+        "type": "human_browse",
+        "selector": "",
+        "value": "3200",
+        "assertKind": "text_contains",
+        "label": "קריאה ותנועת עכבר במאמר"
+      },
+      {
+        "type": "goto",
+        "selector": "",
+        "value": "https://citedcart.com/",
+        "assertKind": "text_contains",
+        "label": "כניסה ל-CitedCart עם Google Referer תואם מדינה",
+        "referer": "google",
+        "followExternal": true
+      },
+      {
+        "type": "dismiss_overlays",
+        "selector": "",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "סגירת שכבות ב-CitedCart"
+      },
+      {
+        "type": "human_browse",
+        "selector": "",
+        "value": "3000",
+        "assertKind": "text_contains",
+        "label": "סקירה וגלילה בדף הבית של CitedCart"
+      },
+      {
+        "type": "click",
+        "selector": "a.header-story[href=\"#question\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "לחיצה פנימית על כפתור Meet the agent",
+        "followExternal": true
+      },
+      {
+        "type": "scroll_to",
+        "selector": "nav.trust-links a[href=\"/guides/google-ai-visibility\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "גלילה לקישור מדריך AI Visibility"
+      },
+      {
+        "type": "click",
+        "selector": "nav.trust-links a[href=\"/guides/google-ai-visibility\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "לחיצה פנימית למדריך Google AI Visibility",
+        "followExternal": true
+      },
+      {
+        "type": "read_article",
+        "selector": "",
+        "value": "3800",
+        "assertKind": "text_contains",
+        "label": "קריאת מדריך AI Visibility"
+      },
+      {
+        "type": "click",
+        "selector": "a[href=\"/guides/chatgpt-search-robots-txt\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "לחיצה פנימית למדריך ChatGPT Robots",
+        "followExternal": true
+      },
+      {
+        "type": "human_browse",
+        "selector": "",
+        "value": "2800",
+        "assertKind": "text_contains",
+        "label": "עיון וגלילה במדריך"
+      },
+      {
+        "type": "go_back",
+        "selector": "",
+        "value": "800",
+        "assertKind": "text_contains",
+        "label": "חזרה אחורה בתוך CitedCart"
+      },
+      {
+        "type": "goto",
+        "selector": "",
+        "value": "https://jobs.gethirepulse.xyz/",
+        "assertKind": "text_contains",
+        "label": "כניסה ללוח המשרות Jobs HirePulse עם Google Referer",
+        "referer": "google",
+        "followExternal": true
+      },
+      {
+        "type": "human_browse",
+        "selector": "",
+        "value": "2800",
+        "assertKind": "text_contains",
+        "label": "גלילה וקריאה בלוח המשרות"
+      },
+      {
+        "type": "click",
+        "selector": "a[href=\"browse/remote-jobs.html\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "לחיצה פנימית לעמוד המשרות מרחוק",
+        "followExternal": true
+      },
+      {
+        "type": "human_browse",
+        "selector": "",
+        "value": "2800",
+        "assertKind": "text_contains",
+        "label": "סקירת משרות וגלילה"
+      },
+      {
+        "type": "go_back",
+        "selector": "",
+        "value": "800",
+        "assertKind": "text_contains",
+        "label": "חזרה לעמוד הראשי של Jobs"
+      },
+      {
+        "type": "scroll_to",
+        "selector": "a[href=\"https://gethirepulse.xyz\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "גלילה לקישור HirePulse הראשי"
+      },
+      {
+        "type": "click",
+        "selector": "a[href=\"https://gethirepulse.xyz\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "מעבר ל-HirePulse Gateway הראשי דרך הקישור באתר",
+        "followExternal": true
+      },
+      {
+        "type": "human_browse",
+        "selector": "",
+        "value": "2800",
+        "assertKind": "text_contains",
+        "label": "גלילה בדף הבית של gethirepulse.xyz"
+      },
+      {
+        "type": "click",
+        "selector": "#tab-mcp",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "מעבר ללשונית MCP Tools ב-gethirepulse",
+        "followExternal": true
+      },
+      {
+        "type": "wait",
+        "selector": "",
+        "value": "700",
+        "assertKind": "text_contains",
+        "label": "המתנת תצוגת לשונית MCP"
+      },
+      {
+        "type": "click",
+        "selector": "#tab-paid",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "חזרה ללשונית Paid Tools",
+        "followExternal": true
+      },
+      {
+        "type": "click",
+        "selector": "a[href=\"/quickstart\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "לחיצה פנימית אל /quickstart",
+        "followExternal": true
+      },
+      {
+        "type": "human_browse",
+        "selector": "",
+        "value": "2600",
+        "assertKind": "text_contains",
+        "label": "סקירת דף ההתקנה /quickstart"
+      },
+      {
+        "type": "click",
+        "selector": "a[href=\"/about\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "לחיצה פנימית אל /about",
+        "followExternal": true
+      },
+      {
+        "type": "human_browse",
+        "selector": "",
+        "value": "2400",
+        "assertKind": "text_contains",
+        "label": "גלילה בעמוד האודות של HirePulse"
+      },
+      {
+        "type": "goto",
+        "selector": "",
+        "value": "/",
+        "assertKind": "text_contains",
+        "label": "חזרה ל-CleanTab מכיוון Google והמשך גלילה",
+        "referer": "google"
+      },
+      {
+        "type": "read_article",
+        "selector": "",
+        "value": "3500",
+        "assertKind": "text_contains",
+        "label": "גלילה וקריאה בחזרה ב-CleanTab"
+      },
+      {
+        "type": "goto",
+        "selector": "",
+        "value": "/guides/browser-profile-isolation-guide",
+        "assertKind": "text_contains",
+        "label": "פתיחת מדריך בידוד הפרופילים ב-CleanTab"
+      },
+      {
+        "type": "human_browse",
+        "selector": "",
+        "value": "2800",
+        "assertKind": "text_contains",
+        "label": "קריאה ותנועת עכבר במדריך"
+      },
+      {
+        "type": "click",
+        "selector": "a[href=\"/guides/clean-markdown-notes-workflow\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "לחיצה פנימית למדריך Clean Markdown Notes"
+      },
+      {
+        "type": "read_article",
+        "selector": "",
+        "value": "3200",
+        "assertKind": "text_contains",
+        "label": "קריאה לפני מעבר לשלב הגלישה האוטונומי (Hybrid)"
+      },
+      {
+        "type": "screenshot",
+        "selector": "",
+        "value": "Full Power Google Night Complete",
+        "assertKind": "text_contains",
+        "label": "צילום סיום המסלול המלא — ממשיך ל-Hybrid פנימי ב-CleanTab"
+      }
+    ],
+    "keepBrowserOpenMs": 1000,
+    "interVisitDelayMs": 2500,
+    "snippet": null,
+    "schedule": {
+      "enabled": true,
+      "startHour": "22:00",
+      "endHour": "08:00"
+    },
+    "devices": {
+      "desktopChrome": 75,
+      "iphone14": 0,
+      "pixel7": 0,
+      "desktopFirefox": 25,
+      "desktopSafari": 0,
+      "ipadPro": 0
+    },
+    "personas": [
+      {
+        "name": "engaged_reader",
+        "scrollDepth": 0.95,
+        "clickRate": 0.65,
+        "readTime": [
+          3000,
+          7000
+        ],
+        "pageCount": [
+          2,
+          4
+        ],
+        "idleChance": 0.2,
+        "resizeChance": 0.05,
+        "uTurnChance": 0.15
+      },
+      {
+        "name": "window_shopper",
+        "scrollDepth": 0.65,
+        "clickRate": 0.55,
+        "readTime": [
+          1500,
+          4000
+        ],
+        "pageCount": [
+          2,
+          3
+        ],
+        "idleChance": 0.12,
+        "resizeChance": 0.1,
+        "uTurnChance": 0.25
+      },
+      {
+        "name": "quick_scanner",
+        "scrollDepth": 0.4,
+        "clickRate": 0.35,
+        "readTime": [
+          1000,
+          2500
+        ],
+        "pageCount": [
+          1,
+          2
+        ],
+        "idleChance": 0.05,
+        "resizeChance": 0,
+        "uTurnChance": 0.1
+      }
+    ],
+    "proxy": {
+      "enabled": true,
+      "mode": "round_robin",
+      "servers": [],
+      "countryFilterEnabled": true,
+      "fallbackToAnyIfEmpty": true,
+      "preferredCountries": [
+        "US"
+      ]
+    },
+    "sessionPersistence": {
+      "enabled": true,
+      "returningUserRate": 65,
+      "profilePoolSize": 80
+    },
+    "adSafety": {
+      "avoidAdClicks": false,
+      "dismissOverlays": true,
+      "closePopunders": true,
+      "skipTelemetryHeader": true
+    },
+    "resourceMode": "ultra_lite"
+  }
+}

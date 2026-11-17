@@ -1,0 +1,236 @@
+{
+  "id": "profile-1794728256320",
+  "name": "ניסיןו",
+  "description": "",
+  "category": "custom",
+  "isBuiltin": false,
+  "updatedAt": "2026-11-15T07:37:36.334Z",
+  "config": {
+    "targetUrl": "https://cleantab-lab.hirepulse-commerce-sandbox.workers.dev",
+    "pages": [
+      "/",
+      "/tools",
+      "/guides",
+      "/about",
+      "/tools/link-cleaner",
+      "/tools/prompt-formatter",
+      "/tools/password-entropy"
+    ],
+    "visitCount": 3,
+    "minConcurrency": 1,
+    "concurrency": 1,
+    "firstPagePriority": 60,
+    "sessionTimeoutMs": 90000,
+    "pageMinMs": 4000,
+    "headless": false,
+    "engineMode": "crawlee_autoscaled",
+    "taskMode": "scenario",
+    "referrerMode": "mixed",
+    "taskSteps": [
+      {
+        "type": "goto",
+        "selector": "",
+        "value": "/tools/link-cleaner",
+        "assertKind": "text_contains",
+        "label": "פתיחת כלי ניקוי לינקים"
+      },
+      {
+        "type": "wait",
+        "selector": "",
+        "value": "2000",
+        "assertKind": "text_contains",
+        "label": "המתנת טעינת מודעות ו-DOM (2s)"
+      },
+      {
+        "type": "audit_ads",
+        "selector": "",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "ביקורת סלוטי מודעות (ללא לחיצה)"
+      },
+      {
+        "type": "dismiss_overlays",
+        "selector": "",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "סגירת Vignette/Push אם חוסמים"
+      },
+      {
+        "type": "fill",
+        "selector": "#lc-input",
+        "value": "https://example.com/offer?utm_source=test&fbclid=IwAR999&v=42",
+        "assertKind": "text_contains",
+        "label": "הדבקת URL עם פרמטרי מעקב"
+      },
+      {
+        "type": "click",
+        "selector": "aside[data-ad-position=\"in_content_mid\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "לחיצה על Strip Trackers"
+      },
+      {
+        "type": "wait",
+        "selector": "",
+        "value": "400",
+        "assertKind": "text_contains",
+        "label": "המתנה לעיבוד"
+      },
+      {
+        "type": "assert",
+        "selector": "#lc-output",
+        "value": "https://example.com/offer?v=42",
+        "assertKind": "text_contains",
+        "label": "אימות שהלינק נוקה"
+      },
+      {
+        "type": "click",
+        "selector": "aside[data-ad-position=\"in_content_mid\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "הפעלת Password Entropy (#pe-gen)"
+      },
+      {
+        "type": "scroll_to",
+        "selector": "aside.ad-slot-box[data-ad-position=\"smartlink_cta\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "גלילה בטוחה לסלוט CTA (אפס לחיצה)"
+      },
+      {
+        "type": "click",
+        "selector": "div[data-ad-slot-id=\"monetag_in_page_push\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "הפעלת Password Entropy (#pe-gen)"
+      },
+      {
+        "type": "screenshot",
+        "selector": "",
+        "value": "CleanTab Ad-Safe Audit",
+        "assertKind": "text_contains",
+        "label": "צילום תוצאה סופית"
+      }
+    ],
+    "keepBrowserOpenMs": 2500,
+    "interVisitDelayMs": 0,
+    "snippet": null,
+    "schedule": {
+      "enabled": false,
+      "startHour": "08:00",
+      "endHour": "22:00"
+    },
+    "devices": {
+      "desktopChrome": 40,
+      "iphone14": 20,
+      "pixel7": 12,
+      "desktopFirefox": 10,
+      "desktopSafari": 10,
+      "ipadPro": 8
+    },
+    "personas": [
+      {
+        "name": "quick_scanner",
+        "scrollDepth": 0.3,
+        "clickRate": 0.5,
+        "readTime": [
+          500,
+          1800
+        ],
+        "pageCount": [
+          1,
+          2
+        ],
+        "idleChance": 0.04,
+        "resizeChance": 0,
+        "uTurnChance": 0.2
+      },
+      {
+        "name": "engaged_reader",
+        "scrollDepth": 0.9,
+        "clickRate": 0.7,
+        "readTime": [
+          2000,
+          5000
+        ],
+        "pageCount": [
+          2,
+          4
+        ],
+        "idleChance": 0.15,
+        "resizeChance": 0.1,
+        "uTurnChance": 0.05
+      },
+      {
+        "name": "form_filler",
+        "scrollDepth": 0.6,
+        "clickRate": 0.9,
+        "readTime": [
+          1000,
+          3000
+        ],
+        "pageCount": [
+          2,
+          3
+        ],
+        "idleChance": 0.1,
+        "resizeChance": 0.05,
+        "uTurnChance": 0.05
+      },
+      {
+        "name": "window_shopper",
+        "scrollDepth": 0.5,
+        "clickRate": 0.6,
+        "readTime": [
+          800,
+          2500
+        ],
+        "pageCount": [
+          2,
+          5
+        ],
+        "idleChance": 0.08,
+        "resizeChance": 0.15,
+        "uTurnChance": 0.3
+      },
+      {
+        "name": "power_user",
+        "scrollDepth": 1,
+        "clickRate": 0.9,
+        "readTime": [
+          1500,
+          4000
+        ],
+        "pageCount": [
+          3,
+          6
+        ],
+        "idleChance": 0.12,
+        "resizeChance": 0.2,
+        "uTurnChance": 0.1
+      }
+    ],
+    "proxy": {
+      "enabled": true,
+      "mode": "round_robin",
+      "servers": [],
+      "countryFilterEnabled": true,
+      "fallbackToAnyIfEmpty": true,
+      "preferredCountries": [
+        "US"
+      ]
+    },
+    "sessionPersistence": {
+      "enabled": false,
+      "returningUserRate": 50,
+      "profilePoolSize": 10
+    },
+    "adSafety": {
+      "avoidAdClicks": false,
+      "dismissOverlays": true,
+      "closePopunders": true,
+      "skipTelemetryHeader": true
+    },
+    "resourceMode": "ultra_lite"
+  }
+}

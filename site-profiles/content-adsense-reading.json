@@ -1,0 +1,155 @@
+{
+  "id": "content-adsense-reading",
+  "name": "אתר תוכן + Google AdSense (קריאה בטוחה)",
+  "description": "מותאם לאתרי תוכן ומאמרים עם AdSense: קריאה אנושית הדרגתית, שהייה טבעית ומעבר בין כתבות עם אפס לחיצות על מודעות.",
+  "category": "content_adsense",
+  "isBuiltin": true,
+  "config": {
+    "targetUrl": "http://127.0.0.1:4310/demo-site",
+    "pages": [
+      "/",
+      "/about",
+      "/pricing"
+    ],
+    "visitCount": 5,
+    "minConcurrency": 1,
+    "concurrency": 3,
+    "firstPagePriority": 50,
+    "sessionTimeoutMs": 120000,
+    "pageMinMs": 5500,
+    "headless": false,
+    "engineMode": "crawlee_autoscaled",
+    "taskMode": "hybrid",
+    "taskSteps": [
+      {
+        "type": "goto",
+        "selector": "",
+        "value": "/",
+        "assertKind": "text_contains",
+        "label": "פתיחת דף ראשי / מאמר"
+      },
+      {
+        "type": "wait",
+        "selector": "",
+        "value": "2000",
+        "assertKind": "text_contains",
+        "label": "המתנת טעינת יחידות AdSense (2s)"
+      },
+      {
+        "type": "dismiss_overlays",
+        "selector": "",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "סגירת Vignette / שכבות אם מופיעות"
+      },
+      {
+        "type": "audit_ads",
+        "selector": "",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "בדיקת נוכחות מודעות ו-AdSense (אפס קליק)"
+      },
+      {
+        "type": "read_article",
+        "selector": "",
+        "value": "8500",
+        "assertKind": "text_contains",
+        "label": "קריאת תוכן אנושית (גלילה ועצירות קריאה)"
+      },
+      {
+        "type": "screenshot",
+        "selector": "",
+        "value": "Content AdSense Reading",
+        "assertKind": "text_contains",
+        "label": "צילום דף בתום הקריאה"
+      }
+    ],
+    "keepBrowserOpenMs": 2000,
+    "snippet": null,
+    "schedule": {
+      "enabled": false,
+      "startHour": "08:00",
+      "endHour": "22:00"
+    },
+    "devices": {
+      "desktopChrome": 45,
+      "iphone14": 25,
+      "pixel7": 15,
+      "desktopFirefox": 8,
+      "desktopSafari": 5,
+      "ipadPro": 2
+    },
+    "personas": [
+      {
+        "name": "engaged_reader",
+        "scrollDepth": 0.95,
+        "clickRate": 0.65,
+        "readTime": [
+          3000,
+          7000
+        ],
+        "pageCount": [
+          2,
+          4
+        ],
+        "idleChance": 0.2,
+        "resizeChance": 0.05,
+        "uTurnChance": 0.15
+      },
+      {
+        "name": "window_shopper",
+        "scrollDepth": 0.65,
+        "clickRate": 0.55,
+        "readTime": [
+          1500,
+          4000
+        ],
+        "pageCount": [
+          2,
+          3
+        ],
+        "idleChance": 0.12,
+        "resizeChance": 0.1,
+        "uTurnChance": 0.25
+      },
+      {
+        "name": "quick_scanner",
+        "scrollDepth": 0.4,
+        "clickRate": 0.35,
+        "readTime": [
+          1000,
+          2500
+        ],
+        "pageCount": [
+          1,
+          2
+        ],
+        "idleChance": 0.05,
+        "resizeChance": 0,
+        "uTurnChance": 0.1
+      }
+    ],
+    "proxy": {
+      "enabled": true,
+      "mode": "round_robin",
+      "servers": [],
+      "countryFilterEnabled": true,
+      "preferredCountries": [
+        "US"
+      ]
+    },
+    "sessionPersistence": {
+      "enabled": false,
+      "returningUserRate": 50,
+      "profilePoolSize": 10
+    },
+    "adSafety": {
+      "avoidAdClicks": false,
+      "dismissOverlays": true,
+      "closePopunders": true,
+      "skipTelemetryHeader": false
+    },
+    "resourceMode": "ultra_lite"
+  },
+  "updatedAt": "2026-11-14T18:58:01.134Z"
+}

@@ -1,139 +1,78 @@
-# Traffic Generator
+# Browser QA Dashboard
 
-Generates realistic browser sessions on any website. Configured via `config.json`.
+A self-hosted dashboard for running real Playwright browser sessions with Crawlee. Record and replay multi-step journeys, exercise a site across device and persona profiles, inspect the DOM, and review run logs and PDF reports.
 
-## How it works
+![Dashboard overview on the built-in demo site](docs/img/dashboard-overview.png)
 
-Each simulated visit:
-- Picks a random browser/device profile with weighted distribution (configurable)
-- Lands on the first page in `pages` with `firstPagePriority`% probability, otherwise a random page from the pool
-- Follows a persona (quick scanner, engaged reader, form filler, window shopper, power user) that controls scroll depth, click rate, read time, and number of pages visited
-- Simulates human mouse movement along bezier curves, smooth scrolling, text selection, form interaction, and occasional rage clicks / tab switches
-- Spends at least `pageMinMs` ms per page before navigating away
-- Sends a realistic `Referer` header (Google, Bing, social, or direct)
-- Optionally injects a custom script at the start of every page load
+## Features
 
-### Default browser distribution
+| Area | What the dashboard supports |
+| --- | --- |
+| Runs engine | Concurrent Playwright sessions, device and persona variation, scheduled start windows, live status and pause, resume, and stop controls. |
+| Journey recorder | Capture and replay navigation, form interactions, waits and other steps. Inspect the DOM and audit ad surfaces on authorized sites. |
+| Inbox flows | Create a live inbox through the configured email service and fill email or one-time code fields during an authorized test. |
+| Proxy layer | Assign a proxy per visit, optionally filter the pool by country, and check reachability and latency before a run. |
+| Reports | Review live logs and per-session step outcomes. Download a summary PDF when Chromium can render it. |
+| AI commander | Optional provider-backed chat and run review. Configured integrations can supply guidance or propose configuration changes. |
 
-| Profile | Engine | UA | Default weight |
-|---|---|---|---|
-| `desktopChrome` | Firefox | Chrome/136 Windows/Mac | 40 |
-| `iphone14` | WebKit | Mobile Safari | 20 |
-| `pixel7` | Firefox | Chrome/136 Android | 12 |
-| `desktopFirefox` | Firefox | Firefox | 10 |
-| `desktopSafari` | WebKit | Safari | 10 |
-| `ipadPro` | WebKit | iPad Safari | 8 |
+[Live run log](docs/img/live-run-log.png) · [Generated PDF report page](docs/img/generated-pdf-report.png)
 
-Chrome sessions run on the Firefox engine to avoid Playwright's Chromium headless-shell being fingerprinted by bot filters.
+## Quickstart
 
-## Configuration
+Use a supported Node.js LTS release on Windows. From the repository root in PowerShell:
 
-All settings live in `config.json`:
-
-```json
-{
-  "targetUrl": "https://example.com",
-  "pages": ["/", "/about", "/pricing"],
-  "visitCount": 1000,
-  "concurrency": 5,
-  "firstPagePriority": 60,
-  "sessionTimeoutMs": 90000,
-  "pageMinMs": 4000,
-  "snippet": null,
-  "devices": { "desktopChrome": 40, "iphone14": 20, "pixel7": 12, "desktopFirefox": 10, "desktopSafari": 10, "ipadPro": 8 },
-  "personas": [...]
-}
-```
-
-### Core fields
-
-| Field | Default | Description |
-|---|---|---|
-| `targetUrl` | — | Root URL of the site (required; trailing slash stripped automatically) |
-| `pages` | `["/"]` | Pages to visit. If empty or omitted, only the root is visited. |
-| `visitCount` | `1000` | Total sessions to run |
-| `concurrency` | `5` | Parallel browser contexts (also overridable via `CONCURRENCY` env var) |
-| `firstPagePriority` | `60` | % of sessions that land on the first entry in `pages` |
-| `sessionTimeoutMs` | `90000` | Hard timeout per session in ms |
-| `pageMinMs` | `4000` | Minimum dwell time per page in ms |
-| `snippet` | `null` | JS injected at the start of every page load (see below) |
-
-### Device weights
-
-`devices` is a map of profile name → relative weight. Omit a key to disable that profile; set a weight to 0 to disable it. Weights don't need to sum to 100.
-
-```json
-"devices": {
-  "desktopChrome": 40,
-  "iphone14": 20,
-  "pixel7": 12,
-  "desktopFirefox": 10,
-  "desktopSafari": 10,
-  "ipadPro": 8
-}
-```
-
-### Personas
-
-`personas` is an array of visitor behavior profiles. Each session picks one at random. All fields have defaults so you only need to specify what you want to override.
-
-| Field | Default | Description |
-|---|---|---|
-| `name` | `"custom"` | Label shown in logs |
-| `scrollDepth` | `0.5` | Fraction of page height scrolled (0–1) |
-| `clickRate` | `0.5` | Probability of clicking a link or element (0–1) |
-| `readTime` | `[1000, 3000]` | `[min, max]` ms spent reading per page |
-| `pageCount` | `[1, 3]` | `[min, max]` pages visited per session |
-| `idleChance` | `0.08` | Probability of pausing mid-session (0–1) |
-| `resizeChance` | `0.1` | Probability of resizing the window (0–1) |
-| `uTurnChance` | `0.1` | Probability of hitting back before finishing a page (0–1) |
-
-```json
-"personas": [
-  { "name": "quick_scanner",  "scrollDepth": 0.3, "clickRate": 0.5, "readTime": [500, 1800],  "pageCount": [1,2], "idleChance": 0.04, "resizeChance": 0.0,  "uTurnChance": 0.2  },
-  { "name": "engaged_reader", "scrollDepth": 0.9, "clickRate": 0.7, "readTime": [2000, 5000], "pageCount": [2,4], "idleChance": 0.15, "resizeChance": 0.1,  "uTurnChance": 0.05 },
-  { "name": "form_filler",    "scrollDepth": 0.6, "clickRate": 0.9, "readTime": [1000, 3000], "pageCount": [2,3], "idleChance": 0.10, "resizeChance": 0.05, "uTurnChance": 0.05 },
-  { "name": "window_shopper", "scrollDepth": 0.5, "clickRate": 0.6, "readTime": [800, 2500],  "pageCount": [2,5], "idleChance": 0.08, "resizeChance": 0.15, "uTurnChance": 0.3  },
-  { "name": "power_user",     "scrollDepth": 1.0, "clickRate": 0.9, "readTime": [1500, 4000], "pageCount": [3,6], "idleChance": 0.12, "resizeChance": 0.2,  "uTurnChance": 0.1  }
-]
-```
-
-### Snippet injection
-
-Set `snippet` to inject any JavaScript at the start of every page load — analytics, session replay, heatmap tools, etc. Accepts either a raw JS string or a full `<script>…</script>` block; the tags are stripped automatically.
-
-```json
-{
-  "snippet": "<script>\nconsole.log('injected');\n</script>"
-}
-```
-
-### Multiple sites / configs
-
-Pass a config file path as the first argument:
-
-```sh
-node generate_visits.js /path/to/other-site.json
-```
-
-## Usage
-
-### Docker (recommended)
-
-```sh
-docker compose up --build
-```
-
-Override concurrency without editing the config:
-
-```sh
-CONCURRENCY=10 docker compose up --build
-```
-
-### Local
-
-```sh
+```powershell
 npm install
-npx playwright install firefox webkit
-node generate_visits.js
+npm --prefix dashboard install
+npx playwright install chromium firefox webkit
+Copy-Item config.example.json config.json
 ```
+
+Edit `targetUrl` in `config.json` to point to a site you own or are authorized to test. The example points to the dashboard's local demo site. Run `start-dashboard.bat` and open [http://127.0.0.1:4310](http://127.0.0.1:4310).
+
+## Proxies
+
+The repository ships **no proxies**. Supply your own list in `proxies.txt` at the repository root, with one entry per line in the form `http://<user>:<pass>@<host>:<port>`. Git ignores this file. Never commit it.
+
+When enabled, the proxy layer can filter candidates by country and precheck reachability and latency. It selects a proxy for each visit using round-robin or random rotation. An optional static fallback pool can be kept in the ignored `proxies-fallback.txt` file.
+
+## Configuration reference
+
+| Key | Purpose |
+| --- | --- |
+| `targetUrl` | Base HTTP(S) URL for the site under test. |
+| `pages` | Navigation paths used by the browsing engine. |
+| `visitCount` | Number of sessions planned for a run. |
+| `minConcurrency` | Baseline parallelism for the autoscaled engine. |
+| `concurrency` | Upper bound on simultaneous sessions. |
+| `firstPagePriority` | Weighted preference for the first entry in `pages`, as a percentage. |
+| `sessionTimeoutMs` | Time budget for a session in milliseconds. |
+| `pageMinMs` | Minimum page dwell time for flows that use it, in milliseconds. |
+| `headless` | Whether the browser launches without a visible window. |
+| `engineMode` | Selects the Playwright execution and scheduling mode. |
+| `taskMode` | Chooses browsing behavior, an explicit scenario, or a hybrid run. |
+| `referrerMode` | Selects the referrer policy applied by the runner. |
+| `taskSteps` | Ordered step objects for scenario playback. |
+| `keepBrowserOpenMs` | Delay before browser context cleanup, in milliseconds. |
+| `interVisitDelayMs` | Requested pacing delay between visits, in milliseconds. |
+| `snippet` | Optional initialization JavaScript for browser pages. |
+| `schedule` | Optional local-time execution window. |
+| `devices` | Relative weights for the available browser and device profiles. |
+| `personas` | Session presets that vary scrolling, interaction and dwell time. |
+| `proxy` | Enables proxy assignment and configures pool selection and country filtering. |
+| `stealthMode` | Selects the browser launch profile. |
+| `resourceMode` | Controls browser resource handling or selects a CDP backend. |
+| `waves` | Optional run planning settings for grouping and varying scenario sessions. |
+| `ai` | Optional AI provider, models, guidance and orchestration settings. |
+| `sessionPersistence` | Controls local profile reuse and the size of the pool. |
+| `adSafety` | Safety switches that control overlay dismissal, pop-under handling, click filtering and a telemetry header. |
+
+See [the technical specification](docs/SPEC.md) for the run pipeline, API and scenario step types.
+
+## Ethics and limitations
+
+Operators are responsible for complying with the terms of service, robots directives and advertising policies of any site they automate. The authors provide this software as-is for testing, QA and monitoring of sites the operator owns or is authorized to test.
+
+## License
+
+[MIT](LICENSE)

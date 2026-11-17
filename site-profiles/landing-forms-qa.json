@@ -1,0 +1,202 @@
+{
+  "id": "landing-forms-qa",
+  "name": "אתר תדמית וטופסי לידים (QA דמו)",
+  "description": "בודק זמינות דפים, מילוי טופס יצירת קשר ואימות שהשרת מחזיר אישור שליחה תקין.",
+  "category": "forms_qa",
+  "isBuiltin": true,
+  "config": {
+    "targetUrl": "http://127.0.0.1:4310/demo-site",
+    "pages": [
+      "/",
+      "/about",
+      "/pricing",
+      "/contact"
+    ],
+    "visitCount": 2,
+    "minConcurrency": 1,
+    "concurrency": 2,
+    "firstPagePriority": 60,
+    "sessionTimeoutMs": 90000,
+    "pageMinMs": 3000,
+    "headless": false,
+    "engineMode": "crawlee_autoscaled",
+    "taskMode": "scenario",
+    "taskSteps": [
+      {
+        "type": "goto",
+        "selector": "",
+        "value": "/contact",
+        "assertKind": "text_contains",
+        "label": "פתיחת דף צור קשר"
+      },
+      {
+        "type": "fill",
+        "selector": "input[name=\"name\"]",
+        "value": "Avi QA Tester",
+        "assertKind": "text_contains",
+        "label": "הזנת שם מלא"
+      },
+      {
+        "type": "fill",
+        "selector": "input[name=\"email\"]",
+        "value": "qa@hirepulse.dev",
+        "assertKind": "text_contains",
+        "label": "הזנת אימייל"
+      },
+      {
+        "type": "select",
+        "selector": "select[name=\"topic\"]",
+        "value": "demo",
+        "assertKind": "text_contains",
+        "label": "בחירת נושא"
+      },
+      {
+        "type": "fill",
+        "selector": "textarea[name=\"message\"]",
+        "value": "Automated end-to-end form QA check",
+        "assertKind": "text_contains",
+        "label": "הזנת הודעה"
+      },
+      {
+        "type": "click",
+        "selector": "button[type=\"submit\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "שליחת הטופס"
+      },
+      {
+        "type": "wait",
+        "selector": "",
+        "value": "400",
+        "assertKind": "text_contains",
+        "label": "המתנה לתשובה"
+      },
+      {
+        "type": "assert",
+        "selector": "#form-status",
+        "value": "Form received by QA Sandbox!",
+        "assertKind": "text_contains",
+        "label": "אימות הודעת הצלחה"
+      }
+    ],
+    "keepBrowserOpenMs": 2000,
+    "snippet": null,
+    "schedule": {
+      "enabled": false,
+      "startHour": "08:00",
+      "endHour": "22:00"
+    },
+    "devices": {
+      "desktopChrome": 40,
+      "iphone14": 20,
+      "pixel7": 12,
+      "desktopFirefox": 10,
+      "desktopSafari": 10,
+      "ipadPro": 8
+    },
+    "personas": [
+      {
+        "name": "quick_scanner",
+        "scrollDepth": 0.3,
+        "clickRate": 0.5,
+        "readTime": [
+          500,
+          1800
+        ],
+        "pageCount": [
+          1,
+          2
+        ],
+        "idleChance": 0.04,
+        "resizeChance": 0,
+        "uTurnChance": 0.2
+      },
+      {
+        "name": "engaged_reader",
+        "scrollDepth": 0.9,
+        "clickRate": 0.7,
+        "readTime": [
+          2000,
+          5000
+        ],
+        "pageCount": [
+          2,
+          4
+        ],
+        "idleChance": 0.15,
+        "resizeChance": 0.1,
+        "uTurnChance": 0.05
+      },
+      {
+        "name": "form_filler",
+        "scrollDepth": 0.6,
+        "clickRate": 0.9,
+        "readTime": [
+          1000,
+          3000
+        ],
+        "pageCount": [
+          2,
+          3
+        ],
+        "idleChance": 0.1,
+        "resizeChance": 0.05,
+        "uTurnChance": 0.05
+      },
+      {
+        "name": "window_shopper",
+        "scrollDepth": 0.5,
+        "clickRate": 0.6,
+        "readTime": [
+          800,
+          2500
+        ],
+        "pageCount": [
+          2,
+          5
+        ],
+        "idleChance": 0.08,
+        "resizeChance": 0.15,
+        "uTurnChance": 0.3
+      },
+      {
+        "name": "power_user",
+        "scrollDepth": 1,
+        "clickRate": 0.9,
+        "readTime": [
+          1500,
+          4000
+        ],
+        "pageCount": [
+          3,
+          6
+        ],
+        "idleChance": 0.12,
+        "resizeChance": 0.2,
+        "uTurnChance": 0.1
+      }
+    ],
+    "proxy": {
+      "enabled": true,
+      "mode": "round_robin",
+      "servers": [],
+      "countryFilterEnabled": true,
+      "preferredCountries": [
+        "US"
+      ]
+    },
+    "sessionPersistence": {
+      "enabled": false,
+      "returningUserRate": 50,
+      "profilePoolSize": 10
+    },
+    "adSafety": {
+      "avoidAdClicks": false,
+      "dismissOverlays": true,
+      "closePopunders": true,
+      "skipTelemetryHeader": false
+    },
+    "resourceMode": "ultra_lite"
+  },
+  "updatedAt": "2026-11-14T18:58:01.134Z"
+}

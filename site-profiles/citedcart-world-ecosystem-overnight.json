@@ -1,0 +1,289 @@
+{
+  "id": "citedcart-world-ecosystem-overnight",
+  "name": "★ מסע עולמי בלילה (מתחיל ב-CitedCart): קישורים חיצוניים, GTA6 וחזרה",
+  "description": "וריאציית לילה שנייה (80 פרופילים, 22:00–08:00): מתחיל ב-CitedCart, ממשיך דרך קישורים יוצאים אל Google Search Docs ו-GTA6 HirePulse (החלפת פלטפורמה ו-Timezone), חוזר ל-CitedCart וממשיך לטייל.",
+  "category": "my_sites",
+  "isBuiltin": true,
+  "config": {
+    "targetUrl": "https://citedcart.com",
+    "pages": [
+      "/",
+      "/guides/google-ai-visibility",
+      "/guides/chatgpt-search-robots-txt",
+      "/products/report",
+      "/about"
+    ],
+    "visitCount": 180,
+    "minConcurrency": 1,
+    "concurrency": 1,
+    "firstPagePriority": 70,
+    "sessionTimeoutMs": 240000,
+    "pageMinMs": 5000,
+    "headless": true,
+    "engineMode": "crawlee_autoscaled",
+    "taskMode": "scenario",
+    "taskSteps": [
+      {
+        "type": "goto",
+        "selector": "",
+        "value": "/",
+        "assertKind": "text_contains",
+        "label": "פתיחת CitedCart ממדינה תורנית בעולם"
+      },
+      {
+        "type": "audit_ads",
+        "selector": "",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "בדיקת נוכחות AdSense (קריאה בלבד)"
+      },
+      {
+        "type": "read_article",
+        "selector": "",
+        "value": "5500",
+        "assertKind": "text_contains",
+        "label": "קריאה ראשונית בדף הבית"
+      },
+      {
+        "type": "click",
+        "selector": "a.header-story[href=\"#question\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "לחיצה על \"Meet the agent\""
+      },
+      {
+        "type": "scroll_to",
+        "selector": "nav.trust-links a[href=\"/guides/google-ai-visibility\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "גלילה אל קישור מדריך Google AI Visibility"
+      },
+      {
+        "type": "click",
+        "selector": "nav.trust-links a[href=\"/guides/google-ai-visibility\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "מעבר למדריך Google AI Visibility"
+      },
+      {
+        "type": "read_article",
+        "selector": "",
+        "value": "6500",
+        "assertKind": "text_contains",
+        "label": "קריאת המדריך"
+      },
+      {
+        "type": "click",
+        "selector": "a[href=\"https://developers.google.com/search/docs/fundamentals/ai-optimization-guide\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "לחיצה לקישור החיצוני ב-Google Search Central",
+        "followExternal": true
+      },
+      {
+        "type": "human_browse",
+        "selector": "",
+        "value": "5500",
+        "assertKind": "text_contains",
+        "label": "קריאה ובחירת טקסט במסמך החיצוני"
+      },
+      {
+        "type": "go_back",
+        "selector": "",
+        "value": "1200",
+        "assertKind": "text_contains",
+        "label": "חזרה בהיסטוריה חזרה אל CitedCart"
+      },
+      {
+        "type": "goto",
+        "selector": "",
+        "value": "https://gta6.gethirepulse.xyz/",
+        "assertKind": "text_contains",
+        "label": "מעבר לאתר חיצוני נוסף — gta6.gethirepulse.xyz"
+      },
+      {
+        "type": "click",
+        "selector": "button.platform-btn[data-platform=\"xbox\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "החלפת פלטפורמה ל-Xbox"
+      },
+      {
+        "type": "click",
+        "selector": "button.tz-pill[data-tz=\"America/New_York\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "החלפת Timezone בשעון"
+      },
+      {
+        "type": "click",
+        "selector": "a[href=\"/preload-size/\"]",
+        "value": "",
+        "assertKind": "text_contains",
+        "label": "פתיחת כתבת Pre-Load"
+      },
+      {
+        "type": "read_article",
+        "selector": "",
+        "value": "6000",
+        "assertKind": "text_contains",
+        "label": "קריאת הכתבה באתר החיצוני"
+      },
+      {
+        "type": "goto",
+        "selector": "",
+        "value": "https://citedcart.com/guides/chatgpt-search-robots-txt",
+        "assertKind": "text_contains",
+        "label": "חזרה אל CitedCart להמשך קריאה"
+      },
+      {
+        "type": "read_article",
+        "selector": "",
+        "value": "6500",
+        "assertKind": "text_contains",
+        "label": "קריאת מדריך נוסף ב-CitedCart"
+      },
+      {
+        "type": "goto",
+        "selector": "",
+        "value": "/products/report",
+        "assertKind": "text_contains",
+        "label": "המשך טיול לעמוד הדוח"
+      },
+      {
+        "type": "human_browse",
+        "selector": "",
+        "value": "4500",
+        "assertKind": "text_contains",
+        "label": "סיור מסכם בדף המוצר"
+      },
+      {
+        "type": "screenshot",
+        "selector": "",
+        "value": "CitedCart World Overnight Complete",
+        "assertKind": "text_contains",
+        "label": "צילום סיום המסלול"
+      }
+    ],
+    "keepBrowserOpenMs": 1000,
+    "interVisitDelayMs": 6000,
+    "snippet": null,
+    "schedule": {
+      "enabled": true,
+      "startHour": "22:00",
+      "endHour": "08:00"
+    },
+    "devices": {
+      "desktopChrome": 75,
+      "iphone14": 0,
+      "pixel7": 0,
+      "desktopFirefox": 25,
+      "desktopSafari": 0,
+      "ipadPro": 0
+    },
+    "personas": [
+      {
+        "name": "quick_scanner",
+        "scrollDepth": 0.3,
+        "clickRate": 0.5,
+        "readTime": [
+          500,
+          1800
+        ],
+        "pageCount": [
+          1,
+          2
+        ],
+        "idleChance": 0.04,
+        "resizeChance": 0,
+        "uTurnChance": 0.2
+      },
+      {
+        "name": "engaged_reader",
+        "scrollDepth": 0.9,
+        "clickRate": 0.7,
+        "readTime": [
+          2000,
+          5000
+        ],
+        "pageCount": [
+          2,
+          4
+        ],
+        "idleChance": 0.15,
+        "resizeChance": 0.1,
+        "uTurnChance": 0.05
+      },
+      {
+        "name": "form_filler",
+        "scrollDepth": 0.6,
+        "clickRate": 0.9,
+        "readTime": [
+          1000,
+          3000
+        ],
+        "pageCount": [
+          2,
+          3
+        ],
+        "idleChance": 0.1,
+        "resizeChance": 0.05,
+        "uTurnChance": 0.05
+      },
+      {
+        "name": "window_shopper",
+        "scrollDepth": 0.5,
+        "clickRate": 0.6,
+        "readTime": [
+          800,
+          2500
+        ],
+        "pageCount": [
+          2,
+          5
+        ],
+        "idleChance": 0.08,
+        "resizeChance": 0.15,
+        "uTurnChance": 0.3
+      },
+      {
+        "name": "power_user",
+        "scrollDepth": 1,
+        "clickRate": 0.9,
+        "readTime": [
+          1500,
+          4000
+        ],
+        "pageCount": [
+          3,
+          6
+        ],
+        "idleChance": 0.12,
+        "resizeChance": 0.2,
+        "uTurnChance": 0.1
+      }
+    ],
+    "proxy": {
+      "enabled": true,
+      "mode": "round_robin",
+      "servers": [],
+      "countryFilterEnabled": true,
+      "preferredCountries": [
+        "US"
+      ]
+    },
+    "sessionPersistence": {
+      "enabled": true,
+      "returningUserRate": 55,
+      "profilePoolSize": 80
+    },
+    "adSafety": {
+      "avoidAdClicks": false,
+      "dismissOverlays": true,
+      "closePopunders": true,
+      "skipTelemetryHeader": false
+    },
+    "resourceMode": "ultra_lite"
+  },
+  "updatedAt": "2026-11-14T21:16:23.169Z"
+}

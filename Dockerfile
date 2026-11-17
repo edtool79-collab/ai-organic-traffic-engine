@@ -1,15 +1,19 @@
-# Use official Node.js LTS image
-FROM mcr.microsoft.com/playwright:v1.58.2-jammy
+FROM mcr.microsoft.com/playwright:v1.58.2-noble
 
-# Set working directory
 WORKDIR /app
 
-# Copy package files and install dependencies
-COPY package.json package-lock.json* ./
-RUN npm install
+ENV NODE_ENV=production \
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+    CRAWLEE_AVAILABLE_MEMORY_RATIO=0.85
 
-# Copy the rest of the app
+COPY package*.json ./
+COPY dashboard/package*.json ./dashboard/
+
+RUN npm install --omit=dev && \
+    cd dashboard && npm install --omit=dev
+
 COPY . .
 
-# Default command
-CMD ["node", "generate_visits.js"]
+EXPOSE 4310
+
+CMD ["node", "dashboard/server.js"]
