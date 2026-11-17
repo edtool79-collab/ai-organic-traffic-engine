@@ -31,6 +31,7 @@ const {
   getDesktopSessionInfo,
 } = require('../src/journeyRecorder');
 const { getEmailClientStatus, createEmailInbox, getEmailCode, listEmailMessages, extractConfirmationUrlFromMessages } = require('../src/emailInboxClient');
+const { redactText } = require('../src/redaction');
 const {
   REPORTS_DIR,
   savePersistentSessionState,
@@ -574,7 +575,7 @@ function appendLog(level, message) {
     id: ++logSeq,
     ts: new Date().toISOString(),
     level,
-    message,
+    message: redactText(message),
   };
   logHistory.push(entry);
   if (logHistory.length > MAX_LOGS) logHistory.shift();

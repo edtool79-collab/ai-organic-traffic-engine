@@ -66,6 +66,10 @@ taskScenarioRunner.js:819  return `הוזן אימייל סוכן חי בשדה 
 |---|---|---|
 | `emitStep` | `taskScenarioRunner.js:1184` | כל שורת יומן שהדשבורד והמשתמש רואים |
 | `stepResults[].detail` | `taskScenarioRunner.js:1324` | קובץ מצב הריצה, דוח ה־PDF וסקירת ה־AI |
+| `appendLog` | `dashboard/server.js:578` | כל שורת stdout/stderr שהשרת משדר ל־SSE |
+
+השלישית היא שכבת ביטחון שנייה: גם אם מנוע עתידי יפלוט ערך גולמי, השרת מסתיר אותו
+לפני שהוא נוגע ב־`logHistory` ובמשדר האירועים.
 
 בנוסף: `fill` לא מדפיס יותר ערך של שדה סודי אלא אורך בלבד, `fill_otp` לא מדפיס את הקוד,
 ו־`fill_email` מסתיר את החלק המקומי של הכתובת (`n***@domain`) — הכתובת המלאה נשארת רק
