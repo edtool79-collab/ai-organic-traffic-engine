@@ -22,6 +22,7 @@ const {
 } = require('./adSafetyHelper');
 const { runScanProductsStep } = require('./wavePlanner');
 const { runAiExploreStep, runAiSmartRecoveryStep } = require('./aiCommander');
+const { redactText, registerSecret, maskEmail, isSecretField } = require('./redaction');
 const {
   createEmailInbox,
   getEmailCode,
@@ -745,6 +746,7 @@ const STEP_HANDLERS = {
     const isStoreField = /store|domain|website|shop|url/.test(selLower);
     const isOtpField = /#code|\bcode\b|otp|verification|verify-code|pin/i.test(selLower) && !isEmailField && !isStoreField;
     let usedLiveInbox = false;
+    const isSecretValue = step.secret === true || isSecretField(step.selector, step.label);
     if (
       trimmedUpper === '{{AGENT_EMAIL}}' ||
       trimmedUpper === '{{EMAIL}}' ||
@@ -772,7 +774,8 @@ const STEP_HANDLERS = {
         }).catch(() => null);
         if (otpRes && otpRes.code) {
           val = String(otpRes.code);
-          emit(`[HirePulse OTP] נשלף קוד אימות חי מהמייל להזנה אוטומטית: ${val}`);
+          registerSecret(val);
+          emit(`[HirePulse OTP] נשלף קוד אימות חי מהמייל והוזן אוטומטית (${val.length} תווים, הערך מוסתר מהיומן)`);
         } else if (isOtpField && !/^\d{4,8}$/.test(val.trim())) {
           val = String(Math.floor(100000 + Math.random() * 900000));
         }
@@ -813,12 +816,16 @@ const STEP_HANDLERS = {
     if (actual !== val) {
       await loc.fill(val).catch(() => {});
     }
+    if (isSecretValue) registerSecret(val);
+
     if (usedLiveInbox) {
       // Live-inbox submissions are conversion surface — remember for end-of-session beacon flush
       ctx.partnerActivity = true;
-      return `הוזן אימייל סוכן חי בשדה ${step.selector}: ${val}`;
+      return `הוזן אימייל סוכן חי בשדה ${step.selector}: ${maskEmail(val)}`;
     }
-    return `הוזן טקסט בשדה ${step.selector} (${val.length} תווים: "${val}")`;
+    return isSecretValue
+      ? `הוזן ערך רגיש בשדה ${step.selector} (${val.length} תווים, הערך מוסתר מהיומן)`
+      : `הוזן טקסט בשדה ${step.selector} (${val.length} תווים: "${redactText(val)}")`;
   },
 
   async fill_email(page, step, ctx) {
@@ -827,7 +834,7 @@ const STEP_HANDLERS = {
     const selector = String(step.selector || '').trim() ||
       'input[type="email"], input[name*="email" i], input[id*="email" i], input[placeholder*="mail" i]';
     const resText = await STEP_HANDLERS.fill(page, { ...step, selector, value: inbox.address }, ctx);
-    return `${resText} [אימייל סוכן חי: ${inbox.address}]`;
+    return `${resText} [אימייל סוכן חי: ${maskEmail(inbox.address)}]`;
   },
 
   async fill_otp(page, step, ctx) {
@@ -1174,7 +1181,7 @@ async function executeTaskSteps({
     __wtgLockerOpenedAt: null,
   };
   const stepResults = [];
-  const emitStep = msg => { if (typeof onStep === 'function') onStep(msg); };
+  const emitStep = msg => { if (typeof onStep === 'function') onStep(redactText(msg)); };
   applyPageSafeTimeouts(page);
 
   try {
@@ -1314,7 +1321,7 @@ async function executeTaskSteps({
         label: stepLabel,
         ok,
         durationMs,
-        detail,
+        detail: redactText(detail),
       });
 
       emitStep(`[ביקור ${visitIndex + 1} | צעד ${idx + 1}/${steps.length}] ${detail}`);
