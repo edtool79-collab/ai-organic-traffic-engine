@@ -1255,7 +1255,7 @@ async function run() {
                 proxyPool.reportSuccess();
                 proxyScore.reportOutcome({ domain: targetOfferDomain, proxyUrl: selectedProxyUrl, outcome: 'ok' });
 
-                const shouldLogDetail = visitCount <= 100 || i < 15 || (i % 20 === 0) || i === visitCount - 1;
+                const shouldLogDetail = visitCount <= 100 || i < 15 || (i % 23 === 0) || i === visitCount - 1;
                 if (shouldLogDetail) {
                   const pTag = selectedProxyUrl ? `, proxy: ${maskProxyLabel(selectedProxyUrl)}` : '';
                   console.log(`[HTTP #${i + 1}] ${res.status} | ${res.loadMs}ms | ${Math.round(res.bytesTransferred / 1024)}KB | ${entryPath}${pTag}`);

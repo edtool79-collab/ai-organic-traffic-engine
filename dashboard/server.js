@@ -2251,9 +2251,12 @@ function launchRunnerWave(cfg, { isContinuationWave = false, isAutoResume = fals
       streamState.waveNumber += 1;
       runState.status = 'running';
       broadcastEvent('status', runState);
+      const waveEngineLabel = (cfg.engineMode === 'http_fast')
+        ? 'מנוע HTTP Fast (ללא דפדפן ו-AI)'
+        : 'ראשי הצוות (GLM-5.3-Flash + DeepSeek + Beam + Clef)';
       appendLog(
         'info',
-        `🌊 [נחל אוטונומי רציף — גל #${finishedWave} הושלם בהצלחה!] ראשי הצוות (GLM-5.3-Flash + DeepSeek + Beam + Clef) משגרים את גל #${streamState.waveNumber} בעוד 10 שניות...`
+        `🌊 [נחל אוטונומי רציף — גל #${finishedWave} הושלם בהצלחה!] ${waveEngineLabel} משגרים את גל #${streamState.waveNumber} בעוד 10 שניות...`
       );
       streamState.nextWaveTimer = setTimeout(() => {
         streamState.nextWaveTimer = null;
