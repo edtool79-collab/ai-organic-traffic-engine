@@ -759,26 +759,27 @@ function buildChildJourney({
     }
   }
 
-  // Every visit starts on a real search engine so the landing request carries a results-page
-  // referrer. Without this the offer is reached with no Referer header at all -> "Direct Hit".
-  if (String(wavesCfg?.referrerMode || aiCfg?.referrerMode || '').toLowerCase() !== 'direct') {
+  // Every visit starts on a real search engine or social referrer so the landing request carries a
+  // plausible Referer header. Without this the target is reached with no Referer header -> "Direct Hit".
+  const refModeNorm = String(wavesCfg?.referrerMode || aiCfg?.referrerMode || '').toLowerCase();
+  if (refModeNorm && refModeNorm !== 'direct') {
     const firstNavIsExternal = (() => {
       const g = childSteps.find(s => s.type === 'goto');
       if (!g) return false;
       try { return new URL(g.value, targetUrl).hostname !== new URL(targetUrl).hostname; } catch { return false; }
     })();
-    if (firstNavIsExternal || isConverter) {
-      childSteps.unshift({
-        type: 'search_entry',
-        selector: '',
-        value: '',
-        query: '',
-        label: 'כניסה אורגנית מתוצאות חיפוש (מקור תנועה אמיתי בדוח)',
-        optional: true,
-        tab: 0,
-      });
-      mutated = true;
-    }
+    childSteps.unshift({
+      type: 'search_entry',
+      selector: '',
+      value: '',
+      query: '',
+      mode: refModeNorm,
+      fastHeaderOnly: !firstNavIsExternal,
+      label: 'כניסה אורגנית ממנוע חיפוש / רשת חברתית (Referer אמיתי ל-GA4)',
+      optional: true,
+      tab: 0,
+    });
+    mutated = true;
   }
 
   // ── Deeper AI involvement ────────────────────────────────────────────────────

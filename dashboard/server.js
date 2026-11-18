@@ -1044,6 +1044,10 @@ app.put('/api/config', (req, res) => {
   try {
     const normalized = validateAndNormalizeConfig(req.body);
     writeConfigToDisk(normalized);
+    if (activeProcess) {
+      try { activeProcess.send({ type: 'update_runtime_config', config: normalized }); } catch {}
+    }
+    broadcastEvent('config_updated', { config: normalized });
     res.json({ ok: true, config: normalized });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -1734,8 +1738,12 @@ function applyFleetDirectives(directives = [], { isAutoCheck = false } = {}) {
       applied.push('resume');
     } else if (d.type === 'set_concurrency') {
       try {
-        const nextMax = clampInt(d.max, 1, 32, runState.maxConcurrency || 3);
-        const nextMin = clampInt(d.min, 1, nextMax, runState.minConcurrency || 1);
+        const curDisk = readConfigFromDisk();
+        const dirText = String(curDisk.ai?.commanderDirective || '');
+        const floorMatch = dirText.match(/(?:רצפה[^0-9]{0,20}|מתחת ל-?)(\d+)/);
+        const lockedFloor = (isAutoCheck && floorMatch) ? clampInt(floorMatch[1], 1, 32, 1) : 1;
+        const nextMax = Math.max(lockedFloor, clampInt(d.max, 1, 32, runState.maxConcurrency || 3));
+        const nextMin = Math.max(lockedFloor, clampInt(d.min, 1, nextMax, runState.minConcurrency || 1));
         updateSavedConfig(cur => {
           cur.minConcurrency = nextMin;
           cur.concurrency = nextMax;

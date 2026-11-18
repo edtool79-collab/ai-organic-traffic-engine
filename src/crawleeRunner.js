@@ -1082,6 +1082,10 @@ async function run() {
       if (nc.interVisitDelayMs != null) runtimeState.interVisitDelayMs = Number(nc.interVisitDelayMs) || 0;
       if (nc.firstPagePriority != null) cfgVars.firstPagePriority = Number(nc.firstPagePriority);
       if (nc.resourceMode) runtimeState.resourceMode = nc.resourceMode;
+      if (nc.referrerMode) {
+        cfgVars.referrerMode = nc.referrerMode;
+        wavesCfg.referrerMode = nc.referrerMode;
+      }
       if (nc.waves && typeof nc.waves === 'object') Object.assign(wavesCfg, nc.waves);
       if (nc.ai && typeof nc.ai === 'object') {
         Object.assign(aiConfig, nc.ai);
@@ -1231,7 +1235,7 @@ async function run() {
                 geo,
                 title: typeof snippet === 'string' ? snippet.slice(0, 120) : '',
                 targetUrl: visitTargetUrl,
-                mode: referrerMode,
+                mode: wavesCfg.referrerMode || cfgVars.referrerMode || referrerMode,
               });
               const pacingDelayMs = Number(runtimeState.interVisitDelayMs ?? interVisitDelayMs) || 0;
               if (i > 0 && pacingDelayMs > 0 && !aborted) {
@@ -1414,7 +1418,7 @@ async function run() {
           geo,
           title: typeof snippet === 'string' ? snippet.slice(0, 120) : '',
           targetUrl: visitTargetUrl,
-          mode: referrerMode,
+          mode: wavesCfg.referrerMode || cfgVars.referrerMode || referrerMode,
         });
         const referrer = referrerPick.url;
         // Google itself remembers this proxy (the "sorry" page). Only Google is avoided — and only
