@@ -108,7 +108,7 @@ Read-only network diagnostic scripts (`tests/probe-geo.js`, `tests/probe-render.
 | `taskSteps`, `snippet` | Ordered scenario steps (up to 100) and optional page init JavaScript. |
 | `schedule` | Local-time window `{ enabled, startHour, endHour }`. |
 | `devices`, `personas` | Device weights and behavioral reading/interaction presets. |
-| `proxy` | Proxy `enabled`, `mode` (`round_robin`/`random`), `countryFilterEnabled`, `fallbackToAnyIfEmpty`, `preferredCountries`, `servers`, `fallbackServers`, `residential { enabled, byteBudgetMb, country, overheadFactor }`. |
+| `proxy` | Proxy `enabled`, `tier` (`datacenter` / `residential` / `auto`), `mode` (`round_robin`/`random`), `countryFilterEnabled`, `fallbackToAnyIfEmpty`, `preferredCountries`, `servers`, `fallbackServers`, `residential { enabled, byteBudgetMb, country, overheadFactor }`. |
 | `stealthMode`, `resourceMode` | `standard`/`maximum` launch profile and `full`/`lite`/`ultra_lite`/`browserless_cdp`/`lightpanda_cdp`. |
 | `waves` | Scenario variation settings (`enabled`, `mode`, `conversionRate`, `childMutationRate`, `scanProductsChance`, `extraPageChance`, `mutateForms`, `maxProductsPerVisit`, `formInputs`, `referrerMode`). |
 | `ai` | `{ enabled, autoManage, provider, commanderModel, workerModel, workerPct, allSquadsModel, recoveryModel, formAssist, routeRepair, commanderDirective }`. |

@@ -13,6 +13,7 @@ const {
   normalizeProxyLine,
   readProxiesTxt,
   writeProxiesTxt,
+  readDatacenterServers,
   checkProxiesBatch,
   selectProxiesForCountries,
   resolveNetworkGeo,
@@ -108,6 +109,7 @@ const DEFAULT_CONFIG = {
   ],
   proxy: {
     enabled: false,
+    tier: 'auto',
     mode: 'round_robin',
     countryFilterEnabled: true,
     fallbackToAnyIfEmpty: true,
@@ -383,6 +385,9 @@ function validateAndNormalizeConfig(input) {
     personas,
     proxy: {
       enabled: Boolean(input.proxy?.enabled),
+      tier: ['auto', 'datacenter', 'residential'].includes(String(input.proxy?.tier || '').toLowerCase())
+        ? String(input.proxy.tier).toLowerCase()
+        : 'auto',
       mode: input.proxy?.mode === 'random' ? 'random' : 'round_robin',
       countryFilterEnabled: input.proxy?.countryFilterEnabled !== false,
       fallbackToAnyIfEmpty: input.proxy?.fallbackToAnyIfEmpty !== false,
@@ -1452,7 +1457,17 @@ app.get('/api/proxy/residential', (_req, res) => {
     const cfg = readConfigFromDisk();
     const residentialPool = require('../src/residentialPool');
     const resiCfg = cfg.proxy?.residential || {};
-    res.json({ ok: true, ...residentialPool.summary(resiCfg), usage: residentialPool.getUsage() });
+    const dcStatic = new Set([
+      ...readDatacenterServers(),
+      ...recorderProxyCandidates(cfg),
+    ].filter(u => u && !residentialPool.isResidentialUrl(u)));
+    res.json({
+      ok: true,
+      ...residentialPool.summary(resiCfg),
+      usage: residentialPool.getUsage(),
+      datacenterCount: dcStatic.size,
+      tier: cfg.proxy?.tier || 'auto',
+    });
   } catch (err) {
     res.status(500).json({ ok: false, error: String((err && err.message) || err) });
   }
@@ -1506,6 +1521,21 @@ app.post('/api/recorder/start', async (req, res) => {
     let proxyCountry = 'DIRECT';
     if (proxyMode !== 'direct') {
       const candidates = recorderProxyCandidates(cfg);
+      if (proxyMode === 'datacenter') {
+        const dcPool = Array.from(new Set([
+          ...candidates,
+          ...readDatacenterServers(),
+        ].filter(p => p && !residentialPool.isResidentialUrl(p))));
+        if (!dcPool.length) {
+          return res.status(400).json({
+            error: 'לא נמצאו פרוקסי דאטה־סנטר זמינים. הוסף פרוקסים סטטיים או בחר רזידנציאלי / חיבור ישיר.',
+          });
+        }
+        const offerOkPool = dcPool.filter(p => (geoMap[hostPortOf(p)] || {}).offerOk === true);
+        const usable = offerOkPool.length ? offerOkPool : dcPool;
+        const rotated = usable.filter(p => !lastRecorderProxyUrl || p !== lastRecorderProxyUrl || usable.length <= 1);
+        proxyUrl = rotated[Math.floor(Math.random() * rotated.length)] || usable[0];
+      } else {
       if (!candidates.length) {
         return res.status(400).json({
           error: 'לא נמצאו פרוקסים בהגדרות (proxy.servers / proxies.txt). הוסף פרוקסים או בחר "ישיר מהמחשב (ישראל)".',
@@ -1553,6 +1583,7 @@ app.post('/api/recorder/start', async (req, res) => {
           });
         }
         proxyUrl = match;
+      }
       }
       proxyCountry = (geoMap[hostPortOf(proxyUrl)] || {}).cc || 'AUTO';
     }

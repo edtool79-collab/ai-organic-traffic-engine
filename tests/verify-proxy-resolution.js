@@ -76,6 +76,43 @@ resolved = resolveProxies(disabledCfg);
 eq('all three still returned', resolved.length, 3);
 eq('metering skipped (isResidentialUrl still true, but not charged)', resolved.filter(u => u.includes('p.webshare.io')).length, 3);
 
+const dcFile = path.join(tmpDir, 'datacenter.json');
+fs.writeFileSync(dcFile, JSON.stringify(datacenterTwo), 'utf8');
+process.env.WTG_DATACENTER_FILE = dcFile;
+
+console.log('=== 6. explicit tier="datacenter" ignores residential servers cleanly ===');
+const forceDcCfg = {
+  ...baseCfg,
+  proxy: {
+    ...baseCfg.proxy,
+    tier: 'datacenter',
+    servers: [...residentialThree],
+  },
+};
+resolved = resolveProxies(forceDcCfg);
+eq('tier=datacenter uses cheap pool even if servers has residential', resolved.length, 2);
+eq('tier=datacenter never contains webshare', resolved.some(u => u.includes('p.webshare.io')), false);
+
+console.log('=== 7. explicit tier="residential" pulls metered pool even if servers has datacenter ===');
+fs.writeFileSync(process.env.WTG_RESI_POOL_FILE, JSON.stringify(residentialThree), 'utf8');
+pool.resetUsage();
+const forceResiCfg = {
+  ...baseCfg,
+  proxy: {
+    ...baseCfg.proxy,
+    tier: 'residential',
+    servers: [...datacenterTwo],
+  },
+};
+resolved = resolveProxies(forceResiCfg);
+eq('tier=residential pulls residential pool', resolved.length, 3);
+eq('tier=residential contains only webshare', resolved.every(u => u.includes('p.webshare.io')), true);
+
+pool.addBytes(2 * 1024 * 1024, { visits: 1 });
+resolved = resolveProxies(forceResiCfg);
+eq('tier=residential falls back to datacenter once exhausted', resolved.some(u => u.includes('p.webshare.io')), false);
+eq('tier=residential fallback returns datacenter entries', resolved.length, 2);
+
 console.log(`=== RESULT: ${fail === 0 ? 'ALL PASS' : fail + ' FAILED'} (${pass} passed) ===`);
 fs.rmSync(tmpDir, { recursive: true, force: true });
 process.exit(fail === 0 ? 0 : 1);

@@ -245,9 +245,22 @@ function createCrawleeProxyConfiguration(proxyUrls) {
 }
 
 const FALLBACK_PROXIES_TXT_PATH = path.join(__dirname, '..', 'proxies-fallback.txt');
+const DATACENTER_PROXIES_PATH = path.join(__dirname, '..', 'data', 'proxies-datacenter.json');
 
 function readFallbackProxiesTxt() {
   return readProxiesTxt(FALLBACK_PROXIES_TXT_PATH);
+}
+
+/** Reads the static datacenter proxy pool (`WTG_DATACENTER_FILE` override supported). */
+function readDatacenterServers() {
+  try {
+    const p = process.env.WTG_DATACENTER_FILE || DATACENTER_PROXIES_PATH;
+    if (!fs.existsSync(p)) return [];
+    const arr = JSON.parse(fs.readFileSync(p, 'utf8'));
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
 }
 
 const PROXY_FAILURE_RE = /ERR_TUNNEL_CONNECTION_FAILED|ERR_PROXY_CONNECTION_FAILED|ERR_PROXY_AUTH|ERR_UNSUPPORTED_AUTH_SCHEME|ERR_NO_SUPPORTED_PROXIES|Proxy Authentication Required|\b40[27]\b/i;
@@ -608,7 +621,9 @@ module.exports = {
   toPlaywrightProxy,
   createCrawleeProxyConfiguration,
   FALLBACK_PROXIES_TXT_PATH,
+  DATACENTER_PROXIES_PATH,
   readFallbackProxiesTxt,
+  readDatacenterServers,
   createFailoverProxyPool,
   checkSingleProxy,
   checkProxiesBatch,

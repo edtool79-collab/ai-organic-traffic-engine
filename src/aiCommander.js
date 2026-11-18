@@ -1446,6 +1446,7 @@ async function askFleetCommander({
       sessionPersistence: config.sessionPersistence,
       adSafety: config.adSafety,
       proxyEnabled: Boolean(config.proxy?.enabled),
+      proxyTier: config.proxy?.tier || 'auto',
       proxyMode: config.proxy?.mode,
       preferredCountries: config.proxy?.preferredCountries || [],
       proxyServersCount: Array.isArray(config.proxy?.servers) ? config.proxy.servers.length : 0,

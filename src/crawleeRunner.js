@@ -44,6 +44,7 @@ const {
 const {
   readProxiesTxt,
   readFallbackProxiesTxt,
+  readDatacenterServers,
   createFailoverProxyPool,
   normalizeProxyLine,
   toPlaywrightProxy,
@@ -118,19 +119,6 @@ function loadConfig(configPath) {
   return cfg;
 }
 
-// Datacenter proxies used only after the metered residential budget is spent. Kept in its own file
-// so that saving the dashboard (which rewrites `proxy.servers`) can never delete the fallback.
-function readDatacenterList() {
-  try {
-    const p = process.env.WTG_DATACENTER_FILE || path.join(ROOT_DIR, 'data', 'proxies-datacenter.json');
-    if (!fs.existsSync(p)) return [];
-    const arr = JSON.parse(fs.readFileSync(p, 'utf8'));
-    return Array.isArray(arr) ? arr : [];
-  } catch {
-    return [];
-  }
-}
-
 function resolveProxies(cfg) {
   if (!cfg.proxy?.enabled) return [];
   const effectiveTargetUrls = Array.isArray(cfg.targets) && cfg.targets.filter(t => t && t.url).length
@@ -152,24 +140,64 @@ function resolveProxies(cfg) {
     return out;
   };
 
-  // `proxy.servers` (the list the dashboard shows) is the single source of truth. Entries that
-  // point at the metered Webshare gateway are residential and are charged per byte; everything
-  // else is an unmetered static proxy. No hidden second list, so what you see is what runs.
   const configured = normalizeList(
     Array.isArray(cfg.proxy?.servers) && cfg.proxy.servers.length ? cfg.proxy.servers : readProxiesTxt()
   );
+  const tierRaw = String(cfg.proxy?.tier || 'auto').trim().toLowerCase();
+  const tier = ['auto', 'datacenter', 'residential'].includes(tierRaw) ? tierRaw : 'auto';
   const resiCfg = cfg.proxy?.residential || {};
-  const metered = resiCfg.enabled === false ? [] : configured.filter(u => residentialPool.isResidentialUrl(u));
 
+  const readFallbackPool = () => normalizeList(
+    Array.isArray(cfg.proxy?.fallbackServers) && cfg.proxy.fallbackServers.length
+      ? cfg.proxy.fallbackServers
+      : readDatacenterServers()
+  );
+
+  // Explicit cheap mode: never touch metered residential proxies, even if residential lines exist in servers.
+  if (tier === 'datacenter') {
+    const nonResi = list => list.filter(u => !residentialPool.isResidentialUrl(u));
+    const staticCfg = nonResi(configured);
+    const dcList = staticCfg.length
+      ? staticCfg
+      : (nonResi(normalizeList(readDatacenterServers())).length
+        ? nonResi(normalizeList(readDatacenterServers()))
+        : (nonResi(normalizeList(cfg.proxy?.fallbackServers)).length
+          ? nonResi(normalizeList(cfg.proxy?.fallbackServers))
+          : nonResi(normalizeList(readFallbackProxiesTxt()))));
+    console.log(`[Proxy Tier] מצב זול (Datacenter בלבד): ${dcList.length} שרתים — 0MB ממכסת הרזידנציאל.`);
+    return dcList;
+  }
+
+  // Explicit expensive mode: pull from the metered residential pool directly with budget protection.
+  if (tier === 'residential') {
+    const activeResiCfg = { ...resiCfg, enabled: true };
+    const budget = residentialPool.summary(activeResiCfg);
+    if (budget.exhausted) {
+      const fallback = readFallbackPool();
+      console.log(
+        `[Proxy Tier] מצב יקר (Residential) — המכסה נוצלה (${budget.usedMb}/${budget.budgetMb}MB) — עובר למאגר החלופי (${fallback.length} פרוקסים).`
+      );
+      if (fallback.length) return fallback;
+      console.log('[Residential] אין מאגר חלופי מוגדר — הריצה תעצור כדי לא לשרוף מכסה בתשלום.');
+      return [];
+    }
+    const cc = String(activeResiCfg.country || '').toLowerCase().replace(/[^a-z]/g, '').slice(0, 2);
+    let metered = normalizeList(cc ? residentialPool.listForCountry(cc) : residentialPool.getServers(activeResiCfg));
+    if (!metered.length) metered = configured.filter(u => residentialPool.isResidentialUrl(u));
+    if (!metered.length && cc) metered = normalizeList(residentialPool.getServers(activeResiCfg));
+    console.log(
+      `[Proxy Tier] מצב יקר (Residential${cc ? '/' + cc.toUpperCase() : ''}): ${metered.length} סשנים, נותרו ${budget.remainingMb}MB מתוך ${budget.budgetMb}MB (${budget.usedPct}% נוצל).`
+    );
+    return metered;
+  }
+
+  // Default 'auto': use the list configured in `proxy.servers` and guard any residential entries inside it.
+  const metered = resiCfg.enabled === false ? [] : configured.filter(u => residentialPool.isResidentialUrl(u));
   if (!metered.length) return configured;
 
   const budget = residentialPool.summary(resiCfg);
   if (budget.exhausted) {
-    const fallback = normalizeList(
-      Array.isArray(cfg.proxy?.fallbackServers) && cfg.proxy.fallbackServers.length
-        ? cfg.proxy.fallbackServers
-        : readDatacenterList()
-    );
+    const fallback = readFallbackPool();
     console.log(
       `[Residential] המכסה נוצלה (${budget.usedMb}/${budget.budgetMb}MB) — עובר למאגר החלופי (${fallback.length} פרוקסים).`
     );

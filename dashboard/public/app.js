@@ -131,6 +131,21 @@ $('browserEngine').value = cfg.browserEngine || 'chromium';
   $('snippet').value = cfg.snippet || '';
 
   $('proxy-enabled').checked = Boolean(cfg.proxy?.enabled);
+  if ($('proxy-tier')) {
+    $('proxy-tier').value = ['auto', 'datacenter', 'residential'].includes(cfg.proxy?.tier) ? cfg.proxy.tier : 'auto';
+  }
+  if ($('proxy-residential-country')) {
+    const resiCc = String(cfg.proxy?.residential?.country || '').toLowerCase();
+    const sel = $('proxy-residential-country');
+    if (resiCc && !Array.from(sel.options).some(o => o.value === resiCc)) {
+      const opt = document.createElement('option');
+      opt.value = resiCc;
+      opt.textContent = `${flagOf(resiCc)} ${resiCc.toUpperCase()}`;
+      sel.appendChild(opt);
+    }
+    sel.value = resiCc;
+    sel.disabled = (($('proxy-tier')?.value || cfg.proxy?.tier) === 'datacenter');
+  }
   $('proxy-mode').value = cfg.proxy?.mode || 'round_robin';
   if ($('proxy-country-filter')) $('proxy-country-filter').checked = cfg.proxy?.countryFilterEnabled !== false;
   if ($('proxy-country-fallback')) $('proxy-country-fallback').checked = cfg.proxy?.fallbackToAnyIfEmpty !== false;
@@ -206,14 +221,28 @@ cfg.browserEngine = $('browserEngine').value;
   const rawSnippet = $('snippet').value.trim();
   cfg.snippet = rawSnippet ? rawSnippet : null;
 
+  const tierVal = $('proxy-tier') ? $('proxy-tier').value : (cfg.proxy?.tier || 'auto');
+  const resiCountryVal = $('proxy-residential-country')
+    ? $('proxy-residential-country').value.trim().toLowerCase()
+    : (cfg.proxy?.residential?.country || '');
+  if ($('proxy-residential-country')) {
+    $('proxy-residential-country').disabled = (tierVal === 'datacenter');
+  }
+
   cfg.proxy = {
     ...(cfg.proxy || {}),
     enabled: $('proxy-enabled').checked,
+    tier: ['auto', 'datacenter', 'residential'].includes(tierVal) ? tierVal : 'auto',
     mode: $('proxy-mode').value === 'random' ? 'random' : 'round_robin',
     countryFilterEnabled: $('proxy-country-filter') ? $('proxy-country-filter').checked : true,
     fallbackToAnyIfEmpty: $('proxy-country-fallback') ? $('proxy-country-fallback').checked : true,
     preferredCountries: Array.isArray(cfg.proxy?.preferredCountries) ? cfg.proxy.preferredCountries : [...state.tier1Defaults],
     servers: $('proxy-servers').value.split(/\r?\n/).map(s => s.trim()).filter(s => s && !s.startsWith('#')),
+    residential: {
+      ...(cfg.proxy?.residential || {}),
+      enabled: tierVal === 'residential' ? true : (cfg.proxy?.residential?.enabled !== false),
+      country: resiCountryVal,
+    },
   };
 
   if ($('stealth-mode')) cfg.stealthMode = $('stealth-mode').value === 'standard' ? 'standard' : 'maximum';
@@ -1554,7 +1583,7 @@ function wireActions() {
     'targetUrl', 'engineMode', 'browserEngine', 'taskMode', 'visitCount', 'minConcurrency', 'concurrency',
     'pageMinMs', 'sessionTimeoutMs', 'keepBrowserOpenMs', 'interVisitDelayMs', 'firstPagePriority', 'quick-watch-mode',
     'schedule-enabled', 'schedule-start', 'schedule-end', 'snippet',
-    'proxy-enabled', 'proxy-mode', 'proxy-country-filter', 'proxy-country-fallback', 'proxy-servers',
+    'proxy-enabled', 'proxy-tier', 'proxy-residential-country', 'proxy-mode', 'proxy-country-filter', 'proxy-country-fallback', 'proxy-servers',
     'stealth-mode', 'resource-mode',
     'waves-enabled', 'waves-mode', 'waves-conversion-rate', 'referrer-mode', 'waves-mutation-rate', 'waves-scan-chance', 'waves-extra-page-chance', 'waves-max-products', 'waves-mutate-forms', 'waves-form-inputs',
     'ai-enabled', 'ai-auto-manage', 'ai-provider', 'ai-commander-model', 'ai-worker-model', 'ai-all-squads-model', 'ai-recovery-model', 'ai-form-assist', 'ai-route-repair', 'ai-worker-pct', 'ai-directive-input',
@@ -2504,17 +2533,19 @@ async function init() {
     const res = await fetch('/api/proxy/residential');
     const d = await res.json();
     if (!d.ok) throw new Error(d.error || 'failed');
-    const inList = ($('proxy-servers').value || '')
-      .split(/\r?\n/)
-      .filter(l => l.trim() && /webshare/i.test(l)).length;
+    const selectedTier = $('proxy-tier')?.value || state.config?.proxy?.tier || d.tier || 'auto';
+    const tierLabel = selectedTier === 'datacenter'
+      ? '🏢 מצב פעיל: זול (דאטה־סנטר בלבד — 0MB רזידנציאלי)'
+      : (selectedTier === 'residential' ? '🌍 מצב פעיל: יקר (רזידנציאלי מדוד)' : '⚙️ מצב פעיל: אוטומטי (לפי הרשימה)');
     const tail = d.exhausted
-      ? ' · המכסה נוצלה — הריצה הבאה תעבור למאגר הדאטה־סנטר'
+      ? ' · המכסה נוצלה — הריצה תעבור לדאטה־סנטר'
       : '';
-    el.textContent = `מאגר רזידנציאלי: ${inList} סשנים ברשימה · נוצלו ${d.usedMb}MB מתוך ${d.budgetMb}MB · נותרו ${d.remainingMb}MB · ${d.visits} ביקורים${tail}`;
+    el.textContent = `${tierLabel} | דאטה־סנטר: ${d.datacenterCount ?? 0} שרתים | רזידנציאלי: ${d.poolSize ?? 0} סשנים · נוצלו ${d.usedMb}/${d.budgetMb}MB (נותרו ${d.remainingMb}MB · ${d.visits} ביקורים)${tail}`;
   } catch {
-    el.textContent = 'מאגר רזידנציאלי: לא ניתן לקרוא סטטוס מהשרת';
+    el.textContent = 'מאגר פרוקסים: לא ניתן לקרוא סטטוס מהשרת';
   }
 }
+$('proxy-tier')?.addEventListener('change', refreshResidentialStatus);
 
 wireActions();
 refreshResidentialStatus();

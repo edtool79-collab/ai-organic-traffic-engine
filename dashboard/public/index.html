@@ -338,7 +338,7 @@
                 <option value="resi:fr">🇫🇷 רשת הקלטה: צרפת (רזידנציאלי)</option>
                 <option value="resi:nl">🇳🇱 רשת הקלטה: הולנד (רזידנציאלי)</option>
                 <option value="resi:">🌍 רשת הקלטה: אקראי — כל המדינות (רזידנציאלי)</option>
-                <option value="auto">🏢 רשת הקלטה: דאטה־סנטר (גיבוי, לא מומלץ מול Cloudflare)</option>
+                <option value="datacenter">🏢 רשת הקלטה: דאטה־סנטר (פרוקסי זול — לא צורך רזידנציאל)</option>
                 <optgroup label="בחירה ידנית לפי מדינה" id="recorder-proxy-country-group"></optgroup>
               </select>
               <button type="button" class="small" id="btn-recorder-proxy-refresh" title="רענן את רשימת הפרוקסים והמדינות">🔄 רענן רשימת פרוקסים</button>
@@ -538,6 +538,27 @@
             <input id="proxy-enabled" type="checkbox" />
           </div>
           <div class="form-grid">
+            <div class="field">
+              <label for="proxy-tier">סוג פרוקסי להרצות — זול מול יקר (<code>proxy.tier</code>)</label>
+              <select id="proxy-tier">
+                <option value="datacenter">🏢 פרוקסי זול — דאטה־סנטר בלבד (מומלץ לבדיקות ואתרים פנימיים, 0MB רזידנציאל)</option>
+                <option value="residential">🌍 פרוקסי יקר — רזידנציאלי איכותי (מכסת 1GB, לאתרים מוגנים)</option>
+                <option value="auto">⚙️ אוטומטי — לפי רשימת השרתים למטה (ברירת מחדל)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="proxy-residential-country">מדינת יציאה בפרוקסי היקר (<code>proxy.residential.country</code>)</label>
+              <select id="proxy-residential-country">
+                <option value="">🌍 אקראי — כל המדינות (ברירת מחדל)</option>
+                <option value="us">🇺🇸 ארה״ב (US)</option>
+                <option value="gb">🇬🇧 בריטניה (GB)</option>
+                <option value="ca">🇨🇦 קנדה (CA)</option>
+                <option value="au">🇦🇺 אוסטרליה (AU)</option>
+                <option value="de">🇩🇪 גרמניה (DE)</option>
+                <option value="fr">🇫🇷 צרפת (FR)</option>
+                <option value="nl">🇳🇱 הולנד (NL)</option>
+              </select>
+            </div>
             <div class="field">
               <label for="proxy-mode">שיטת בחירה (<code>proxy.mode</code>)</label>
               <select id="proxy-mode">
