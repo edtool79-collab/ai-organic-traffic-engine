@@ -16,35 +16,112 @@ const COUNTRY_LOCALE_MAP = {
   CA: 'en-CA',
   AU: 'en-AU',
   DE: 'de-DE',
+  AT: 'de-AT',
+  CH: 'de-CH',
   FR: 'fr-FR',
   NL: 'nl-NL',
+  BE: 'nl-BE',
   ES: 'es-ES',
   IT: 'it-IT',
+  PT: 'pt-PT',
   BR: 'pt-BR',
   PL: 'pl-PL',
+  CZ: 'cs-CZ',
+  RO: 'ro-RO',
+  HU: 'hu-HU',
+  BG: 'bg-BG',
+  GR: 'el-GR',
+  UA: 'uk-UA',
+  TR: 'tr-TR',
+  SE: 'sv-SE',
+  NO: 'nb-NO',
+  DK: 'da-DK',
+  FI: 'fi-FI',
+  IE: 'en-IE',
+  NZ: 'en-NZ',
   JP: 'ja-JP',
+  KR: 'ko-KR',
   IN: 'en-IN',
   SG: 'en-SG',
+  HK: 'zh-HK',
+  TW: 'zh-TW',
+  TH: 'th-TH',
+  VN: 'vi-VN',
+  ID: 'id-ID',
+  MY: 'ms-MY',
+  PH: 'en-PH',
+  MX: 'es-MX',
+  AR: 'es-AR',
+  CL: 'es-CL',
+  CO: 'es-CO',
+  ZA: 'en-ZA',
+  AE: 'ar-AE',
+  RU: 'ru-RU',
+  MA: 'fr-MA',
 };
 
 const geoCache = new Map();
 const proxyCountryCache = new Map();
+const hostPortCountryCache = new Map();
+
+function extractHostPort(proxyUrlStr) {
+  try {
+    const s = String(proxyUrlStr || '').trim();
+    if (!s) return '';
+    const u = new URL(s);
+    return `${u.hostname}:${u.port || '80'}`.toLowerCase();
+  } catch {
+    const s = String(proxyUrlStr || '').trim();
+    const at = s.lastIndexOf('@');
+    return (at >= 0 ? s.slice(at + 1) : s).toLowerCase();
+  }
+}
 
 function loadDiskGeoCache() {
+  let needsSave = false;
   try {
-    if (!fs.existsSync(GEO_DISK_CACHE_PATH)) return;
-    const raw = JSON.parse(fs.readFileSync(GEO_DISK_CACHE_PATH, 'utf8'));
-    if (raw && typeof raw.geo === 'object') {
-      for (const [k, v] of Object.entries(raw.geo)) {
-        if (v && typeof v === 'object') geoCache.set(k, v);
+    if (fs.existsSync(GEO_DISK_CACHE_PATH)) {
+      const raw = JSON.parse(fs.readFileSync(GEO_DISK_CACHE_PATH, 'utf8'));
+      if (raw && typeof raw.geo === 'object') {
+        for (const [k, v] of Object.entries(raw.geo)) {
+          if (v && typeof v === 'object') {
+            const cc = String(v.countryCode || '').trim().toUpperCase();
+            if (cc && cc !== 'IL' && (!v.locale || v.locale === 'he-IL')) {
+              v.locale = COUNTRY_LOCALE_MAP[cc] || 'en-US';
+              needsSave = true;
+            }
+            geoCache.set(k, v);
+          }
+        }
       }
-    }
-    if (raw && typeof raw.country === 'object') {
-      for (const [k, v] of Object.entries(raw.country)) {
-        if (typeof v === 'string') proxyCountryCache.set(k, v);
+      if (raw && typeof raw.country === 'object') {
+        for (const [k, v] of Object.entries(raw.country)) {
+          if (typeof v === 'string') {
+            proxyCountryCache.set(k, v);
+            const hp = extractHostPort(k);
+            if (hp) hostPortCountryCache.set(hp, v.toUpperCase());
+          }
+        }
       }
     }
   } catch {}
+  try {
+    const staticGeoPath = path.join(__dirname, '..', 'data', 'proxy-geo.json');
+    if (fs.existsSync(staticGeoPath)) {
+      const parsed = JSON.parse(fs.readFileSync(staticGeoPath, 'utf8'));
+      if (parsed && typeof parsed.proxies === 'object') {
+        for (const [hp, info] of Object.entries(parsed.proxies)) {
+          const cc = String(info?.cc || '').trim().toUpperCase();
+          if (hp && cc) {
+            hostPortCountryCache.set(hp.toLowerCase(), cc);
+          }
+        }
+      }
+    }
+  } catch {}
+  if (needsSave) {
+    saveDiskGeoCache();
+  }
 }
 
 function saveDiskGeoCache() {
@@ -131,7 +208,7 @@ function resolveNetworkGeo(proxyUrlStr = null, timeoutMs = 2500) {
                   exitIp: json.query || null,
                   countryCode: cc,
                   timezoneId: json.timezone || fallback.timezoneId,
-                  locale: inferLocaleFromCountry(cc, fallback.locale),
+                  locale: inferLocaleFromCountry(cc, cc === 'IL' ? 'he-IL' : 'en-US'),
                 });
               }
             } catch {}
@@ -455,11 +532,15 @@ const COUNTRY_CATALOG = [
   { code: 'IL', nameHe: 'ישראל (IL)', tier: 2 },
   { code: 'FR', nameHe: 'צרפת (FR)', tier: 2 },
   { code: 'NL', nameHe: 'הולנד (NL)', tier: 2 },
+  { code: 'AT', nameHe: 'אוסטריה (AT)', tier: 2 },
   { code: 'ES', nameHe: 'ספרד (ES)', tier: 2 },
   { code: 'IT', nameHe: 'איטליה (IT)', tier: 2 },
+  { code: 'CZ', nameHe: 'צ׳כיה (CZ)', tier: 2 },
+  { code: 'RO', nameHe: 'רומניה (RO)', tier: 2 },
   { code: 'PL', nameHe: 'פולין (PL)', tier: 2 },
   { code: 'SG', nameHe: 'סינגפור (SG)', tier: 2 },
   { code: 'JP', nameHe: 'יפן (JP)', tier: 2 },
+  { code: 'KR', nameHe: 'דרום קוריאה (KR)', tier: 2 },
   { code: 'BR', nameHe: 'ברזיל (BR)', tier: 3 },
   { code: 'IN', nameHe: 'הודו (IN)', tier: 3 },
 ];
@@ -551,6 +632,13 @@ async function selectProxiesForCountries(rawProxies = [], options = {}) {
       proxyCountryCache.set(entry.url, entry.hint);
     } else if (proxyCountryCache.has(entry.url)) {
       countryByUrl.set(entry.url, proxyCountryCache.get(entry.url));
+    } else {
+      const hp = extractHostPort(entry.url);
+      if (hp && hostPortCountryCache.has(hp)) {
+        const cc = hostPortCountryCache.get(hp);
+        countryByUrl.set(entry.url, cc);
+        proxyCountryCache.set(entry.url, cc);
+      }
     }
   }
 

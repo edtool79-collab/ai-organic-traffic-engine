@@ -1731,7 +1731,28 @@ async function executeTaskSteps({
           ctx.activeTabId = 0;
         }
         activeStepPage = tabPage || page;
+        const preExploreUrl = (step.type === 'ai_explore' && activeStepPage && !activeStepPage.isClosed())
+          ? activeStepPage.url()
+          : '';
+        const preExploreNorm = preExploreUrl ? getNormalizedTabUrl(activeStepPage) : '';
         detail = await handler(tabPage, step, ctx);
+        if (preExploreUrl && preExploreNorm && activeStepPage && !activeStepPage.isClosed()) {
+          const postExploreNorm = getNormalizedTabUrl(activeStepPage);
+          if (postExploreNorm && postExploreNorm !== preExploreNorm) {
+            const nextSelStep = steps.slice(idx + 1).find(s =>
+              (Number.isInteger(s?.tab) ? s.tab : 0) === stepTab
+              && ['click', 'fill', 'fill_email', 'select'].includes(s?.type)
+              && s?.selector
+            );
+            if (nextSelStep) {
+              const existsOnNewPage = (await activeStepPage.locator(nextSelStep.selector).count().catch(() => 0)) > 0;
+              if (!existsOnNewPage) {
+                await activeStepPage.goto(preExploreUrl, { waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
+                detail = `${detail} (וחזרה לדף המסלול להמשך צעד מוקלט)`;
+              }
+            }
+          }
+        }
       } catch (err) {
         // Offer pages bounce through two or three URLs during a visit. A redirect that
         // lands mid-step destroys the JS execution context and the whole visit used to

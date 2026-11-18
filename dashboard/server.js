@@ -1454,6 +1454,28 @@ const RECORDER_LOCALE_BY_CC = {
   SG: ['en-SG', 'Asia/Singapore'],
 };
 
+function getDatacenterCountryCounts(cfg) {
+  try {
+    const residentialPool = require('../src/residentialPool');
+    const geo = readProxyGeoMap();
+    const dcStatic = Array.from(new Set([
+      ...readDatacenterServers(),
+      ...recorderProxyCandidates(cfg),
+    ].filter(u => u && !residentialPool.isResidentialUrl(u))));
+    const counts = {};
+    for (const p of dcStatic) {
+      const hp = hostPortOf(p);
+      const cc = String((geo[hp] || {}).cc || '').trim().toUpperCase();
+      if (cc) {
+        counts[cc] = (counts[cc] || 0) + 1;
+      }
+    }
+    return counts;
+  } catch {
+    return {};
+  }
+}
+
 // רשימת הפרוקסים הזמינים לבחירה במסך ההקלטה (ללא סיסמאות).
 // יתרת המכסה הרזידנציאלית (1GB) — נספרת מהבייטים שירדו בפועל בכל ביקור, לא מהערכה.
 app.get('/api/proxy/residential', (_req, res) => {
@@ -1465,12 +1487,16 @@ app.get('/api/proxy/residential', (_req, res) => {
       ...readDatacenterServers(),
       ...recorderProxyCandidates(cfg),
     ].filter(u => u && !residentialPool.isResidentialUrl(u)));
+    const datacenterCounts = getDatacenterCountryCounts(cfg);
     res.json({
       ok: true,
       ...residentialPool.summary(resiCfg),
       usage: residentialPool.getUsage(),
       datacenterCount: dcStatic.size,
+      datacenterCounts,
       tier: cfg.proxy?.tier || 'auto',
+      countryFilterEnabled: cfg.proxy?.countryFilterEnabled !== false,
+      preferredCountries: Array.isArray(cfg.proxy?.preferredCountries) ? cfg.proxy.preferredCountries : [],
     });
   } catch (err) {
     res.status(500).json({ ok: false, error: String((err && err.message) || err) });
@@ -1535,8 +1561,12 @@ app.post('/api/recorder/start', async (req, res) => {
             error: 'לא נמצאו פרוקסי דאטה־סנטר זמינים. הוסף פרוקסים סטטיים או בחר רזידנציאלי / חיבור ישיר.',
           });
         }
-        const offerOkPool = dcPool.filter(p => (geoMap[hostPortOf(p)] || {}).offerOk === true);
-        const usable = offerOkPool.length ? offerOkPool : dcPool;
+        const countryMatched = wantedCountry
+          ? dcPool.filter(p => String((geoMap[hostPortOf(p)] || {}).cc || '').toLowerCase() === wantedCountry)
+          : dcPool;
+        const basePool = countryMatched.length ? countryMatched : dcPool;
+        const offerOkPool = basePool.filter(p => (geoMap[hostPortOf(p)] || {}).offerOk === true);
+        const usable = offerOkPool.length ? offerOkPool : basePool;
         const rotated = usable.filter(p => !lastRecorderProxyUrl || p !== lastRecorderProxyUrl || usable.length <= 1);
         proxyUrl = rotated[Math.floor(Math.random() * rotated.length)] || usable[0];
       } else {
@@ -1675,7 +1705,7 @@ function deepMergeConfigPatch(target, patch, depth = 0) {
   return target;
 }
 
-function applyFleetDirectives(directives = []) {
+function applyFleetDirectives(directives = [], { isAutoCheck = false } = {}) {
   const applied = [];
   let configChanged = false;
   let latestConfig = null;
@@ -1956,6 +1986,10 @@ function applyFleetDirectives(directives = []) {
         }
       } catch {}
     } else if (d.type === 'remove_recording_step') {
+      if (isAutoCheck) {
+        appendLog('warn', '[AI Commander Guard] נחסמה מחיקת צעד הקלטה אוטומטית ברקע (remove_recording_step מותר רק בפקודת צ׳אט מפורשת מהמפעיל).');
+        continue;
+      }
       try {
         const updated = updateSavedConfig(cur => {
           const list = Array.isArray(cur.taskSteps) ? [...cur.taskSteps] : [];
@@ -1977,6 +2011,10 @@ function applyFleetDirectives(directives = []) {
         applied.push(`remove_recording_step(${d.index || d.tab || d.match || 'step'})`);
       } catch {}
     } else if (d.type === 'replace_task_steps' && Array.isArray(d.steps)) {
+      if (isAutoCheck) {
+        appendLog('warn', '[AI Commander Guard] נחסמה החלפת תסריט הקלטה אוטומטית ברקע (replace_task_steps מותר רק בפקודת צ׳אט מפורשת).');
+        continue;
+      }
       try {
         const updated = updateSavedConfig(cur => { cur.taskSteps = d.steps; });
         if (activeProcess) {
@@ -1996,10 +2034,287 @@ function applyFleetDirectives(directives = []) {
 }
 
 app.get('/api/proxies/countries', (_req, res) => {
+  const cfg = readConfigFromDisk();
   res.json({
     tier1Defaults: TIER1_DEFAULT_COUNTRIES,
     catalog: COUNTRY_CATALOG,
+    datacenterCounts: getDatacenterCountryCounts(cfg),
   });
+});
+
+app.post('/api/ai/onboard-site', async (req, res) => {
+  try {
+    const cfg = readConfigFromDisk();
+    const rawUrl = typeof req.body?.targetUrl === 'string' && req.body.targetUrl.trim()
+      ? req.body.targetUrl.trim()
+      : cfg.targetUrl;
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(rawUrl);
+    } catch {
+      return res.status(400).json({ error: 'כתובת היעד (targetUrl) אינה תקינה.' });
+    }
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      return res.status(400).json({ error: 'כתובת היעד חייבת להתחיל ב-http:// או https://' });
+    }
+
+    const goal = String(req.body?.goal || 'tools_clicks').trim();
+    const aiLevel = String(req.body?.aiLevel || 'full_autonomous').trim();
+    const proxyTier = ['datacenter', 'residential', 'auto'].includes(req.body?.proxyTier)
+      ? req.body.proxyTier
+      : (cfg.proxy?.tier || 'datacenter');
+    const selectedCountry = typeof req.body?.country === 'string' ? req.body.country.trim() : '';
+    const visitScale = Math.max(1, parseInt(String(req.body?.visitCount || cfg.visitCount || 500), 10) || 500);
+    const userNotes = typeof req.body?.userNotes === 'string' ? req.body.userNotes.trim() : '';
+
+    // 1. Live scan of the site: discover real pages, title, headings, interactive links, and forms
+    const baseOrigin = parsedUrl.origin;
+    const basePath = parsedUrl.pathname && parsedUrl.pathname !== '/' ? parsedUrl.pathname.replace(/\/$/, '') : '';
+    const discovered = new Set(['/']);
+    const toolLinks = [];
+    const guideLinks = [];
+    let siteTitle = parsedUrl.hostname;
+    const headings = [];
+    let hasForms = false;
+    let rootStatus = 0;
+
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      try {
+        const resp = await fetch(parsedUrl.toString(), { signal: ctrl.signal, redirect: 'follow' });
+        rootStatus = resp.status;
+        const html = await resp.text();
+        const titleM = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+        if (titleM && titleM[1]) {
+          siteTitle = titleM[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 90);
+        }
+        const hRegex = /<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi;
+        let hm;
+        while ((hm = hRegex.exec(html)) !== null && headings.length < 8) {
+          const cleanH = hm[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+          if (cleanH.length >= 3) headings.push(cleanH.slice(0, 70));
+        }
+        hasForms = /<(form|input|textarea|select)\b/i.test(html);
+        const hrefRegex = /href\s*=\s*["']([^"'#]+)["']/gi;
+        let m;
+        while ((m = hrefRegex.exec(html)) !== null) {
+          try {
+            const u = new URL(m[1], parsedUrl.toString());
+            if (u.origin !== baseOrigin) continue;
+            if (/\.(css|js|png|jpg|jpeg|svg|webp|ico|woff2?|xml|json|pdf)$/i.test(u.pathname)) continue;
+            let rel = u.pathname || '/';
+            if (basePath && rel.startsWith(basePath)) rel = rel.slice(basePath.length) || '/';
+            if (!rel.startsWith('/')) rel = '/' + rel;
+            discovered.add(rel);
+            if (/\/(tool|tools|app|calculator|checker|generator|product|shop|item|feature)/i.test(rel) && !toolLinks.includes(rel)) {
+              toolLinks.push(rel);
+            } else if (/\/(guide|guides|blog|article|docs|post|learn|about)/i.test(rel) && !guideLinks.includes(rel)) {
+              guideLinks.push(rel);
+            }
+          } catch {}
+        }
+      } finally {
+        clearTimeout(timer);
+      }
+    } catch {}
+
+    try {
+      const sCtrl = new AbortController();
+      const sTimer = setTimeout(() => sCtrl.abort(), 3500);
+      const sResp = await fetch(`${baseOrigin}${basePath}/sitemap.xml`, { signal: sCtrl.signal }).catch(() => null);
+      clearTimeout(sTimer);
+      if (sResp && sResp.ok) {
+        const xml = await sResp.text();
+        const locRegex = /<loc>\s*([^<\s]+)\s*<\/loc>/gi;
+        let m;
+        while ((m = locRegex.exec(xml)) !== null && discovered.size < 30) {
+          try {
+            const u = new URL(m[1]);
+            if (u.origin !== baseOrigin) continue;
+            let rel = u.pathname || '/';
+            if (basePath && rel.startsWith(basePath)) rel = rel.slice(basePath.length) || '/';
+            if (!rel.startsWith('/')) rel = '/' + rel;
+            discovered.add(rel);
+            if (/\/(tool|tools|app|calculator|checker|generator|product)/i.test(rel) && !toolLinks.includes(rel)) {
+              toolLinks.push(rel);
+            } else if (/\/(guide|guides|blog|article|docs|post)/i.test(rel) && !guideLinks.includes(rel)) {
+              guideLinks.push(rel);
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+
+    const discoveredPages = [...discovered].slice(0, 25);
+
+    // 2. Check if existing recorded taskSteps match the new site or belong to an old domain/missing paths
+    const prevHost = (() => {
+      try { return new URL(cfg.targetUrl).hostname.toLowerCase(); } catch { return ''; }
+    })();
+    const newHost = parsedUrl.hostname.toLowerCase();
+    const isNewDomain = prevHost && prevHost !== newHost;
+    const existingSteps = Array.isArray(cfg.taskSteps) ? cfg.taskSteps : [];
+    const hasStaleSteps = isNewDomain || existingSteps.some(s => {
+      const sel = String(s?.selector || '');
+      const hrefM = sel.match(/a\[href=["'](\/[^"']+)["']\]/i);
+      if (hrefM && hrefM[1] && discoveredPages.length > 1 && !discoveredPages.includes(hrefM[1])) {
+        return true;
+      }
+      return false;
+    });
+
+    // Build tailored starter steps if switching to a new domain, if user asked to rebuild, or if old steps had stale paths
+    let adaptedSteps = existingSteps;
+    let stepsRebuilt = false;
+    if (req.body?.rebuildSteps === true || isNewDomain || !existingSteps.length || hasStaleSteps) {
+      stepsRebuilt = true;
+      const sampleTool1 = toolLinks[0] || discoveredPages[1] || '/';
+      const sampleTool2 = toolLinks[1] || guideLinks[0] || discoveredPages[2] || sampleTool1;
+      const sampleGuide1 = guideLinks[0] || discoveredPages[1] || '/';
+      if (goal === 'tools_clicks') {
+        adaptedSteps = [
+          { type: 'goto', selector: '', value: '/', assertKind: 'text_contains', label: 'פתיחת דף הבית (/)' },
+          { type: 'scroll', selector: '', value: '65', assertKind: 'text_contains', label: 'גלילה וסריקת כלים בדף הראשי' },
+          ...(sampleTool1 !== '/' ? [{ type: 'click', selector: `a[href="${sampleTool1}"]`, value: '', assertKind: 'text_contains', label: `כניסה לכלי/עמוד (${sampleTool1})` }] : []),
+          { type: 'ai_explore', selector: '', value: '2', assertKind: 'text_contains', label: 'הפעלה ואינטראקציה חכמה של סוכן ה-AI עם האובייקטים בעמוד' },
+          { type: 'human_browse', selector: '', value: '4500', assertKind: 'text_contains', label: 'גלישה אנושית ובדיקת תוצאה' },
+          ...(sampleTool2 && sampleTool2 !== sampleTool1 && sampleTool2 !== '/' ? [
+            { type: 'goto', selector: '', value: sampleTool2, assertKind: 'text_contains', label: `מעבר לעמוד פנימי נוסף (${sampleTool2})` },
+            { type: 'ai_explore', selector: '', value: '2', assertKind: 'text_contains', label: 'חקירת אובייקטים משנית ע"י AI' },
+          ] : []),
+        ];
+      } else if (goal === 'deep_reading') {
+        adaptedSteps = [
+          { type: 'goto', selector: '', value: '/', assertKind: 'text_contains', label: 'פתיחת דף הבית (/)' },
+          { type: 'read_article', selector: '', value: '6500', assertKind: 'text_contains', label: 'קריאת תוכן מדורגת בדף הראשי' },
+          ...(sampleGuide1 !== '/' ? [{ type: 'click', selector: `a[href="${sampleGuide1}"]`, value: '', assertKind: 'text_contains', label: `כניסה למאמר/מדריך (${sampleGuide1})` }] : []),
+          { type: 'read_article', selector: '', value: '8500', assertKind: 'text_contains', label: 'קריאת עומק אנושית (5 עצירות + תנועות עכבר)' },
+          { type: 'ai_explore', selector: '', value: '2', assertKind: 'text_contains', label: 'מעבר חכם של סוכן AI למאמר קשור' },
+        ];
+      } else if (goal === 'conversions_forms') {
+        adaptedSteps = [
+          { type: 'goto', selector: '', value: '/', assertKind: 'text_contains', label: 'פתיחת דף היעד (/)' },
+          { type: 'human_browse', selector: '', value: '3500', assertKind: 'text_contains', label: 'סריקת הצעה וטופס' },
+          { type: 'ai_explore', selector: '', value: '3', assertKind: 'text_contains', label: 'איתור ומילוי שדות/טפסים אוטונומי ע"י AI' },
+        ];
+      }
+    }
+
+    // 3. Apply tailored settings based on operator interview answers
+    const workerPct = aiLevel === 'full_autonomous' ? 100 : (aiLevel === 'balanced_50' ? 50 : 20);
+    const autoManage = aiLevel !== 'light_repair';
+    const taskMode = goal === 'free_organic' ? 'behavior' : 'hybrid';
+    const pageMinMs = goal === 'deep_reading' ? 5500 : (goal === 'tools_clicks' ? 3000 : 3500);
+    const scanChance = goal === 'tools_clicks' ? 80 : (goal === 'deep_reading' ? 55 : 65);
+    const extraPageChance = goal === 'deep_reading' ? 75 : 60;
+    const goalDirectiveMap = {
+      tools_clicks: `אתר יעד: ${siteTitle} (${parsedUrl.hostname}). התמקד בלחיצה ושימוש בכלים, כפתורים ואובייקטים אינטראקטיביים בעמודים (${toolLinks.slice(0, 4).join(', ') || discoveredPages.slice(0, 4).join(', ')}).`,
+      deep_reading: `אתר יעד: ${siteTitle} (${parsedUrl.hostname}). התמקד בקריאת עומק של מדריכים ומאמרים (${guideLinks.slice(0, 4).join(', ') || discoveredPages.slice(0, 4).join(', ')}), גלילה אנושית ושהייה טבעית.`,
+      free_organic: `אתר יעד: ${siteTitle} (${parsedUrl.hostname}). בצע גלישה אורגנית חופשית וטבעית בין עמודי האתר תוך גיוון מסלולים.`,
+      conversions_forms: `אתר יעד: ${siteTitle} (${parsedUrl.hostname}). אתר טפסים, שדות קלט וכפתורי הנעה לפעולה (CTA) והשלם אינטראקציה מלאה.`,
+    };
+    const tailoredDirective = userNotes
+      ? `${goalDirectiveMap[goal] || goalDirectiveMap.tools_clicks} דגש מפעיל: ${userNotes}`.slice(0, 300)
+      : (goalDirectiveMap[goal] || goalDirectiveMap.tools_clicks).slice(0, 300);
+
+    const updatedConfig = validateAndNormalizeConfig({
+      ...cfg,
+      targetUrl: parsedUrl.toString().replace(/\/$/, ''),
+      pages: discoveredPages,
+      visitCount: visitScale,
+      taskMode,
+      pageMinMs,
+      taskSteps: adaptedSteps,
+      proxy: {
+        ...(cfg.proxy || {}),
+        enabled: true,
+        tier: proxyTier,
+        ...(selectedCountry && selectedCountry !== '__preferred__'
+          ? {
+            countryFilterEnabled: true,
+            preferredCountries: [selectedCountry.toUpperCase()],
+            residential: { ...(cfg.proxy?.residential || {}), country: selectedCountry.toLowerCase() },
+          }
+          : selectedCountry === ''
+            ? {
+              countryFilterEnabled: false,
+              residential: { ...(cfg.proxy?.residential || {}), country: '' },
+            }
+            : {}),
+      },
+      waves: {
+        ...(cfg.waves || {}),
+        enabled: true,
+        mode: visitScale >= 500 ? 'burst' : (cfg.waves?.mode || 'natural_peaks'),
+        scanProductsChance: scanChance,
+        extraPageChance,
+        mutateForms: goal === 'conversions_forms' ? true : (cfg.waves?.mutateForms !== false),
+        conversionRate: goal === 'conversions_forms' ? 65 : (cfg.waves?.conversionRate ?? 25),
+      },
+      ai: {
+        ...(cfg.ai || {}),
+        enabled: true,
+        autoManage,
+        workerPct,
+        routeRepair: true,
+        formAssist: true,
+        commanderDirective: tailoredDirective,
+      },
+    });
+
+    writeConfigToDisk(updatedConfig);
+    aiCommanderState.activeDirective = tailoredDirective;
+    broadcastEvent('config_updated', { config: updatedConfig });
+
+    const followUpQuestions = [
+      toolLinks.length
+        ? `מצאתי באתר ${toolLinks.length} עמודי כלים (${toolLinks.slice(0, 3).join(', ')}) ו-${guideLinks.length} מדריכים — תרצה שהסוכנים יתמקדו בכלי מסוים או יתחלקו שווה בשווה בין כולם?`
+        : `סרקתי ${discoveredPages.length} עמודים חיים באתר (${discoveredPages.slice(0, 4).join(', ')}) — האם יש עמוד יעד ספציפי שחשוב לך שכל סוכן יעבור בו ב-100% מהביקורים?`,
+      hasForms
+        ? 'זיהיתי שדות קלט/טפסים באתר — האם להפעיל הזנת נתונים ואינטראקציה בתוך השדות של הכלים בכל ביקור?'
+        : 'האם תרצה להקליט מסלול קליקים מדויק משלך בחלון ההקלטה או לתת ל-AI להוביל אוטונומית לפי המסלול שבניתי?',
+    ];
+
+    const summaryReply = [
+      `✅ האתר **${siteTitle}** (${parsedUrl.origin}) נסרק והותאם אוטומטית!`,
+      `• **עמודים חיים שהתגלו (${discoveredPages.length}):** ${discoveredPages.slice(0, 8).join(', ')}${discoveredPages.length > 8 ? '...' : ''} (עמודי 404 ישנים נוקו).`,
+      `• **תסריט ומצב פעולה:** \`taskMode = ${taskMode}\` | ${stepsRebuilt ? `נבנו ${adaptedSteps.length} צעדים מותאמים לאתר החדש` : `נשמרו ${adaptedSteps.length} צעדים קיימים`}.`,
+      `• **שליטת מוח AI:** \`workerPct = ${workerPct}%\` | ניהול חי אוטונומי: \`${autoManage ? 'מופעל' : 'כבוי'}\` | תיקון מסלול חכם: \`מופעל\`.`,
+      `• **פרוקסי וסקאלה:** \`${proxyTier}\` | מדינה: \`${selectedCountry ? selectedCountry.toUpperCase() : 'כל המדינות'}\` | יעד: \`${visitScale}\` ביקורים.`,
+      '',
+      '💬 **שאלות מיקוד מה-AI (אפשר לענות בתיבה או להפעיל הרצה מיד):**',
+      `1. ${followUpQuestions[0]}`,
+      `2. ${followUpQuestions[1]}`,
+    ].join('\n');
+
+    const feedItem = {
+      role: 'assistant',
+      content: summaryReply,
+      applied: ['onboard_site', `pages(${discoveredPages.length})`, `taskMode(${taskMode})`, `workerPct(${workerPct}%)`],
+      model: updatedConfig.ai?.commanderModel || 'site-onboard-ai',
+      ts: new Date().toISOString(),
+    };
+    aiCommanderState.history.push(feedItem);
+    broadcastEvent('ai_feed', feedItem);
+
+    res.json({
+      ok: true,
+      rootStatus,
+      siteTitle,
+      headings,
+      discoveredPages,
+      toolLinks,
+      guideLinks,
+      hasForms,
+      stepsRebuilt,
+      questions: followUpQuestions,
+      reply: summaryReply,
+      config: updatedConfig,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'התאמת האתר האוטומטית נכשלה.' });
+  }
 });
 
 app.get('/api/ai/status', (_req, res) => {
@@ -2369,7 +2684,7 @@ function launchRunnerWave(cfg, { isContinuationWave = false, isAutoResume = fals
           provider: cfg.ai.provider,
           isAutoCheck: true,
         });
-        const applied = applyFleetDirectives(resReview.directives);
+        const applied = applyFleetDirectives(resReview.directives, { isAutoCheck: true });
         const item = {
           role: 'assistant',
           auto: true,

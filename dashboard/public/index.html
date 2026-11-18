@@ -128,8 +128,65 @@
               <input id="new-page-input" type="text" class="ltr" placeholder="/tools/link-cleaner" />
               <button type="button" id="btn-add-page">הוסף עמוד +</button>
             </div>
-            <div class="hint">חשוב: לחץ על "סרוק עמודים קיימים באתר 🔍" כשמחליפים אתר, כדי שלא ייכנס לעמודים שלא קיימים (404) כמו /pricing.</div>
+            <div class="hint">חשוב: לחץ על "סרוק עמודים קיימים באתר 🔍" או על אשף ה-AI למטה כשמחליפים אתר, כדי שלא ייכנס לעמודים שלא קיימים (404) כמו /pricing.</div>
             <div id="pages-list" class="pages-list"></div>
+          </div>
+
+          <div class="recorder-box" id="site-onboard-box" style="margin-top:12px; border-color:#38bdf8;">
+            <div class="section-title" style="margin-bottom:8px;">
+              <span>🤖 אשף התאמת אתר אוטומטית וראיון AI (Auto-Adapt &amp; AI Interview)</span>
+              <span class="badge completed" id="onboard-domain-badge">מוכן להתאמה</span>
+            </div>
+            <p class="hint" style="margin-bottom:10px;">
+              הכנסת אתר חדש? ענה על 2 שאלות קצרות ולחץ <strong>"✨ סרוק אתר והתאם הגדרות אוטומטית עם ה-AI"</strong> — המערכת תגלה את העמודים החיים באתר (ללא 404), תכוון את סמכות ה-AI, תבנה תסריט מותאם ותשאל אותך שאלות מיקוד.
+            </p>
+            <div class="form-grid" style="margin-bottom:8px;">
+              <div class="field">
+                <label for="onboard-goal">1. מה המטרה המרכזית של ההרצה/הקלטה באתר זה?</label>
+                <select id="onboard-goal">
+                  <option value="tools_clicks">🎯 לחיצות ושימוש בכלים, כפתורים ואובייקטים באתר</option>
+                  <option value="deep_reading">📖 קריאת עומק של מאמרים, מדריכים ותוכן</option>
+                  <option value="free_organic">🌿 גלישה אורגנית חופשית וטבעית בין עמודים</option>
+                  <option value="conversions_forms">✉️ מילוי טפסים, הרשמה ובדיקת המרות (CTA)</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="onboard-ai-level">2. רמת המעורבות והסמכות של מוח ה-AI בסשנים:</label>
+                <select id="onboard-ai-level">
+                  <option value="full_autonomous">🧠 שליטה אוטונומית מלאה (100% סוכני AI + ניהול חי)</option>
+                  <option value="balanced_50">⚖️ משולב חצי-חצי (50% AI + 50% מסלול מוקלט)</option>
+                  <option value="light_repair">🛡️ עדין (20% — נאמן להקלטה + תיקון מסלול בלבד)</option>
+                </select>
+              </div>
+            </div>
+            <div class="inline-row" style="gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+              <input id="onboard-user-notes" type="text" placeholder="תשובה לשאלות ה-AI או דגש מיוחד (למשל: התמקד ב-/tools/robots-checker ואל תצא לקישורים חיצוניים)..." style="flex:1; min-width:240px;" />
+              <label style="display:flex; align-items:center; gap:6px; font-size:0.83rem; cursor:pointer;">
+                <input id="onboard-rebuild-steps" type="checkbox" />
+                <span>בנה גם תסריט צעדים חדש לאתר</span>
+              </label>
+              <button type="button" class="primary" id="btn-onboard-site">✨ סרוק אתר והתאם הגדרות אוטומטית עם ה-AI</button>
+            </div>
+            <div id="onboard-ai-result" class="advice-box" style="display:none; white-space:pre-line; line-height:1.55;"></div>
+          </div>
+
+          <div class="recorder-box" id="multi-targets-box" style="margin-top:12px;">
+            <div class="section-title" style="margin-bottom:8px;">
+              <span>🎯 ריבוי אתרי יעד במקביל (<code>targets[]</code> — הרצה על כמה אתרים בסבב)</span>
+              <span class="badge idle" id="multi-targets-count-badge">יעד יחיד (targetUrl)</span>
+            </div>
+            <p class="hint" style="margin-bottom:8px;">
+              רוצה להריץ במקביל על כמה אתרים או דפי נחיתה? הוסף אותם כאן — כל אתר מקבל רשימת עמודים משלו, מכסת ביקורים ועוגיות נפרדות לחלוטין (Round-Robin בין היעדים). כשיש רשימה כאן, המערכת מחלקת את הביקורים ביניהם.
+            </p>
+            <div class="inline-row" style="gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+              <input id="new-target-url" type="url" class="ltr" placeholder="https://second-site.com" style="flex:2; min-width:210px;" />
+              <input id="new-target-pages" type="text" class="ltr" placeholder="/, /tools, /about (או השאר ריק לסריקה)" style="flex:2; min-width:190px;" />
+              <input id="new-target-visits" type="number" min="0" max="100000" placeholder="ביקורים (0=חלוקה שווה)" style="width:155px;" />
+              <button type="button" class="small primary" id="btn-discover-add-target">🔍 סרוק עמודים והוסף יעד +</button>
+              <button type="button" class="small" id="btn-add-target">+ הוסף יעד</button>
+              <button type="button" class="small danger" id="btn-clear-targets">נקה יעדים נוספים</button>
+            </div>
+            <div id="targets-list" class="pages-list"></div>
           </div>
 
           <hr style="border:0;border-top:1px solid var(--border);margin:18px 0;" />
@@ -550,9 +607,10 @@
               </select>
             </div>
             <div class="field">
-              <label for="proxy-residential-country">מדינת יציאה בפרוקסי היקר (<code>proxy.residential.country</code>)</label>
+              <label for="proxy-residential-country">בחירת מדינת יציאה — לפרוקסי זול ויקר (<code>country</code>)</label>
               <select id="proxy-residential-country">
-                <option value="">🌍 אקראי — כל המדינות (ברירת מחדל)</option>
+                <option value="">🌍 כל המדינות הזמינות (ללא הגבלת מדינה)</option>
+                <option value="__preferred__">🎯 לפי המדינות המסומנות בכפתורי הדגלים למעלה</option>
                 <option value="us">🇺🇸 ארה״ב (US)</option>
                 <option value="gb">🇬🇧 בריטניה (GB)</option>
                 <option value="ca">🇨🇦 קנדה (CA)</option>
@@ -560,6 +618,18 @@
                 <option value="de">🇩🇪 גרמניה (DE)</option>
                 <option value="fr">🇫🇷 צרפת (FR)</option>
                 <option value="nl">🇳🇱 הולנד (NL)</option>
+                <option value="at">🇦🇹 אוסטריה (AT)</option>
+                <option value="it">🇮🇹 איטליה (IT)</option>
+                <option value="cz">🇨🇿 צ׳כיה (CZ)</option>
+                <option value="ro">🇷🇴 רומניה (RO)</option>
+                <option value="pl">🇵🇱 פולין (PL)</option>
+                <option value="es">🇪🇸 ספרד (ES)</option>
+                <option value="jp">🇯🇵 יפן (JP)</option>
+                <option value="kr">🇰🇷 דרום קוריאה (KR)</option>
+                <option value="sg">🇸🇬 סינגפור (SG)</option>
+                <option value="il">🇮🇱 ישראל (IL)</option>
+                <option value="br">🇧🇷 ברזיל (BR)</option>
+                <option value="in">🇮🇳 הודו (IN)</option>
               </select>
             </div>
             <div class="field">
