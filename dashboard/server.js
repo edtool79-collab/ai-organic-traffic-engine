@@ -172,7 +172,7 @@ const DEFAULT_CONFIG = {
 };
 
 const { TIER1_DEFAULT_COUNTRIES, COUNTRY_CATALOG, normalizeCountryCode } = require('../src/proxyManager');
-const { askFleetCommander, getOllamaStatusPublic } = require('../src/aiCommander');
+const { askFleetCommander, getOllamaStatusPublic, shouldUseHirePulseGateway, resolveHirePulseAiKey, DEFAULT_HIREPULSE_HOST } = require('../src/aiCommander');
 
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(PUBLIC_DIR));
@@ -438,7 +438,7 @@ function validateAndNormalizeConfig(input) {
     ai: {
       enabled: Boolean(input.ai?.enabled),
       autoManage: Boolean(input.ai?.autoManage),
-      provider: ['auto', 'ollama_cloud', 'uncensoredllm'].includes(input.ai?.provider)
+      provider: ['auto', 'hirepulse', 'ollama_cloud', 'uncensoredllm'].includes(input.ai?.provider)
         ? input.ai.provider
         : 'auto',
       commanderModel: (typeof input.ai?.commanderModel === 'string' && input.ai.commanderModel.trim())
@@ -2448,13 +2448,46 @@ app.post('/api/ai/clone-funnel', async (req, res) => {
       ] : []),
     ];
 
-    const reportHe = [
+    const reportLines = [
       `🕵️ **Funnel Intelligence & Clone Report for ${siteTitle} (${parsedUrl.origin}):**`,
       `• **Detected Pixels & Telemetry (${detectedPixels.length}):** ${detectedPixels.length ? detectedPixels.join(' | ') : 'No visible third-party pixels detected in initial HTML'}`,
       `• **Site & Funnel Structure:** ${internalPages.size} internal pages (${toolPages.length} tool/app pages, ${guidePages.length} guides/articles, ${outboundDomains.size} outbound domains).`,
       `• **Homepage Interactive Elements:** ${formsCount} forms, ${inputsCount} input fields, ${buttonsCount} buttons.`,
       `• **Cloned Scenario (${clonedSteps.length} steps):** Built and applied automatically (organic entry, Smart Tool \`use_tool\`, biometric reading, and AI Brain)!`,
-    ].join('\n');
+    ];
+
+    let hirepulseAudit = null;
+    const isLoopbackHost = /^(localhost|127\.0\.0\.1|::1)$/i.test(parsedUrl.hostname);
+    if (!isLoopbackHost && shouldUseHirePulseGateway(cfg.ai?.provider || 'auto')) {
+      const hpCred = resolveHirePulseAiKey();
+      if (hpCred.apiKey) {
+        try {
+          const auditResp = await fetch(`${DEFAULT_HIREPULSE_HOST}/v1/qa/funnel-audit`, {
+            method: 'POST',
+            signal: AbortSignal.timeout(12000),
+            headers: {
+              'Content-Type': 'application/json',
+              'X-HirePulse-Credit-Key': hpCred.apiKey,
+              'User-Agent': 'WebTrafficGen-OpenCore/1.0',
+            },
+            body: JSON.stringify({
+              targetUrl: parsedUrl.toString(),
+              htmlSample: String(html || '').slice(0, 110000),
+            }),
+          });
+          const auditJson = await auditResp.json().catch(() => null);
+          if (auditResp.ok && auditJson?.ok) {
+            hirepulseAudit = {
+              aiModel: auditJson.aiModel || null,
+              chargedMicroUsd: auditJson.charged_micro_usd ?? null,
+              balanceMicroUsd: auditJson.balance_micro_usd ?? null,
+            };
+            if (auditJson.report) reportLines.push('', String(auditJson.report));
+          }
+        } catch {}
+      }
+    }
+    const reportHe = reportLines.join('\n');
 
     let updatedConfig = cfg;
     if (req.body?.applyToConfig !== false) {
@@ -2489,6 +2522,7 @@ app.post('/api/ai/clone-funnel', async (req, res) => {
       },
       clonedSteps,
       reportHe,
+      hirepulseAudit,
       config: updatedConfig,
     });
   } catch (err) {

@@ -871,7 +871,8 @@
               <div class="field" style="grid-column:span 2;">
                 <label for="ai-provider">Cloud Provider &amp; Failover Policy (<code>ai.provider</code>)</label>
                 <select id="ai-provider">
-                  <option value="auto">Auto (Ollama Cloud &rarr; automatic failover to UncensoredLLM at $0.105/M)</option>
+                  <option value="auto">Auto (Ollama Cloud &rarr; UncensoredLLM &rarr; HirePulse Credits)</option>
+                  <option value="hirepulse">HirePulse Cloud Credits (gethirepulse.xyz — No Ollama key needed)</option>
                   <option value="uncensoredllm">UncensoredLLM Direct (Ultra-low-cost models)</option>
                   <option value="ollama_cloud">Ollama Cloud Only</option>
                 </select>

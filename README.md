@@ -20,6 +20,14 @@
 
 ![Dashboard overview on the built-in demo site](docs/img/dashboard-overview.png)
 
+### Live Dashboard Execution &amp; Real-Time GA4 Verification
+<p align="center">
+  <img src="docs/img/live-ga4-demo.gif" alt="Live Traffic Engine Run Counter, Active Workers, Browser Preview & GA4 Hit Verification" width="100%" />
+</p>
+<p align="center">
+  <em>Zero-edit live capture (English dashboard): click <strong>Start Run</strong> &rarr; Crawlee workers spin up &rarr; live browser frames stream &rarr; real <code>google-analytics.com/g/collect</code> hits verify per session (<code>6 / 6 &bull; 100%</code>).</em>
+</p>
+
 ### AI Fleet, Live Inboxes &amp; Automated OTP Verification
 <p align="center">
   <img src="docs/img/feature-ai-otp.png" alt="AI Fleet Commander, Live Inboxes, OTP Verification &amp; PDF Reporting" width="100%" />
@@ -76,7 +84,7 @@ Most traffic and QA automation tools fall into one of three weak buckets:
 | **Execution & Scheduling** | Runs in `crawlee_autoscaled` (Mode A — real browsers), `crawlee_playwright` (Mode B — real browsers), or `http_fast` (no-browser protocol load mode for high-throughput HTTP/S requests with proxies, UTM params, and `Referer` headers — without JS execution or client-side analytics). Real-browser modes run `behavior`, `scenario`, and `hybrid` task modes with wave pacing (`off`, `steady`, `ramp_up`, `natural_peaks`, `burst`), strict operator concurrency sovereignty, live GA4 hit verification, sampled `rrweb` preview on mass runs, local time windows (`schedule`), and single- or multi-target (`targets[]`) round-robin execution with `byTarget` metrics. |
 | **Browser Engines & Profiles** | Selects between `chromium` (Playwright + stealth evasions), `patchright`, and `camoufox` (Firefox-based engine), plus optional CDP connections via `browserless` and `@lightpanda/browser`. Weighted device emulation across desktop and mobile viewports plus geo-matched persistent browser profiles (`sessionPersistence`) with multi-day lifecycle stages (`day1_discovery` through `loyal_advocate`). |
 | **Recorder & Scenario Steps** | Interactive browser recorder (`journeyRecorder.js`), DOM/ad-slot inspector (`pageMapper.js`), and 25 scenario step handlers including `goto`, `click`, `fill`, `fill_email`, `fill_otp`, `select`, `press`, `hover`, `scroll`, `scroll_to`, `read_article`, `human_browse`, `use_tool`, `scan_products`, `search_entry`, `ai_explore`, `ai_route_repair`, `ai_form_guard`, `wait`, `dismiss_overlays`, `audit_ads`, `assert`, `go_back`, `close_tab`, and `screenshot`. |
-| **AI Fleet Commander & Onboarding** | Connects to Ollama Cloud (`OLLAMA_API_KEY`) and UncensoredLLM (`ULLM_API_KEY`) with automatic quota/429 failover and an offline local fallback advisor. Includes a built-in **AI Site Onboarding Wizard** (`POST /api/ai/onboard-site`), interactive follow-up chat (`POST /api/ai/onboard-reply`), and **Funnel Cloner** (`POST /api/ai/clone-funnel`) that detects pixels, maps tools/forms, and builds a tailored scenario. Routes `/v1/systemone` decision models such as `clef:27b` (0 output tokens) for worker/recovery steps while keeping free-form JSON scenario helpers (`ai_route_repair`, `ai_form_guard`, Fleet Commander chat) on chat-capable models. |
+| **AI Fleet Commander & Onboarding** | Connects to **HirePulse Cloud Credits** (`HIREPULSE_CREDIT_KEY` &rarr; `gethirepulse.xyz/v1/qa/*`), Ollama Cloud (`OLLAMA_API_KEY`), and UncensoredLLM (`ULLM_API_KEY`) with automatic quota/429 failover and an offline local fallback advisor. Includes a built-in **AI Site Onboarding Wizard** (`POST /api/ai/onboard-site`), interactive follow-up chat (`POST /api/ai/onboard-reply`), and **Funnel Cloner** (`POST /api/ai/clone-funnel`) that detects pixels, maps tools/forms, and builds a tailored scenario across 4 tactical squads (Alpha, Bravo, Charlie, Delta) with route Playbook Caching and `/v1/systemone` decision routing (`clef:27b`). |
 | **Proxy Pool, Scoring & Saver** | Supports `proxy.tier` (`datacenter`, `residential`, `auto`), `round_robin` / `random` selection, Tier-1 country filtering, concurrent preflight reachability/latency checks, per-domain proxy cooldowns and scoring (`proxyScoreboard.js`), metered residential byte budgeting (`residentialPool.js`) with automatic static datacenter fallback (`fallbackServers` / `proxies-fallback.txt`), and a static asset RAM cache + tracker/media blocker (`lite` / `ultra_lite`). |
 | **Live Inbox & Email Sweeps** | Integrates with the HirePulse inbox API (`src/emailInboxClient.js`) to create temporary inboxes per visit, inject addresses (`fill_email`), retrieve OTP codes or confirmation links (`fill_otp`), and run post-visit confirmation sweeps (`emailSweepPasses` / `emailSweepDelayMs`). |
 | **Diagnostics & Safety Gates** | Includes read-only target preflight classification (`open`, `cf_interstitial`, `site_tick`, `dead`, `unknown` via `tools/preflight-target.js`) and read-only CAPTCHA/challenge widget detection (`challengeDetector.js` — detection and reporting only, never solves challenges). Ad-safety switches control overlay dismissal, pop-under cleanup, element exclusion (`avoidAdClicks`), and origin-scoped telemetry headers. |
@@ -125,7 +133,8 @@ Sensitive files (`config.json`, `.env.local`, `proxies.txt`, `proxies-fallback.t
 | Variable | Purpose | Source |
 | --- | --- | --- |
 | `HIREPULSE_OWNER_PILOT_TOKEN` | Owner-pilot bearer token for HirePulse live inboxes (takes precedence over paid key). | Local gateway config (`https://gethirepulse.xyz/email-pilot`) |
-| `HIREPULSE_EMAIL_API_KEY` | Commercial API key for HirePulse inboxes. | `https://gethirepulse.xyz/credits` |
+| `HIREPULSE_CREDIT_KEY` | Hosted Cloud AI QA &amp; Funnel Audit key (routes Fleet Commander, DOM step decisions, and funnel audits via `gethirepulse.xyz/v1/qa/*` with zero local Ollama setup). | `https://gethirepulse.xyz/credits` |
+| `HIREPULSE_EMAIL_API_KEY` | Commercial API key for HirePulse live inboxes (also reused as a HirePulse AI credit key fallback if `HIREPULSE_CREDIT_KEY` is unset). | `https://gethirepulse.xyz/credits` |
 | `HIREPULSE_OWNER_PILOT_FILE` | Optional path to a local JSON holding `{"API_KEYS":{"owner-pilot":"..."}}`. | Local file |
 | `OLLAMA_API_KEY` | Ollama Cloud API key (or stored locally outside repo). | Ollama Cloud |
 | `ULLM_API_KEY` | UncensoredLLM API key for primary or 429-failover routing. | UncensoredLLM |
@@ -135,11 +144,41 @@ Features without a configured key report themselves as `unconfigured` in the das
 
 ---
 
-## AI Fleet & Decision Routing
+## AI Architecture &amp; 4-Squad Hybrid Brain
 
-* **Squads & Roles:** `askFleetCommander` monitors live run telemetry and logs, emits structured runtime directives (`update_config`, `set_concurrency`, `set_wave_mode`, `set_resource_mode`, `assign_squad_model`, `pause`/`resume`/`stop`), and coordinates 4 default tactical squads (`alpha`, `bravo`, `charlie`, `delta`) unless overridden by `ai.allSquadsModel`.
-* **Decision vs. Chat Models:** Decision models such as `clef:27b` only accept `/v1/systemone` (`callDecisionModel` / `askActionChoice`) and return typed `choice`/`score` decisions with 0 output tokens. Free-form scenario steps (`ai_route_repair`, `ai_form_guard`) and Fleet Commander chat automatically fall back via `resolveChatModel` to `ai.commanderModel` (or `deepseek-v4.1-flash`) when `workerModel` is set to a decision model.
-* **Transport Memory:** Runtime model transport discovery (`/api/chat` vs `/api/generate` vs `/v1/systemone`) is persisted locally to ignored `data/ai-models.json`.
+<p align="center">
+  <img src="docs/img/ai-architecture.jpg" alt="4-Squad AI Hybrid Brain, Playbook Cache & Hosted Credit Gateway Architecture" width="100%" />
+</p>
+
+Unlike brute-force LLM browser agents that burn tokens on every click, **Traffic Engine** runs a cost-aware, 4-squad orchestration architecture with route-level **Playbook Caching**, dual-transport execution, automatic failover, and two flexible credential modes (**BYOK Local Cloud** or **Zero-Setup Hosted HirePulse Credits**):
+
+### 1. Tactical Squad Specialization (`src/wavePlanner.js` + `src/aiCommander.js`)
+
+When waves run without a fixed `ai.allSquadsModel` override, `askFleetCommander` and the wave planner coordinate 4 specialized worker squads dynamically:
+
+| Squad | Role Focus | Default Worker Model | Responsibilities |
+| --- | --- | --- | --- |
+| **Alpha** | Tools &amp; Feature QA | `deepseek-v4.1-flash` | Interactive calculators, tool forms (`use_tool`), result extraction &amp; copy checks |
+| **Bravo** | Multi-Tab &amp; Full Flows | `beam` | Multi-tab journeys, external CTA verification tabs, consent banners &amp; popunder cleanup |
+| **Charlie** | Guides &amp; Content Dwell | `minimax-m3.1-flash` | Long-form articles (`read_article`), biometric mouse sweeps (`performBiometricReadingPass`) &amp; text selection |
+| **Delta** | Navigation &amp; Self-Healing | `gpt-oss:20b` | Route exploration (`ai_explore`), fallback navigation (`ai_route_repair`) &amp; form guards (`ai_form_guard`) |
+
+### 2. Decision Models (`/v1/systemone`) vs. Chat Models
+
+* **Zero-Output-Token Worker Decisions (`callDecisionModel` / `askActionChoice`):** Decision models such as `clef:27b` route strictly to `/v1/systemone`, returning deterministic element-ID/state choices without wasting tokens generating prose.
+* **Structured Chat &amp; Recovery (`callAiChat` / `resolveChatModel`):** Free-form JSON steps (`ai_route_repair`, `ai_form_guard`) and Fleet Commander chat automatically fall back from decision-only models to chat-capable models (e.g., `deepseek-v4.1-flash` or `glm-5.3-flash`).
+* **Persistent Transport Discovery (`data/ai-models.json`):** The engine learns at runtime whether each model prefers `/api/chat`, `/api/generate`, or `/v1/systemone` and remembers it across restarts.
+
+### 3. Playbook Cache, Failover Chain &amp; Funnel Cloner
+
+* **Route &amp; Site Playbook Cache (`aiPagePlaybookCache`):** Once an AI worker explores a page or heals a skipped selector, the compact DOM action plan is cached per route pattern so subsequent concurrent visits replay human-jittered variations at **0 extra AI tokens**.
+* **Multi-Tier Failover (`ai.provider`):** Runs cleanly across **Ollama Cloud** (`OLLAMA_API_KEY`) &rarr; **UncensoredLLM** (`ULLM_API_KEY`, auto-failover on HTTP 429/402 cooldown) &rarr; **HirePulse Cloud Credits** (`HIREPULSE_CREDIT_KEY` / `HIREPULSE_EMAIL_API_KEY`) &rarr; **Deterministic Offline Advisor** (`buildLocalCommanderFallback`), never crashing when keys are omitted.
+* **Hosted Open-Core Cloud Mode ([`gethirepulse.xyz/credits`](https://gethirepulse.xyz/credits)):** Don't want to manage multiple upstream AI vendor keys or Ollama configs? Set `ai.provider = "hirepulse"` (or `auto` with `HIREPULSE_CREDIT_KEY` in `.env.local`) to route **Fleet Commander** (`/v1/qa/commander`), **DOM Step Decisions &amp; Recovery** (`/v1/qa/step-decision`), and **Public Funnel Audits** (`/v1/qa/funnel-audit`) directly through the hosted HirePulse Gateway alongside **Live Email/OTP Inboxes** — while strictly enforcing the **Operator Concurrency Sovereignty Rule** server-side.
+* **AI Onboarding Wizard &amp; Funnel Intelligence Cloner:** Paste any authorized site URL into **AI Onboarding** (`POST /api/ai/onboard-site` + `/api/ai/onboard-reply`) or **Analyze Pixels &amp; Clone Funnel** (`POST /api/ai/clone-funnel`) to detect GA4, GTM, AdSense, Meta, TikTok, Clarity, Hotjar, and Cloudflare Turnstile tags, map interactive tool/guide routes, and synthesize a tailored test scenario automatically.
+
+* **Runtime Fleet Directives (`askFleetCommander`):** Monitors live run telemetry and logs to emit structured runtime actions (`update_config`, `set_wave_mode`, `set_resource_mode`, `assign_squad_model`, `dispatch_directive`, `pause`/`resume`/`stop`) while preserving strict **Operator Concurrency Sovereignty**.
+
+
 
 ---
 

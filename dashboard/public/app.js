@@ -1667,6 +1667,7 @@ function renderAiStatusBadge(info) {
   const badge = $('ai-cred-badge');
   if (!badge || !info) return;
   const parts = [];
+  if (info.providers?.hirepulse?.configured) parts.push(`HirePulse(${info.providers.hirepulse.source})`);
   if (info.providers?.ollama_cloud?.configured) parts.push(`Ollama(${info.providers.ollama_cloud.source})`);
   if (info.providers?.uncensoredllm?.configured) parts.push(`UncensoredLLM(${info.providers.uncensoredllm.source})`);
   if (info.configured) {

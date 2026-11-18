@@ -7,6 +7,15 @@ const { redactData, registerStepSecrets } = require('./redaction');
 
 const DEFAULT_OLLAMA_HOST = 'https://ollama.com';
 const DEFAULT_ULLM_HOST = 'https://api.uncensoredllm.ai';
+const DEFAULT_HIREPULSE_HOST = (process.env.HIREPULSE_GATEWAY_URL || 'https://gethirepulse.xyz').replace(/\/+$/, '');
+
+function resolveHirePulseAiKey() {
+  const explicit = String(process.env.HIREPULSE_CREDIT_KEY || '').trim();
+  if (explicit) return { apiKey: explicit, source: 'env(HIREPULSE_CREDIT_KEY)' };
+  const emailKey = String(process.env.HIREPULSE_EMAIL_API_KEY || '').trim();
+  if (emailKey) return { apiKey: emailKey, source: 'env(HIREPULSE_EMAIL_API_KEY)' };
+  return { apiKey: '', source: 'none' };
+}
 const DEFAULT_COMMANDER_MODEL = 'glm-5.3-flash';
 const DEFAULT_WORKER_MODEL = 'deepseek-v4.1-flash';
 const OLLAMA_CHEAP_WORKER_POOL = [
@@ -94,6 +103,7 @@ function readKeyFile(filePath) {
 function normalizeAiProvider(raw) {
   const v = String(raw || '').trim().toLowerCase();
   if (v === 'ollama' || v === 'ollama_cloud' || v === 'ollama-cloud') return 'ollama_cloud';
+  if (v === 'hirepulse' || v === 'hp' || v === 'gethirepulse' || v === 'credits') return 'hirepulse';
   if (v === 'ullm' || v === 'uncensoredllm' || v === 'uncensored') return 'uncensoredllm';
   return 'auto';
 }
@@ -104,6 +114,16 @@ function normalizeAiProvider(raw) {
  */
 function resolveProviderConfig(provider = 'ollama_cloud') {
   const norm = normalizeAiProvider(provider);
+  if (norm === 'hirepulse') {
+    const { apiKey, source } = resolveHirePulseAiKey();
+    return {
+      provider: 'hirepulse',
+      configured: Boolean(apiKey),
+      source,
+      host: DEFAULT_HIREPULSE_HOST,
+      apiKey,
+    };
+  }
   if (norm === 'uncensoredllm') {
     const host = (process.env.ULLM_CLOUD_HOST || DEFAULT_ULLM_HOST).replace(/\/+$/, '');
     const envKey = String(process.env.ULLM_API_KEY || process.env.UNCENSOREDLLM_API_KEY || '').trim();
@@ -126,25 +146,33 @@ function resolveOllamaConfig() {
   if (ollama.configured) return ollama;
   const ullm = resolveProviderConfig('uncensoredllm');
   if (ullm.configured) return ullm;
+  const hp = resolveProviderConfig('hirepulse');
+  if (hp.configured) return hp;
   return ollama;
 }
 
 function getOllamaStatusPublic() {
   const ollama = resolveProviderConfig('ollama_cloud');
   const ullm = resolveProviderConfig('uncensoredllm');
+  const hirepulse = resolveProviderConfig('hirepulse');
   const cooldownActive = ollamaCooldownUntil > Date.now();
   const activePrimary = (ollama.configured && !cooldownActive)
     ? 'ollama_cloud'
-    : (ullm.configured ? 'uncensoredllm' : (ollama.configured ? 'ollama_cloud' : 'none'));
+    : (ullm.configured ? 'uncensoredllm' : (hirepulse.configured ? 'hirepulse' : (ollama.configured ? 'ollama_cloud' : 'none')));
 
   return {
-    configured: ollama.configured || ullm.configured,
-    source: activePrimary === 'uncensoredllm' ? ullm.source : ollama.source,
-    host: activePrimary === 'uncensoredllm' ? ullm.host : ollama.host,
+    configured: ollama.configured || ullm.configured || hirepulse.configured,
+    source: activePrimary === 'uncensoredllm' ? ullm.source : (activePrimary === 'hirepulse' ? hirepulse.source : ollama.source),
+    host: activePrimary === 'uncensoredllm' ? ullm.host : (activePrimary === 'hirepulse' ? hirepulse.host : ollama.host),
     activePrimary,
     defaultCommanderModel: activePrimary === 'uncensoredllm' ? DEFAULT_ULLM_CHEAP_COMMANDER : DEFAULT_COMMANDER_MODEL,
     defaultWorkerModel: activePrimary === 'uncensoredllm' ? DEFAULT_ULLM_CHEAP_WORKER : DEFAULT_WORKER_MODEL,
     providers: {
+      hirepulse: {
+        configured: hirepulse.configured,
+        source: hirepulse.source,
+        host: hirepulse.host,
+      },
       ollama_cloud: {
         configured: ollama.configured,
         source: ollama.source,
@@ -158,6 +186,153 @@ function getOllamaStatusPublic() {
       },
     },
   };
+}
+
+function shouldUseHirePulseGateway(providerPref = 'auto') {
+  const pref = normalizeAiProvider(providerPref);
+  const hp = resolveProviderConfig('hirepulse');
+  if (!hp.configured) return false;
+  if (pref === 'hirepulse') return true;
+  if (pref === 'ollama_cloud' || pref === 'uncensoredllm') return false;
+  const ollamaReady = resolveProviderConfig('ollama_cloud').configured && ollamaCooldownUntil <= Date.now();
+  const ullmReady = resolveProviderConfig('uncensoredllm').configured;
+  return !ollamaReady && !ullmReady;
+}
+
+function buildCompactTelemetryForGateway(telemetrySummary) {
+  let raw = JSON.stringify(telemetrySummary || {});
+  if (raw.length <= 5800) return telemetrySummary;
+  const trimmed = {
+    ...(telemetrySummary || {}),
+    recentLogs: Array.isArray(telemetrySummary?.recentLogs) ? telemetrySummary.recentLogs.slice(-8) : [],
+    recentVisitsSample: Array.isArray(telemetrySummary?.recentVisitsSample) ? telemetrySummary.recentVisitsSample.slice(0, 3) : [],
+  };
+  raw = JSON.stringify(trimmed);
+  if (raw.length <= 5800) return trimmed;
+  return {
+    completed: telemetrySummary?.completed ?? 0,
+    totalPlanned: telemetrySummary?.totalPlanned ?? 0,
+    succeeded: telemetrySummary?.succeeded ?? 0,
+    failed: telemetrySummary?.failed ?? 0,
+    avgLoadMs: telemetrySummary?.avgLoadMs ?? null,
+    errorsTotal: telemetrySummary?.errorsTotal ?? 0,
+    lastErrorSample: telemetrySummary?.lastErrorSample ?? null,
+    aiStats: telemetrySummary?.aiStats ?? null,
+    currentConfig: {
+      targetUrl: telemetrySummary?.currentConfig?.targetUrl || '',
+      visitCount: telemetrySummary?.currentConfig?.visitCount || 0,
+      taskMode: telemetrySummary?.currentConfig?.taskMode || 'scenario',
+      referrerMode: telemetrySummary?.currentConfig?.referrerMode || 'mixed',
+      resourceMode: telemetrySummary?.currentConfig?.resourceMode || 'lite',
+    },
+  };
+}
+
+async function callHirePulseCommander({
+  message,
+  telemetrySummary = {},
+  isAutoCheck = false,
+  allowConcurrencyChange = false,
+  timeoutMs = 20000,
+} = {}) {
+  const cred = resolveProviderConfig('hirepulse');
+  if (!cred.configured) {
+    const err = new Error('HIREPULSE_CREDIT_KEY / HIREPULSE_EMAIL_API_KEY is not configured.');
+    err.code = 'AI_NOT_CONFIGURED';
+    throw err;
+  }
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(new Error('hirepulse_gateway timeout')), timeoutMs);
+  try {
+    const payload = redactData({
+      message: String(message || '').slice(0, 2400),
+      telemetrySummary: buildCompactTelemetryForGateway(telemetrySummary),
+      isAutoCheck: Boolean(isAutoCheck),
+      allowConcurrencyChange: Boolean(allowConcurrencyChange),
+    });
+    const resp = await fetch(`${cred.host}/v1/qa/commander`, {
+      method: 'POST',
+      signal: ctrl.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-HirePulse-Credit-Key': cred.apiKey,
+        'User-Agent': 'WebTrafficGen-OpenCore/1.0',
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || data?.ok === false) {
+      const msg = data?.detail || data?.title || data?.error || `HTTP ${resp.status}`;
+      const err = new Error(`HirePulse Gateway /v1/qa/commander error: ${msg}`);
+      err.httpStatus = resp.status;
+      throw err;
+    }
+    return {
+      reply: String(data.reply || ''),
+      directives: Array.isArray(data.directives) ? data.directives : [],
+      model: String(data.model || 'hirepulse-gateway'),
+      provider: 'hirepulse',
+      chargedMicroUsd: data.charged_micro_usd ?? null,
+      balanceMicroUsd: data.balance_micro_usd ?? null,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function callHirePulseStepDecision({
+  mode = 'explore',
+  goal = '',
+  url = '',
+  compactDom = {},
+  pageState = '',
+  timeoutMs = 15000,
+} = {}) {
+  const cred = resolveProviderConfig('hirepulse');
+  if (!cred.configured) {
+    const err = new Error('HIREPULSE_CREDIT_KEY / HIREPULSE_EMAIL_API_KEY is not configured.');
+    err.code = 'AI_NOT_CONFIGURED';
+    throw err;
+  }
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(new Error('hirepulse_step_decision timeout')), timeoutMs);
+  try {
+    const domStr = typeof compactDom === 'string' ? compactDom : JSON.stringify(redactData(compactDom || {}));
+    const resp = await fetch(`${cred.host}/v1/qa/step-decision`, {
+      method: 'POST',
+      signal: ctrl.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-HirePulse-Credit-Key': cred.apiKey,
+        'User-Agent': 'WebTrafficGen-OpenCore/1.0',
+      },
+      body: JSON.stringify({
+        mode: ['explore', 'decision', 'route_repair', 'form_guard'].includes(mode) ? mode : 'explore',
+        goal: String(goal || 'Explore interactive page controls').slice(0, 480),
+        url: String(url || '').slice(0, 500),
+        compactDom: domStr.slice(0, 4800),
+        pageState: String(pageState || '').slice(0, 280),
+      }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || data?.ok === false) {
+      const msg = data?.detail || data?.title || data?.error || `HTTP ${resp.status}`;
+      const err = new Error(`HirePulse Gateway /v1/qa/step-decision error: ${msg}`);
+      err.httpStatus = resp.status;
+      throw err;
+    }
+    return {
+      action: String(data.action || 'scroll').toLowerCase(),
+      selector: String(data.selector || ''),
+      value: String(data.value || ''),
+      reason: String(data.reason || ''),
+      model: String(data.model || 'hirepulse-gateway'),
+      chargedMicroUsd: data.charged_micro_usd ?? null,
+      balanceMicroUsd: data.balance_micro_usd ?? null,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function mapModelForProvider(requestedModel, provider, role = 'worker') {
@@ -817,7 +992,7 @@ async function runAiExploreStep(page, step = {}, ctx = {}) {
   const statusInfo = getOllamaStatusPublic();
   const hasSelectedCred = providerPref === 'ollama_cloud'
     ? statusInfo.providers.ollama_cloud.configured
-    : (providerPref === 'uncensoredllm' ? statusInfo.providers.uncensoredllm.configured : statusInfo.configured);
+    : (providerPref === 'uncensoredllm' ? statusInfo.providers.uncensoredllm.configured : (providerPref === 'hirepulse' ? statusInfo.providers.hirepulse.configured : statusInfo.configured));
 
   if (!hasSelectedCred || ctx.aiConfig?.enabled === false) {
     const fallbackNote = await runScanProductsStep(page, { value: '1', sameOriginOnly }, ctx).catch(() => 'Human scroll performed');
@@ -863,7 +1038,28 @@ async function runAiExploreStep(page, step = {}, ctx = {}) {
   let planSteps = [];
   let pageState = null;
   try {
-    if (isDecisionModel(model)) {
+    if (shouldUseHirePulseGateway(providerPref)) {
+      const hpMicroDom = {
+        t: dom.title,
+        h: dom.headings,
+        i: dom.inputs.map(x => ({ id: x.id, s: x.selector, t: x.type, ph: x.placeholder })),
+        c: dom.clickables.map(x => ({ id: x.id, s: x.selector, txt: x.text })),
+      };
+      const hpRes = await callHirePulseStepDecision({
+        mode: 'explore',
+        goal,
+        url: dom.url,
+        compactDom: hpMicroDom,
+      });
+      usedModelLabel = `hirepulse:${hpRes.model || 'gateway'}`;
+      const hpAct = String(hpRes.action || 'scroll').toLowerCase();
+      planSteps = [{
+        act: ['click', 'fill', 'scroll'].includes(hpAct) ? hpAct : 'scroll',
+        val: String(hpRes.value || ''),
+        selectorHint: String(hpRes.selector || ''),
+        targetText: String(hpRes.reason || ''),
+      }];
+    } else if (isDecisionModel(model)) {
       // A decision model cannot write prose, but it classifies the page and picks one action in a
       // single ~200-token request, and it cannot invent a selector that is not on the page.
       const pick = await askActionChoice({
@@ -1138,7 +1334,7 @@ async function runAiSmartRecoveryStep(page, ctx = {}, failedHint = '') {
   const statusInfo = getOllamaStatusPublic();
   const hasSelectedCred = providerPref === 'ollama_cloud'
     ? statusInfo.providers.ollama_cloud.configured
-    : (providerPref === 'uncensoredllm' ? statusInfo.providers.uncensoredllm.configured : statusInfo.configured);
+    : (providerPref === 'uncensoredllm' ? statusInfo.providers.uncensoredllm.configured : (providerPref === 'hirepulse' ? statusInfo.providers.hirepulse.configured : statusInfo.configured));
   if (!hasSelectedCred) return null;
 
   const currentUrl = page.url();
@@ -1188,7 +1384,27 @@ async function runAiSmartRecoveryStep(page, ctx = {}, failedHint = '') {
     let parsed = null;
     let usedRecoveryModel = recoveryModel;
 
-    if (isDecisionModel(recoveryModel)) {
+    if (shouldUseHirePulseGateway(providerPref)) {
+      const hpRecDom = {
+        t: dom.title,
+        h: dom.headings,
+        i: dom.inputs.map(x => ({ id: x.id, s: x.selector, t: x.type, ph: x.placeholder })),
+        c: dom.clickables.map(x => ({ id: x.id, s: x.selector, txt: x.text })),
+      };
+      const hpRes = await callHirePulseStepDecision({
+        mode: 'route_repair',
+        goal: `Recover skipped step: ${String(failedHint || '').slice(0, 120)}`,
+        url: currentUrl,
+        compactDom: hpRecDom,
+      });
+      usedRecoveryModel = `hirepulse:${hpRes.model || 'gateway'}`;
+      const hpAct = String(hpRes.action || 'scroll').toLowerCase();
+      parsed = {
+        act: ['click', 'fill', 'scroll'].includes(hpAct) ? hpAct : 'scroll',
+        val: String(hpRes.value || ''),
+        selectorHint: String(hpRes.selector || ''),
+      };
+    } else if (isDecisionModel(recoveryModel)) {
       const pick = await askRecoveryDecision(recoveryModel, dom, ctx, failedHint);
       if (pick) parsed = { act: pick.act, id: pick.id, val: pick.val };
     } else {
@@ -1227,8 +1443,11 @@ async function runAiSmartRecoveryStep(page, ctx = {}, failedHint = '') {
       selectorHint: clickItem?.selector || inputItem?.selector || '',
       targetText: clickItem?.text || '',
     }];
+    if (!planSteps[0].selectorHint && parsed.selectorHint) {
+      planSteps[0].selectorHint = String(parsed.selectorHint);
+    }
     setCachedPlaybook(recoverKey, {
-      model: `ollama_cloud:${usedRecoveryModel}`,
+      model: String(usedRecoveryModel).startsWith('hirepulse:') ? usedRecoveryModel : `ollama_cloud:${usedRecoveryModel}`,
       planSteps,
       estTokens: Math.round((systemPrompt.length + userPrompt.length) / 3.5) + 50,
     });
@@ -1351,7 +1570,7 @@ async function askFleetCommander({
   const statusInfo = getOllamaStatusPublic();
   const hasCred = providerPref === 'ollama_cloud'
     ? statusInfo.providers.ollama_cloud.configured
-    : (providerPref === 'uncensoredllm' ? statusInfo.providers.uncensoredllm.configured : statusInfo.configured);
+    : (providerPref === 'uncensoredllm' ? statusInfo.providers.uncensoredllm.configured : (providerPref === 'hirepulse' ? statusInfo.providers.hirepulse.configured : statusInfo.configured));
   if (!hasCred) {
     return buildLocalCommanderFallback({ message, runState, config });
   }
@@ -1511,6 +1730,24 @@ async function askFleetCommander({
   ];
 
   try {
+    if (shouldUseHirePulseGateway(providerPref)) {
+      const hpOut = await callHirePulseCommander({
+        message,
+        telemetrySummary,
+        isAutoCheck,
+        allowConcurrencyChange,
+      });
+      return {
+        reply: hpOut.reply,
+        directives: Array.isArray(hpOut.directives) ? hpOut.directives : [],
+        provider: 'hirepulse',
+        model: `hirepulse:${hpOut.model || 'gateway'}`,
+        fallbackUsed: false,
+        chargedMicroUsd: hpOut.chargedMicroUsd ?? null,
+        balanceMicroUsd: hpOut.balanceMicroUsd ?? null,
+      };
+    }
+
     const resp = await callAiChat({
       provider: providerPref,
       role: 'commander',
@@ -1567,6 +1804,11 @@ module.exports = {
   OLLAMA_CHEAP_WORKER_POOL,
   DEFAULT_ULLM_CHEAP_COMMANDER,
   DEFAULT_ULLM_CHEAP_WORKER,
+  DEFAULT_HIREPULSE_HOST,
+  resolveHirePulseAiKey,
+  shouldUseHirePulseGateway,
+  callHirePulseCommander,
+  callHirePulseStepDecision,
   normalizeAiProvider,
   mapModelForProvider,
   resolveProviderConfig,
