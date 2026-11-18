@@ -35,6 +35,7 @@ const state = {
   recorder: null,
   lastImportedRecorderAt: null,
   countryCatalog: [],
+  datacenterCounts: {},
   tier1Defaults: ['US', 'GB', 'CA', 'AU', 'DE'],
   aiStatus: null,
   aiHistory: [],
@@ -134,22 +135,35 @@ $('browserEngine').value = cfg.browserEngine || 'chromium';
   if ($('proxy-tier')) {
     $('proxy-tier').value = ['auto', 'datacenter', 'residential'].includes(cfg.proxy?.tier) ? cfg.proxy.tier : 'auto';
   }
-  if ($('proxy-residential-country')) {
-    const resiCc = String(cfg.proxy?.residential?.country || '').toLowerCase();
-    const sel = $('proxy-residential-country');
-    if (resiCc && !Array.from(sel.options).some(o => o.value === resiCc)) {
-      const opt = document.createElement('option');
-      opt.value = resiCc;
-      opt.textContent = `${flagOf(resiCc)} ${resiCc.toUpperCase()}`;
-      sel.appendChild(opt);
-    }
-    sel.value = resiCc;
-    sel.disabled = (($('proxy-tier')?.value || cfg.proxy?.tier) === 'datacenter');
-  }
   $('proxy-mode').value = cfg.proxy?.mode || 'round_robin';
   if ($('proxy-country-filter')) $('proxy-country-filter').checked = cfg.proxy?.countryFilterEnabled !== false;
   if ($('proxy-country-fallback')) $('proxy-country-fallback').checked = cfg.proxy?.fallbackToAnyIfEmpty !== false;
   $('proxy-servers').value = Array.isArray(cfg.proxy?.servers) ? cfg.proxy.servers.join('\n') : '';
+  if ($('proxy-residential-country')) {
+    populateCountryDropdownOptions();
+    const sel = $('proxy-residential-country');
+    const resiCc = String(cfg.proxy?.residential?.country || '').trim().toLowerCase();
+    const filterOn = cfg.proxy?.countryFilterEnabled !== false;
+    const pref = Array.isArray(cfg.proxy?.preferredCountries)
+      ? cfg.proxy.preferredCountries.map(c => String(c || '').trim().toUpperCase()).filter(Boolean)
+      : [];
+    let targetVal = '';
+    if (resiCc === '__preferred__' || (!resiCc && filterOn && pref.length > 1)) {
+      targetVal = '__preferred__';
+    } else if (resiCc && /^[a-z]{2}$/.test(resiCc)) {
+      targetVal = resiCc;
+    } else if (filterOn && pref.length === 1) {
+      targetVal = pref[0].toLowerCase();
+    }
+    if (targetVal && targetVal !== '__preferred__' && !Array.from(sel.options).some(o => o.value === targetVal)) {
+      const opt = document.createElement('option');
+      opt.value = targetVal;
+      opt.textContent = `${flagOf(targetVal)} ${targetVal.toUpperCase()}`;
+      sel.appendChild(opt);
+    }
+    sel.value = targetVal;
+    sel.disabled = false;
+  }
 
   if ($('stealth-mode')) $('stealth-mode').value = cfg.stealthMode || 'maximum';
   if ($('resource-mode')) $('resource-mode').value = cfg.resourceMode || 'full';
@@ -186,8 +200,22 @@ $('browserEngine').value = cfg.browserEngine || 'chromium';
   $('ad-close-popunders').checked = cfg.adSafety?.closePopunders !== false;
   $('ad-skip-telemetry').checked = Boolean(cfg.adSafety?.skipTelemetryHeader);
 
+  if ($('onboard-domain-badge')) {
+    try {
+      const h = new URL(cfg.targetUrl || 'https://example.com').hostname;
+      $('onboard-domain-badge').textContent = `Adapted for: ${h}`;
+    } catch {
+      $('onboard-domain-badge').textContent = 'Ready to Adapt';
+    }
+  }
+  if ($('onboard-ai-level') && cfg.ai) {
+    const wp = Number(cfg.ai.workerPct ?? 100);
+    $('onboard-ai-level').value = wp >= 80 ? 'full_autonomous' : (wp >= 40 ? 'balanced_50' : 'light_repair');
+  }
+
   renderCountriesSelector();
   renderPages();
+  renderTargets();
   renderTaskSteps();
   renderDevices();
   renderPersonas();
@@ -200,7 +228,7 @@ function collectSimpleFieldsToConfig() {
   if (!cfg) return;
   cfg.targetUrl = $('targetUrl').value.trim();
   cfg.engineMode = $('engineMode').value;
-cfg.browserEngine = $('browserEngine').value;
+  cfg.browserEngine = $('browserEngine').value;
   cfg.taskMode = $('taskMode').value;
   cfg.visitCount = Number($('visitCount').value) || 1;
   cfg.concurrency = Math.max(1, Number($('concurrency').value) || 1);
@@ -226,7 +254,21 @@ cfg.browserEngine = $('browserEngine').value;
     ? $('proxy-residential-country').value.trim().toLowerCase()
     : (cfg.proxy?.residential?.country || '');
   if ($('proxy-residential-country')) {
-    $('proxy-residential-country').disabled = (tierVal === 'datacenter');
+    $('proxy-residential-country').disabled = false;
+  }
+
+  let countryFilterEnabled = $('proxy-country-filter') ? $('proxy-country-filter').checked : true;
+  let preferredCountries = Array.isArray(cfg.proxy?.preferredCountries) ? [...cfg.proxy.preferredCountries] : [...state.tier1Defaults];
+  if (resiCountryVal && resiCountryVal !== '__preferred__' && /^[a-z]{2}$/.test(resiCountryVal)) {
+    countryFilterEnabled = true;
+    preferredCountries = [resiCountryVal.toUpperCase()];
+    if ($('proxy-country-filter')) $('proxy-country-filter').checked = true;
+  } else if (resiCountryVal === '') {
+    countryFilterEnabled = false;
+    if ($('proxy-country-filter')) $('proxy-country-filter').checked = false;
+  } else if (resiCountryVal === '__preferred__') {
+    countryFilterEnabled = true;
+    if ($('proxy-country-filter')) $('proxy-country-filter').checked = true;
   }
 
   cfg.proxy = {
@@ -234,9 +276,9 @@ cfg.browserEngine = $('browserEngine').value;
     enabled: $('proxy-enabled').checked,
     tier: ['auto', 'datacenter', 'residential'].includes(tierVal) ? tierVal : 'auto',
     mode: $('proxy-mode').value === 'random' ? 'random' : 'round_robin',
-    countryFilterEnabled: $('proxy-country-filter') ? $('proxy-country-filter').checked : true,
+    countryFilterEnabled,
     fallbackToAnyIfEmpty: $('proxy-country-fallback') ? $('proxy-country-fallback').checked : true,
-    preferredCountries: Array.isArray(cfg.proxy?.preferredCountries) ? cfg.proxy.preferredCountries : [...state.tier1Defaults],
+    preferredCountries,
     servers: $('proxy-servers').value.split(/\r?\n/).map(s => s.trim()).filter(s => s && !s.startsWith('#')),
     residential: {
       ...(cfg.proxy?.residential || {}),
@@ -369,6 +411,124 @@ function renderPages() {
       dl.appendChild(opt);
     });
   }
+}
+
+function renderTargets() {
+  const listEl = $('targets-list');
+  const badgeEl = $('multi-targets-count-badge');
+  if (!listEl || !state.config) return;
+  const targets = Array.isArray(state.config.targets)
+    ? state.config.targets.filter(t => t && typeof t === 'object' && t.url)
+    : [];
+
+  if (badgeEl) {
+    if (targets.length > 0) {
+      badgeEl.className = 'badge completed';
+      badgeEl.textContent = `🎯 ${targets.length} active targets in round-robin`;
+    } else {
+      badgeEl.className = 'badge idle';
+      badgeEl.textContent = 'Single Target (targetUrl)';
+    }
+  }
+
+  listEl.innerHTML = '';
+  if (!targets.length) {
+    const empty = document.createElement('div');
+    empty.className = 'hint';
+    empty.textContent = 'Currently running against the primary targetUrl above. Add extra targets here to run multiple sites in parallel.';
+    listEl.appendChild(empty);
+    return;
+  }
+
+  const byTargetStats = state.runStatus?.byTarget || {};
+  targets.forEach((t, idx) => {
+    const row = document.createElement('div');
+    row.className = 'page-chip';
+    row.style.flexWrap = 'wrap';
+    row.style.gap = '8px';
+
+    const left = document.createElement('div');
+    left.className = 'inline-row';
+    left.style.flexWrap = 'wrap';
+    left.style.gap = '8px';
+
+    const numBadge = document.createElement('span');
+    numBadge.className = 'badge';
+    numBadge.style.padding = '2px 7px';
+    numBadge.style.fontSize = '0.75rem';
+    numBadge.textContent = `Target #${idx + 1}`;
+    left.appendChild(numBadge);
+
+    const urlCode = document.createElement('code');
+    urlCode.textContent = t.url;
+    left.appendChild(urlCode);
+
+    const pagesArr = Array.isArray(t.pages) && t.pages.length ? t.pages : ['/'];
+    const pagesTag = document.createElement('span');
+    pagesTag.className = 'muted';
+    pagesTag.style.fontSize = '0.8rem';
+    pagesTag.textContent = `(${pagesArr.length} pages: ${pagesArr.slice(0, 4).join(', ')}${pagesArr.length > 4 ? '...' : ''})`;
+    left.appendChild(pagesTag);
+
+    const visitsTag = document.createElement('span');
+    visitsTag.className = 'badge';
+    visitsTag.style.padding = '2px 8px';
+    visitsTag.style.fontSize = '0.75rem';
+    visitsTag.textContent = t.visitCount > 0 ? `${t.visitCount} visits` : 'Equal split';
+    left.appendChild(visitsTag);
+
+    const liveStat = byTargetStats[t.url] || byTargetStats[String(t.url).replace(/\/$/, '')];
+    if (liveStat) {
+      const statBadge = document.createElement('span');
+      statBadge.className = 'badge completed';
+      statBadge.style.padding = '2px 8px';
+      statBadge.style.fontSize = '0.75rem';
+      statBadge.textContent = `Done: ${liveStat.completed || 0}/${liveStat.planned || t.visitCount || '?'} (ok: ${liveStat.succeeded || 0})`;
+      left.appendChild(statBadge);
+    }
+
+    const btns = document.createElement('div');
+    btns.className = 'inline-row';
+
+    const scanBtn = document.createElement('button');
+    scanBtn.type = 'button';
+    scanBtn.className = 'small';
+    scanBtn.textContent = '🔍 Discover Pages';
+    scanBtn.onclick = async () => {
+      scanBtn.disabled = true;
+      scanBtn.textContent = 'Scanning...';
+      try {
+        const res = await api('/api/discover', { method: 'POST', body: JSON.stringify({ targetUrl: t.url }) });
+        if (Array.isArray(res.pages) && res.pages.length) {
+          state.config.targets[idx].pages = res.pages;
+          renderTargets();
+          renderJsonPreview();
+          showToast(`Discovered ${res.pages.length} pages for ${t.url}`);
+        }
+      } catch (err) {
+        showToast('Target page discovery failed: ' + err.message, true);
+      } finally {
+        scanBtn.disabled = false;
+        scanBtn.textContent = '🔍 Discover Pages';
+      }
+    };
+    btns.appendChild(scanBtn);
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'small danger';
+    delBtn.textContent = 'Remove';
+    delBtn.onclick = () => {
+      state.config.targets.splice(idx, 1);
+      renderTargets();
+      renderJsonPreview();
+    };
+    btns.appendChild(delBtn);
+
+    row.appendChild(left);
+    row.appendChild(btns);
+    listEl.appendChild(row);
+  });
 }
 
 function appendMappedStep(stepObj) {
@@ -1421,13 +1581,30 @@ function renderProxyTestResults(results) {
   });
 }
 
+function populateCountryDropdownOptions() {
+  const sel = $('proxy-residential-country');
+  if (!sel) return;
+  const counts = state.datacenterCounts || {};
+  Array.from(sel.options).forEach(opt => {
+    const val = String(opt.value || '').trim().toUpperCase();
+    if (!val || val === '__PREFERRED__' || val.length !== 2) return;
+    const catItem = (state.countryCatalog || []).find(c => c.code === val);
+    const baseName = catItem ? catItem.nameHe : `${ RECORDER_CC_LABEL[val] || val } (${val})`;
+    const dcCount = Number(counts[val] || 0);
+    const dcSuffix = dcCount > 0 ? ` — ${dcCount} DC + Residential` : ' — Residential';
+    opt.textContent = `${flagOf(val)} ${baseName}${dcSuffix}`;
+  });
+}
+
 function renderCountriesSelector() {
   const grid = $('proxy-countries-grid');
   if (!grid || !state.config) return;
+  populateCountryDropdownOptions();
   const selected = new Set(Array.isArray(state.config.proxy?.preferredCountries) ? state.config.proxy.preferredCountries : state.tier1Defaults);
   const catalog = state.countryCatalog.length
     ? state.countryCatalog
     : state.tier1Defaults.map(code => ({ code, nameHe: code, tier: 1 }));
+  const counts = state.datacenterCounts || {};
 
   grid.innerHTML = '';
   catalog.forEach(c => {
@@ -1443,13 +1620,29 @@ function renderCountriesSelector() {
       const cur = new Set(Array.isArray(state.config.proxy.preferredCountries) ? state.config.proxy.preferredCountries : []);
       if (cb.checked) cur.add(c.code);
       else cur.delete(c.code);
-      state.config.proxy.preferredCountries = [...cur];
+      const nextPref = [...cur];
+      state.config.proxy.preferredCountries = nextPref;
+      state.config.proxy.countryFilterEnabled = nextPref.length > 0;
+      if ($('proxy-country-filter')) $('proxy-country-filter').checked = nextPref.length > 0;
+      if ($('proxy-residential-country')) {
+        if (nextPref.length === 1) {
+          $('proxy-residential-country').value = nextPref[0].toLowerCase();
+          if (state.config.proxy.residential) state.config.proxy.residential.country = nextPref[0].toLowerCase();
+        } else if (nextPref.length > 1) {
+          $('proxy-residential-country').value = '__preferred__';
+          if (state.config.proxy.residential) state.config.proxy.residential.country = '__preferred__';
+        } else {
+          $('proxy-residential-country').value = '';
+          if (state.config.proxy.residential) state.config.proxy.residential.country = '';
+        }
+      }
       chip.classList.toggle('selected', cb.checked);
       renderJsonPreview();
     };
 
     const span = document.createElement('span');
-    span.textContent = c.nameEn || c.name || c.code;
+    const dcCount = Number(counts[c.code] || 0);
+    span.textContent = `${flagOf(c.code)} ${c.nameEn || c.name || c.code}${dcCount > 0 ? ` [${dcCount} DC]` : ''}`;
     chip.appendChild(cb);
     chip.appendChild(span);
     if (c.tier === 1) {
@@ -1643,6 +1836,154 @@ function wireActions() {
       btn.textContent = 'Discover Site Pages 🔍';
     }
   };
+
+  $('proxy-residential-country')?.addEventListener('change', () => {
+    renderCountriesSelector();
+  });
+
+  $('targetUrl')?.addEventListener('change', () => {
+    const raw = $('targetUrl')?.value.trim() || '';
+    try {
+      const h = new URL(raw).hostname;
+      const box = $('onboard-ai-result');
+      if (box) {
+        box.style.display = 'block';
+        box.textContent = `🔄 Detected new target (${h}). Click "✨ Scan Site & Auto-Adapt with AI" to discover live pages (avoiding 404s) and tailor AI workers!`;
+      }
+    } catch {}
+  });
+
+  if ($('btn-onboard-site')) {
+    $('btn-onboard-site').onclick = async () => {
+      collectSimpleFieldsToConfig();
+      const targetUrl = $('targetUrl')?.value.trim() || state.config?.targetUrl;
+      if (!targetUrl) {
+        showToast('Please enter a targetUrl first.', true);
+        return;
+      }
+      const btn = $('btn-onboard-site');
+      const resBox = $('onboard-ai-result');
+      btn.disabled = true;
+      btn.textContent = '🤖 Scanning site & auto-adapting with AI...';
+      if (resBox) {
+        resBox.style.display = 'block';
+        resBox.textContent = 'Scanning site pages, analyzing buttons/tools/guides, and configuring AI workers...';
+      }
+      try {
+        const res = await api('/api/ai/onboard-site', {
+          method: 'POST',
+          body: JSON.stringify({
+            targetUrl,
+            goal: $('onboard-goal')?.value || 'tools_clicks',
+            aiLevel: $('onboard-ai-level')?.value || 'full_autonomous',
+            proxyTier: $('proxy-tier')?.value || state.config?.proxy?.tier || 'datacenter',
+            country: $('proxy-residential-country')?.value ?? '',
+            visitCount: Number($('visitCount')?.value) || state.config?.visitCount || 500,
+            userNotes: $('onboard-user-notes')?.value.trim() || '',
+            rebuildSteps: Boolean($('onboard-rebuild-steps')?.checked),
+          }),
+        });
+        if (res && res.config) {
+          state.config = res.config;
+          syncFormFromConfig();
+          renderJsonPreview();
+        }
+        if (resBox && res.reply) {
+          resBox.style.display = 'block';
+          resBox.textContent = res.reply;
+        }
+        showToast(`✅ Site ${res.siteTitle || targetUrl} scanned & auto-adapted (${(res.discoveredPages || []).length} pages)!`);
+      } catch (err) {
+        if (resBox) {
+          resBox.style.display = 'block';
+          resBox.textContent = 'Auto-adapt error: ' + err.message;
+        }
+        showToast('Site auto-adapt failed: ' + err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '✨ Scan Site & Auto-Adapt with AI';
+      }
+    };
+  }
+
+  const addTargetHelper = async ({ autoDiscover = false } = {}) => {
+    if (!state.config) return;
+    const rawUrl = $('new-target-url')?.value.trim() || '';
+    if (!rawUrl) {
+      showToast('Enter a target URL in the multi-target field.', true);
+      return;
+    }
+    let cleanUrl;
+    try {
+      const u = new URL(rawUrl);
+      if (!['http:', 'https:'].includes(u.protocol)) throw new Error('Invalid protocol');
+      cleanUrl = u.toString().replace(/\/$/, '');
+    } catch {
+      showToast('Target URL must be a valid full URL (https://...)', true);
+      return;
+    }
+
+    const rawPagesStr = $('new-target-pages')?.value.trim() || '';
+    let pages = rawPagesStr
+      ? rawPagesStr.split(',').map(s => s.trim()).filter(Boolean).map(p => (p.startsWith('/') ? p : '/' + p))
+      : [];
+    const visitCount = Math.max(0, parseInt(String($('new-target-visits')?.value || '0'), 10) || 0);
+
+    if (autoDiscover || !pages.length) {
+      const btn = $('btn-discover-add-target');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Scanning target...';
+      }
+      try {
+        const res = await api('/api/discover', { method: 'POST', body: JSON.stringify({ targetUrl: cleanUrl }) });
+        if (Array.isArray(res.pages) && res.pages.length) {
+          pages = res.pages;
+        }
+      } catch (err) {
+        showToast('Target discovery failed; adding with / only: ' + err.message, true);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '🔍 Discover Pages & Add +';
+        }
+      }
+    }
+    if (!pages.length) pages = ['/'];
+
+    if (!Array.isArray(state.config.targets)) state.config.targets = [];
+    // If adding a secondary site when targets[] was empty, also include the primary targetUrl as Target #1
+    if (state.config.targets.length === 0 && state.config.targetUrl && state.config.targetUrl.replace(/\/$/, '') !== cleanUrl) {
+      state.config.targets.push({
+        url: state.config.targetUrl.replace(/\/$/, ''),
+        pages: Array.isArray(state.config.pages) && state.config.pages.length ? [...state.config.pages] : ['/'],
+        visitCount: 0,
+      });
+    }
+    state.config.targets.push({ url: cleanUrl, pages, visitCount });
+    if ($('new-target-url')) $('new-target-url').value = '';
+    if ($('new-target-pages')) $('new-target-pages').value = '';
+    if ($('new-target-visits')) $('new-target-visits').value = '';
+    renderTargets();
+    renderJsonPreview();
+    showToast(`Added multi-target site: ${cleanUrl} (${pages.length} pages)`);
+  };
+
+  if ($('btn-add-target')) {
+    $('btn-add-target').onclick = () => addTargetHelper({ autoDiscover: false });
+  }
+  if ($('btn-discover-add-target')) {
+    $('btn-discover-add-target').onclick = () => addTargetHelper({ autoDiscover: true });
+  }
+  if ($('btn-clear-targets')) {
+    $('btn-clear-targets').onclick = () => {
+      if (!state.config) return;
+      state.config.targets = [];
+      renderTargets();
+      renderJsonPreview();
+      showToast('Extra targets cleared — running against primary targetUrl only.');
+    };
+  }
 
   $('btn-add-step').onclick = () => {
     if (!Array.isArray(state.config.taskSteps)) state.config.taskSteps = [];
@@ -2540,19 +2881,34 @@ async function init() {
     const res = await fetch('/api/proxy/residential');
     const d = await res.json();
     if (!d.ok) throw new Error(d.error || 'failed');
+    if (d.datacenterCounts && typeof d.datacenterCounts === 'object') {
+      state.datacenterCounts = d.datacenterCounts;
+      populateCountryDropdownOptions();
+    }
     const selectedTier = $('proxy-tier')?.value || state.config?.proxy?.tier || d.tier || 'auto';
     const tierLabel = selectedTier === 'datacenter'
       ? '🏢 Active Mode: Datacenter Only (0MB residential)'
       : (selectedTier === 'residential' ? '🌍 Active Mode: Residential (metered)' : '⚙️ Active Mode: Auto (follow list)');
+    const selCountry = $('proxy-residential-country')?.value || '';
+    const prefList = Array.isArray(state.config?.proxy?.preferredCountries) ? state.config.proxy.preferredCountries : [];
+    const activeCodes = selCountry === '__preferred__'
+      ? prefList
+      : (selCountry ? [selCountry.toUpperCase()] : []);
+    let geoInfo = 'All countries';
+    if (activeCodes.length) {
+      const matchedDc = activeCodes.reduce((sum, code) => sum + Number(state.datacenterCounts?.[code] || 0), 0);
+      geoInfo = `Countries: ${activeCodes.join(',')} (${matchedDc} matching DC servers)`;
+    }
     const tail = d.exhausted
       ? ' · Budget exhausted — falling back to datacenter'
       : '';
-    el.textContent = `${tierLabel} | Datacenter: ${d.datacenterCount ?? 0} servers | Residential: ${d.poolSize ?? 0} sessions · Used ${d.usedMb}/${d.budgetMb}MB (${d.remainingMb}MB remaining · ${d.visits} visits)${tail}`;
+    el.textContent = `${tierLabel} | ${geoInfo} | Total Datacenter: ${d.datacenterCount ?? 0} servers | Residential: ${d.poolSize ?? 0} sessions · Used ${d.usedMb}/${d.budgetMb}MB (${d.remainingMb}MB remaining · ${d.visits} visits)${tail}`;
   } catch {
     el.textContent = 'Proxy Pool: Unable to fetch status from server';
   }
 }
 $('proxy-tier')?.addEventListener('change', refreshResidentialStatus);
+$('proxy-residential-country')?.addEventListener('change', refreshResidentialStatus);
 
 wireActions();
 refreshResidentialStatus();
@@ -2563,7 +2919,7 @@ setInterval(refreshResidentialStatus, 20000);
       api('/api/system'),
       api('/api/config'),
       api('/api/site-profiles'),
-      api('/api/proxies/countries').catch(() => ({ tier1Defaults: state.tier1Defaults, catalog: [] })),
+      api('/api/proxies/countries').catch(() => ({ tier1Defaults: state.tier1Defaults, catalog: [], datacenterCounts: {} })),
       api('/api/ai/status').catch(() => null),
     ]);
     state.system = sys;
@@ -2575,6 +2931,9 @@ setInterval(refreshResidentialStatus, 20000);
       state.tier1Defaults = countriesData.tier1Defaults;
     }
     state.countryCatalog = countriesData.catalog || [];
+    if (countriesData.datacenterCounts && typeof countriesData.datacenterCounts === 'object') {
+      state.datacenterCounts = countriesData.datacenterCounts;
+    }
     if (aiData) {
       state.aiStatus = aiData;
       state.aiHistory = Array.isArray(aiData.history) ? aiData.history : [];

@@ -801,6 +801,16 @@ const STEP_HANDLERS = {
       });
     }).catch(() => false);
     if (formVisible) return 'AI Route Repair: Target form already visible — no repair needed';
+    if (Array.isArray(ctx?.steps)) {
+      const upcoming = ctx.steps.slice((ctx.currentStepIndex || 0) + 1);
+      const nextWithSel = upcoming.find(s => s && ['click', 'fill', 'fill_email', 'select', 'hover', 'scroll_to'].includes(s.type) && s.selector);
+      if (nextWithSel) {
+        const existsNow = (await page.locator(nextWithSel.selector).count().catch(() => 0)) > 0;
+        if (existsNow) {
+          return 'AI Route Repair: Next recorded target is already present on current page — continuing flow';
+        }
+      }
+    }
     const dom = await captureCompactDomForAi(page, Boolean(ctx.avoidAdClicks), { sameOriginOnly: false });
     if (!dom.clickables.length) return 'AI Route Repair: No clickable links on page';
     const goal = String(step.value || ctx.aiDirective || 'continue to the offer form').slice(0, 200);
@@ -917,6 +927,27 @@ const STEP_HANDLERS = {
     }
 
     const beforeUrl = page.url();
+    if (/(?:allow analytics|data-analytics-allow)/i.test(`${selectorStr} ${step.label || ''}`)) {
+      const consentState = await page.evaluate(() => {
+        try {
+          const btn = document.querySelector('[data-analytics-allow]');
+          const panel = document.querySelector('#analytics-preferences');
+          if (btn && panel && !panel.hidden) {
+            btn.click();
+            return 'clicked';
+          }
+          if (localStorage.getItem('citedcart_tools_analytics_v1') === 'allowed' || (panel && panel.hidden)) {
+            return 'already_allowed';
+          }
+        } catch {}
+        return null;
+      }).catch(() => null);
+      if (consentState === 'clicked' || consentState === 'already_allowed') {
+        await sleep(300);
+        return 'Analytics consent enabled on page (Allow analytics)';
+      }
+    }
+    const internalHrefMatch = !step.opensTab && selectorStr.match(/^a\[href=["'](\/[^"']*)["']\]$/i);
     let loc;
     try {
       const selTest = String(step.selector || step.value || '');
@@ -925,9 +956,25 @@ const STEP_HANDLERS = {
       // click wait matches the 20s locator budget instead of cutting off at 10s.
       const locatorTimeout = isPartnerHrefStep
         ? 24000
-        : ((step.optional && Number.isInteger(step.tab) && step.tab > 0) ? 2200 : 20000);
+        : (internalHrefMatch ? 4500 : ((step.optional && Number.isInteger(step.tab) && step.tab > 0) ? 2200 : 20000));
       loc = await resolveInteractiveLocator(page, selectorStr, locatorTimeout);
     } catch (selErr) {
+      if (internalHrefMatch) {
+        const fallbackDest = resolveTargetUrl(ctx.targetUrl, internalHrefMatch[1]);
+        const navStart = Date.now();
+        const refererOpt = /^https?:\/\//i.test(beforeUrl) ? beforeUrl : undefined;
+        const navResp = await page.goto(fallbackDest, {
+          waitUntil: 'domcontentloaded',
+          timeout: 20000,
+          ...(refererOpt ? { referer: refererOpt } : {}),
+        }).catch(() => null);
+        await sleep(450);
+        const navMs = Date.now() - navStart;
+        const navStatus = navResp ? navResp.status() : 'n/a';
+        ctx.pagesVisited++;
+        ctx.visitedUrls.push({ path: internalHrefMatch[1], url: page.url(), status: navStatus, loadMs: navMs });
+        return `Direct navigation to ${page.url()} (link ${internalHrefMatch[1]} was not present on current page)`;
+      }
       const canFallbackExt = Number.isInteger(step.tab) && step.tab > 0 && selectorStr.includes(':nth-of-type(');
       const fallbackLoc = canFallbackExt ? await resolveFallbackExternalClick(page, step).catch(() => null) : null;
       if (!fallbackLoc) throw selErr;
@@ -1390,11 +1437,17 @@ const STEP_HANDLERS = {
   async go_back(page, step, ctx) {
     const beforeUrl = page.url();
     const resp = await page.goBack({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => null);
+    let afterUrl = String(page.url() || '');
+    if (!/^https?:\/\//i.test(afterUrl) || /^about:blank/i.test(afterUrl)) {
+      const recoverUrl = /^https?:\/\//i.test(beforeUrl) ? beforeUrl : resolveTargetUrl(ctx.targetUrl, '/');
+      await page.goto(recoverUrl, { waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
+      afterUrl = String(page.url() || '');
+    }
     await sleep(withHumanJitter(Number(step.value) || 850, 350, 5000, 0.25));
     const status = resp ? resp.status() : 'history';
     ctx.pagesVisited++;
-    ctx.visitedUrls.push({ path: '(back)', url: page.url(), status, loadMs: 0 });
-    return `Navigated back in history to ${page.url()} (from ${beforeUrl})`;
+    ctx.visitedUrls.push({ path: '(back)', url: afterUrl, status, loadMs: 0 });
+    return `Navigated back in history to ${afterUrl} (from ${beforeUrl})`;
   },
 
   async close_tab(_page, step, ctx) {
@@ -1557,6 +1610,8 @@ async function executeTaskSteps({
     attribution: attribution || {},
     partnerActivity: false,
     __wtgLockerOpenedAt: null,
+    steps,
+    currentStepIndex: 0,
   };
   const stepResults = [];
   const emitStep = msg => { if (typeof onStep === 'function') onStep(redactText(msg)); };
@@ -1598,6 +1653,7 @@ async function executeTaskSteps({
     };
 
     for (let idx = 0; idx < steps.length; idx++) {
+      ctx.currentStepIndex = idx;
       if (page.isClosed()) {
         emitStep(`[Visit ${visitIndex + 1}] Session closed (timeout or stop) — finishing cleanly`);
         break;
@@ -1675,7 +1731,28 @@ async function executeTaskSteps({
           ctx.activeTabId = 0;
         }
         activeStepPage = tabPage || page;
+        const preExploreUrl = (step.type === 'ai_explore' && activeStepPage && !activeStepPage.isClosed())
+          ? activeStepPage.url()
+          : '';
+        const preExploreNorm = preExploreUrl ? getNormalizedTabUrl(activeStepPage) : '';
         detail = await handler(tabPage, step, ctx);
+        if (preExploreUrl && preExploreNorm && activeStepPage && !activeStepPage.isClosed()) {
+          const postExploreNorm = getNormalizedTabUrl(activeStepPage);
+          if (postExploreNorm && postExploreNorm !== preExploreNorm) {
+            const nextSelStep = steps.slice(idx + 1).find(s =>
+              (Number.isInteger(s?.tab) ? s.tab : 0) === stepTab
+              && ['click', 'fill', 'fill_email', 'select'].includes(s?.type)
+              && s?.selector
+            );
+            if (nextSelStep) {
+              const existsOnNewPage = (await activeStepPage.locator(nextSelStep.selector).count().catch(() => 0)) > 0;
+              if (!existsOnNewPage) {
+                await activeStepPage.goto(preExploreUrl, { waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
+                detail = `${detail} (returned to scenario page to continue recorded steps)`;
+              }
+            }
+          }
+        }
       } catch (err) {
         // Offer pages bounce through two or three URLs during a visit. A redirect that
         // lands mid-step destroys the JS execution context and the whole visit used to

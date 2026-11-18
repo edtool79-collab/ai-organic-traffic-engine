@@ -128,8 +128,65 @@
               <input id="new-page-input" type="text" class="ltr" placeholder="/tools/link-cleaner" />
               <button type="button" id="btn-add-page">Add Page +</button>
             </div>
-            <div class="hint">Tip: Click "Discover Site Pages 🔍" when switching sites to avoid visiting non-existent 404 routes.</div>
+            <div class="hint">Tip: Click "Discover Site Pages 🔍" or use the AI Site Onboarding Wizard below when switching targets to avoid 404 routes.</div>
             <div id="pages-list" class="pages-list"></div>
+          </div>
+
+          <div class="recorder-box" id="site-onboard-box" style="margin-top:12px; border-color:#38bdf8;">
+            <div class="section-title" style="margin-bottom:8px;">
+              <span>🤖 AI Site Onboarding Wizard &amp; Auto-Adapt Interview</span>
+              <span class="badge completed" id="onboard-domain-badge">Ready to Adapt</span>
+            </div>
+            <p class="hint" style="margin-bottom:10px;">
+              Added a new target site? Answer 2 quick questions and click <strong>"✨ Scan Site &amp; Auto-Adapt with AI"</strong> — the wizard discovers live pages (avoiding 404s), configures AI authority, builds a tailored scenario, and asks follow-up focus questions.
+            </p>
+            <div class="form-grid" style="margin-bottom:8px;">
+              <div class="field">
+                <label for="onboard-goal">1. Primary goal for this site:</label>
+                <select id="onboard-goal">
+                  <option value="tools_clicks">🎯 Interactive tools, button clicks &amp; widget QA</option>
+                  <option value="deep_reading">📖 Deep reading of articles, guides &amp; content</option>
+                  <option value="free_organic">🌿 Autonomous organic browsing across pages</option>
+                  <option value="conversions_forms">✉️ Form submissions, signups &amp; CTA conversion checks</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="onboard-ai-level">2. AI Brain involvement level:</label>
+                <select id="onboard-ai-level">
+                  <option value="full_autonomous">🧠 Full autonomous control (100% AI workers + live management)</option>
+                  <option value="balanced_50">⚖️ Balanced hybrid (50% AI + 50% recorded scenario)</option>
+                  <option value="light_repair">🛡️ Light (20% — follow recording + route repair only)</option>
+                </select>
+              </div>
+            </div>
+            <div class="inline-row" style="gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+              <input id="onboard-user-notes" type="text" placeholder="Answer AI questions or add focus notes (e.g. focus on /tools/link-cleaner and stay on-domain)..." style="flex:1; min-width:240px;" />
+              <label style="display:flex; align-items:center; gap:6px; font-size:0.83rem; cursor:pointer;">
+                <input id="onboard-rebuild-steps" type="checkbox" />
+                <span>Also rebuild scenario steps for this site</span>
+              </label>
+              <button type="button" class="primary" id="btn-onboard-site">✨ Scan Site &amp; Auto-Adapt with AI</button>
+            </div>
+            <div id="onboard-ai-result" class="advice-box" style="display:none; white-space:pre-line; line-height:1.55;"></div>
+          </div>
+
+          <div class="recorder-box" id="multi-targets-box" style="margin-top:12px;">
+            <div class="section-title" style="margin-bottom:8px;">
+              <span>🎯 Multi-Target Execution (<code>targets[]</code> — Run multiple sites in round-robin)</span>
+              <span class="badge idle" id="multi-targets-count-badge">Single Target (targetUrl)</span>
+            </div>
+            <p class="hint" style="margin-bottom:8px;">
+              Want to test multiple sites or landing pages in parallel? Add them here — each target gets its own pages list, visit budget, and isolated session cookies (round-robin execution).
+            </p>
+            <div class="inline-row" style="gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+              <input id="new-target-url" type="url" class="ltr" placeholder="https://second-site.com" style="flex:2; min-width:210px;" />
+              <input id="new-target-pages" type="text" class="ltr" placeholder="/, /tools, /about (or leave empty to auto-discover)" style="flex:2; min-width:190px;" />
+              <input id="new-target-visits" type="number" min="0" max="100000" placeholder="Visits (0=equal split)" style="width:155px;" />
+              <button type="button" class="small primary" id="btn-discover-add-target">🔍 Discover Pages &amp; Add +</button>
+              <button type="button" class="small" id="btn-add-target">+ Add Target</button>
+              <button type="button" class="small danger" id="btn-clear-targets">Clear Extra Targets</button>
+            </div>
+            <div id="targets-list" class="pages-list"></div>
           </div>
 
           <hr style="border:0;border-top:1px solid var(--border);margin:18px 0;" />
@@ -549,9 +606,10 @@
               </select>
             </div>
             <div class="field">
-              <label for="proxy-residential-country">Residential Exit Country (<code>proxy.residential.country</code>)</label>
+              <label for="proxy-residential-country">Exit Country — Datacenter &amp; Residential (<code>country</code>)</label>
               <select id="proxy-residential-country">
-                <option value="">🌍 Random — All Countries (Default)</option>
+                <option value="">🌍 All Available Countries (No Filter)</option>
+                <option value="__preferred__">🎯 Match Selected Flag Grid Above</option>
                 <option value="us">🇺🇸 United States (US)</option>
                 <option value="gb">🇬🇧 United Kingdom (GB)</option>
                 <option value="ca">🇨🇦 Canada (CA)</option>
@@ -559,6 +617,18 @@
                 <option value="de">🇩🇪 Germany (DE)</option>
                 <option value="fr">🇫🇷 France (FR)</option>
                 <option value="nl">🇳🇱 Netherlands (NL)</option>
+                <option value="at">🇦🇹 Austria (AT)</option>
+                <option value="it">🇮🇹 Italy (IT)</option>
+                <option value="cz">🇨🇿 Czechia (CZ)</option>
+                <option value="ro">🇷🇴 Romania (RO)</option>
+                <option value="pl">🇵🇱 Poland (PL)</option>
+                <option value="es">🇪🇸 Spain (ES)</option>
+                <option value="jp">🇯🇵 Japan (JP)</option>
+                <option value="kr">🇰🇷 South Korea (KR)</option>
+                <option value="sg">🇸🇬 Singapore (SG)</option>
+                <option value="il">🇮🇱 Israel (IL)</option>
+                <option value="br">🇧🇷 Brazil (BR)</option>
+                <option value="in">🇮🇳 India (IN)</option>
               </select>
             </div>
             <div class="field">

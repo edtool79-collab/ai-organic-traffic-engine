@@ -297,12 +297,35 @@ function resolveProxies(cfg) {
       console.log('[Residential] No fallback pool configured — stopping run to prevent overspending.');
       return [];
     }
-    const cc = String(activeResiCfg.country || '').toLowerCase().replace(/[^a-z]/g, '').slice(0, 2);
-    let metered = normalizeList(cc ? residentialPool.listForCountry(cc) : residentialPool.getServers(activeResiCfg));
+    const rawCountry = String(activeResiCfg.country || '').trim().toLowerCase();
+    const usePreferredList = rawCountry === '__preferred__'
+      || (!rawCountry && cfg.proxy?.countryFilterEnabled === true && Array.isArray(cfg.proxy?.preferredCountries) && cfg.proxy.preferredCountries.length > 0);
+    const cc = (!usePreferredList && /^[a-z]{2}$/.test(rawCountry)) ? rawCountry : '';
+    let metered = [];
+    let countryLabel = '';
+    if (cc) {
+      metered = normalizeList(residentialPool.listForCountry(cc));
+      countryLabel = '/' + cc.toUpperCase();
+    } else if (usePreferredList) {
+      const prefCodes = (Array.isArray(cfg.proxy?.preferredCountries) ? cfg.proxy.preferredCountries : [])
+        .map(c => String(c || '').trim().toLowerCase().replace(/[^a-z]/g, '').slice(0, 2))
+        .filter(c => c.length === 2);
+      if (prefCodes.length) {
+        const perCountry = Math.max(4, Math.ceil(30 / prefCodes.length));
+        const combined = [];
+        for (const code of prefCodes) {
+          combined.push(...residentialPool.listForCountry(code, { sampleCount: perCountry }));
+        }
+        metered = normalizeList(combined);
+        countryLabel = '/' + prefCodes.map(c => c.toUpperCase()).join(',');
+      }
+    }
+    if (!metered.length) {
+      metered = normalizeList(residentialPool.getServers(activeResiCfg));
+    }
     if (!metered.length) metered = configured.filter(u => residentialPool.isResidentialUrl(u));
-    if (!metered.length && cc) metered = normalizeList(residentialPool.getServers(activeResiCfg));
     console.log(
-      `[Proxy Tier] Residential${cc ? '/' + cc.toUpperCase() : ''}: ${metered.length} sessions, ${budget.remainingMb}MB remaining of ${budget.budgetMb}MB (${budget.usedPct}% used).`
+      `[Proxy Tier] Residential${countryLabel}: ${metered.length} sessions, ${budget.remainingMb}MB remaining of ${budget.budgetMb}MB (${budget.usedPct}% used).`
     );
     return metered;
   }
