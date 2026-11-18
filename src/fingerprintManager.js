@@ -289,6 +289,16 @@ function generateDeviceFingerprint(deviceKey, locale = null) {
   }
   const locales = locale && locale !== 'en-US' ? [locale, 'en-US'] : ['en-US'];
   const fp = getFpGenerator().getFingerprint({ ...spec.fpOptions, locales });
+  if (fp?.fingerprint?.navigator) {
+    fp.fingerprint.navigator.doNotTrack = null;
+    fp.fingerprint.navigator.globalPrivacyControl = false;
+  }
+  if (fp?.headers) {
+    delete fp.headers.dnt;
+    delete fp.headers.DNT;
+    delete fp.headers['sec-gpc'];
+    delete fp.headers['Sec-GPC'];
+  }
   const pwViewport = spec.pwDevice?.viewport;
   const screenW = fp.fingerprint?.screen?.width;
   const screenH = fp.fingerprint?.screen?.height;
@@ -334,7 +344,6 @@ function getChromiumStealthArgs(headless = true, { stealthMode = 'standard', pro
     '--media-cache-size=1',
     '--metrics-recording-only',
     '--mute-audio',
-    '--no-pings',
     `--disable-features=${disabledFeatures.join(',')}`,
     ...(headless ? ['--renderer-process-limit=4'] : ['--window-position=90,60']),
   ];
@@ -594,19 +603,8 @@ async function applyMaximumStealth(context, { spec, proxied = false, seed = 1337
  * Optional bandwidth/RAM saver routing for massive concurrent sessions.
  */
 const PROXY_SAVER_BLOCKED_HOSTS = [
-  'googletagmanager.com',
-  'google-analytics.com',
-  'analytics.google.com',
-  'doubleclick.net',
-  'googlesyndication.com',
-  'googleadservices.com',
-  'connect.facebook.net',
-  'analytics.tiktok.com',
   'ads-twitter.com',
   'snap.licdn.com',
-  'posthog.com',
-  'hotjar.com',
-  'clarity.ms',
   'fullstory.com',
   'logrocket.com',
   'lr-ingest.io',
@@ -658,13 +656,14 @@ const PROXY_SAVER_BLOCKED_HOSTS = [
 
 const CAPTCHA_AUTH_SAFE_HOST_RE = /(?:recaptcha|hcaptcha|turnstile|arkoselabs|funcaptcha|geetest|accounts\.google\.com|challenges\.cloudflare\.com)/i;
 
-// Attribution allowlist (fix #3): affiliate/partner networks live on tiny tracking pixels & beacons.
-// Blocking them in saving modes silently breaks conversion attribution, so these stay untouched.
+// Attribution & Analytics allowlist: never block GA4, GTM, AdSense/DoubleClick, Clarity, PostHog, or partner beacons in lite/ultra_lite modes.
+const ANALYTICS_SAFE_HOST_RE = /(?:googletagmanager\.com|google-analytics\.com|analytics\.google\.com|doubleclick\.net|googlesyndication\.com|googleadservices\.com|clarity\.ms|posthog\.com|hotjar\.com|connect\.facebook\.net|analytics\.tiktok\.com|mc\.yandex\.ru)$/i;
 const ATTRIBUTION_HOST_RE = /(?:cdnflyer|lnksforyou|mobilerewards|getgokart|brownboots|spassvault|mssh|prizepromote|rewardspark|reward4spot|displayoptoffers|uplevelrewards|impact|clickbank|cpagrip|cpalead|ogads|adsterra|monetag|propellerads|hilltopads|adcash|zeydoo|looty|offerwall|firead|proppeller)$/i;
-const ATTRIBUTION_PATH_RE = /(?:view\.php|\/track(?:er|ing)?\b|\/pixel|\/collect\b|\/postback|\/beacon|\/conversion|\/aff(?:iliate)?\b|\/click\b|(?:^|\/)s\/[a-z0-9]{6,}|[?&](?:click_?id|sub_?id|aff_?id|pub_id|transaction_id|s2s)=)/i;
+const ATTRIBUTION_PATH_RE = /(?:view\.php|\/track(?:er|ing)?\b|\/pixel|\/g?\/collect\b|\/collect\b|\/gtag\/js\b|\/gtm\.js\b|\/analytics\.js\b|\/postback|\/beacon|\/conversion|\/aff(?:iliate)?\b|\/click\b|(?:^|\/)s\/[a-z0-9]{6,}|[?&](?:click_?id|sub_?id|aff_?id|pub_id|transaction_id|s2s)=)/i;
 function isAttributionRequest(hostname = '', pathname = '', search = '') {
   if (!hostname) return false;
   const h = String(hostname).toLowerCase();
+  if (ANALYTICS_SAFE_HOST_RE.test(h) || ANALYTICS_SAFE_HOST_RE.test(getRootDomain(h))) return true;
   if (ATTRIBUTION_HOST_RE.test(getRootDomain(h)) || ATTRIBUTION_HOST_RE.test(h)) return true;
   return ATTRIBUTION_PATH_RE.test(`${pathname || ''}${search || ''}`);
 }
@@ -743,8 +742,8 @@ function isBlockedTrackerHost(hostname) {
 function isCacheableStaticBundle(urlStr, rType) {
   if (!urlStr || !/^https?:\/\//i.test(urlStr)) return false;
   if (rType !== 'script' && rType !== 'stylesheet') return false;
-  if (CAPTCHA_AUTH_SAFE_HOST_RE.test(urlStr)) return false;
-  if (/\/(?:api|oauth|auth|token|graphql|login|signup|webhook|session|collect|pixel|beacon|telemetry)\b/i.test(urlStr)) return false;
+  if (CAPTCHA_AUTH_SAFE_HOST_RE.test(urlStr) || ANALYTICS_SAFE_HOST_RE.test(urlStr)) return false;
+  if (/\/(?:api|oauth|auth|token|graphql|login|signup|webhook|session|collect|pixel|beacon|telemetry|google-analytics|gtag|gtm)\b/i.test(urlStr)) return false;
   if (/[?&](?:token|code|auth|sig|nonce|state|session|ticket|cb|cachebust|_)=/i.test(urlStr)) return false;
   const pathPart = urlStr.split('?')[0].split('#')[0];
   return (
@@ -1373,8 +1372,39 @@ async function openSessionContext({
     context = await browser.newContext(ctxOpts);
 
     if (fp) {
+      if (fp.fingerprint?.navigator) {
+        fp.fingerprint.navigator.doNotTrack = null;
+        fp.fingerprint.navigator.globalPrivacyControl = false;
+      }
+      if (fp.headers) {
+        delete fp.headers.dnt;
+        delete fp.headers.DNT;
+        delete fp.headers['sec-gpc'];
+        delete fp.headers['Sec-GPC'];
+      }
       await getFpInjector().attachFingerprintToPlaywright(context, fp).catch(() => {});
     }
+    await context.addInitScript(() => {
+      try {
+        Object.defineProperty(Navigator.prototype, 'doNotTrack', { get: () => null, configurable: true });
+        Object.defineProperty(Navigator.prototype, 'globalPrivacyControl', { get: () => false, configurable: true });
+      } catch {}
+      try {
+        localStorage.setItem('citedcart_tools_analytics_v1', 'allowed');
+      } catch {}
+      const autoAcceptAnalytics = () => {
+        try {
+          const btn = document.querySelector('[data-analytics-allow]');
+          const panel = document.querySelector('#analytics-preferences');
+          if (btn && (!panel || !panel.hidden)) btn.click();
+        } catch {}
+      };
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => setTimeout(autoAcceptAnalytics, 150), { once: true });
+      } else {
+        setTimeout(autoAcceptAnalytics, 150);
+      }
+    }).catch(() => {});
 
     const derivedSeed = Number.isFinite(Number(sessionSeed))
       ? Number(sessionSeed)
