@@ -69,7 +69,7 @@ async function requestEmailApi(url, { headers = {}, timeoutMs = 15000, ...option
   const { token } = resolveEmailAuthToken();
   if (!token) {
     throw new Error(
-      `חסר מפתח גישה לכלי האימיילים (HIREPULSE_OWNER_PILOT_TOKEN או מפתח מסחרי מ-${COMMERCIAL_CREDITS_URL})`
+      `Missing email inbox access token (HIREPULSE_OWNER_PILOT_TOKEN or commercial key from ${COMMERCIAL_CREDITS_URL})`
     );
   }
 
@@ -132,7 +132,7 @@ async function createEmailInbox({ idempotencyKey = randomUUID(), ttlSeconds = 60
  */
 async function getEmailCode({ inbox_id, capability }) {
   if (!inbox_id || !capability) {
-    throw new Error('חסרים inbox_id או capability לבדיקת קוד אימות.');
+    throw new Error('Missing inbox_id or capability to check verification code.');
   }
   const url = `${DEFAULT_INBOX_ENDPOINT}/${encodeURIComponent(inbox_id)}/code`;
   return requestEmailApi(url, {
@@ -145,7 +145,7 @@ async function getEmailCode({ inbox_id, capability }) {
 
 async function listEmailMessages({ inbox_id, capability }) {
   if (!inbox_id || !capability) {
-    throw new Error('חסרים inbox_id או capability לקריאת הודעות המייל.');
+    throw new Error('Missing inbox_id or capability to read inbox messages.');
   }
   const url = `${DEFAULT_INBOX_ENDPOINT}/${encodeURIComponent(inbox_id)}/messages`;
   return requestEmailApi(url, {
@@ -219,7 +219,7 @@ async function waitForEmailCode({
     await new Promise(r => setTimeout(r, Math.min(effectiveInterval, Math.max(2000, remaining))));
   }
 
-  throw new Error(`לא התקבל קוד אימות במייל תוך ${Math.round(maxDuration / 1000)} שניות (${attempts} בדיקות).`);
+  throw new Error(`No email verification code received within ${Math.round(maxDuration / 1000)}s (${attempts} polls).`);
 }
 
 module.exports = {

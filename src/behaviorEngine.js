@@ -746,15 +746,15 @@ async function runVisitInteractions({
     }
     await sleep(postDomWaitMs);
     visitedUrls.push({ path: entryPath, url: page.url(), status: firstStatus, loadMs: firstLoadMs });
-    emitStep(`[ביקור ${visitIndex + 1}] נכנס אל ${entryPath} (סטטוס: ${firstStatus}, ${firstLoadMs}ms)`);
+    emitStep(`[Visit ${visitIndex + 1}] Entered ${entryPath} (HTTP ${firstStatus}, ${firstLoadMs}ms)`);
 
     let pagesVisited = 1;
     await injectSnippet(page, parsedSnippet);
-    await captureFrameSafe(page, { visitIndex, label: `טעינת ${entryPath} (${firstStatus})`, persona: persona.name }, onFrame);
+    await captureFrameSafe(page, { visitIndex, label: `Loaded ${entryPath} (${firstStatus})`, persona: persona.name }, onFrame);
 
     let t0 = Date.now();
     await randomInteract(page, page.viewportSize(), persona, true, adSafety, emitStep);
-    await captureFrameSafe(page, { visitIndex, label: `גלילה ואינטראקציה ב-${entryPath}`, persona: persona.name }, onFrame);
+    await captureFrameSafe(page, { visitIndex, label: `Scroll & interaction on ${entryPath}`, persona: persona.name }, onFrame);
     const firstRem = pageMinMs - (Date.now() - t0);
     if (firstRem > 0) await sleep(firstRem);
 
@@ -762,10 +762,10 @@ async function runVisitInteractions({
 
     // ~20% of multi-page visitors naturally stay on the landing page to keep reading and navigating within it
     if (numExtra > 0 && Math.random() < 0.2) {
-      emitStep(`[ביקור ${visitIndex + 1}] נשאר באותו עמוד (${entryPath}) ומנווט בתוכו (~20% התפלגות)`);
+      emitStep(`[Visit ${visitIndex + 1}] Staying on ${entryPath} for in-page navigation (~20% distribution)`);
       await humanBrowsePage(page, randomBetween(3500, 6000), adSafety, emitStep);
       await randomInteract(page, page.viewportSize(), persona, false, adSafety, emitStep);
-      await captureFrameSafe(page, { visitIndex, label: `ניווט פנימי באותו עמוד (${entryPath})`, persona: persona.name }, onFrame);
+      await captureFrameSafe(page, { visitIndex, label: `In-page navigation on ${entryPath}`, persona: persona.name }, onFrame);
     } else {
       for (let idx = 0; idx < Math.min(numExtra, shuffled.length); idx++) {
         let nextPath = shuffled[idx];
@@ -778,10 +778,10 @@ async function runVisitInteractions({
             pagesVisited++;
             await sleep(postDomWaitMs);
             visitedUrls.push({ path: nextPath, url: page.url(), status: r.status(), loadMs: Date.now() - navT });
-            emitStep(`[ביקור ${visitIndex + 1}] U-Turn אל ${nextPath} (${r.status()})`);
+            emitStep(`[Visit ${visitIndex + 1}] U-Turn to ${nextPath} (${r.status()})`);
           }
           await injectSnippet(page, parsedSnippet);
-          await captureFrameSafe(page, { visitIndex, label: `U-Turn ב-${nextPath}`, persona: persona.name }, onFrame);
+          await captureFrameSafe(page, { visitIndex, label: `U-Turn on ${nextPath}`, persona: persona.name }, onFrame);
           await sleep(randomBetween(pageMinMs, pageMinMs + 1500));
           await page.goBack({ timeout: 10000 }).catch(() => {});
           await sleep(randomBetween(200, 500));
@@ -804,13 +804,13 @@ async function runVisitInteractions({
         const navMs = Date.now() - navT;
         await sleep(postDomWaitMs);
         visitedUrls.push({ path: nextPath, url: page.url(), status: resp.status(), loadMs: navMs });
-        emitStep(`[ביקור ${visitIndex + 1}] ניווט פנימי אל ${nextPath} (סטטוס: ${resp.status()})`);
+        emitStep(`[Visit ${visitIndex + 1}] Navigated internally to ${nextPath} (HTTP ${resp.status()})`);
 
         await injectSnippet(page, parsedSnippet);
-        await captureFrameSafe(page, { visitIndex, label: `עמוד פנימי ${nextPath} (${resp.status()})`, persona: persona.name }, onFrame);
+        await captureFrameSafe(page, { visitIndex, label: `Internal page ${nextPath} (${resp.status()})`, persona: persona.name }, onFrame);
         t0 = Date.now();
         await randomInteract(page, page.viewportSize(), persona, false, adSafety, emitStep);
-        await captureFrameSafe(page, { visitIndex, label: `סיום אינטראקציה ב-${nextPath}`, persona: persona.name }, onFrame);
+        await captureFrameSafe(page, { visitIndex, label: `Completed interaction on ${nextPath}`, persona: persona.name }, onFrame);
         const pageRem = pageMinMs - (Date.now() - t0);
         if (pageRem > 0) await sleep(pageRem);
       }

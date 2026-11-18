@@ -169,7 +169,7 @@ function normalizeProxyLine(rawLine) {
     } else if (parts.length === 4 && parts[0] && /^\d+$/.test(parts[1])) {
       candidate = `http://${encodeURIComponent(parts[2])}:${encodeURIComponent(parts[3])}@${parts[0]}:${parts[1]}`;
     } else {
-      throw new Error(`פורמט Proxy לא תקין: ${line}`);
+      throw new Error(`Invalid proxy format: ${line}`);
     }
   }
 
@@ -177,14 +177,14 @@ function normalizeProxyLine(rawLine) {
   try {
     parsed = new URL(candidate);
   } catch {
-    throw new Error(`כתובת Proxy לא תקינה: ${line}`);
+    throw new Error(`Invalid proxy URL: ${line}`);
   }
 
   if (!['http:', 'https:', 'socks4:', 'socks5:'].includes(parsed.protocol)) {
-    throw new Error(`פרוטוקול Proxy לא נתמך (${parsed.protocol}): ${line}`);
+    throw new Error(`Unsupported proxy protocol (${parsed.protocol}): ${line}`);
   }
   if (!parsed.hostname) {
-    throw new Error(`חסר hostname ב-Proxy: ${line}`);
+    throw new Error(`Missing proxy hostname: ${line}`);
   }
   return parsed.toString().replace(/\/$/, '');
 }
@@ -377,7 +377,7 @@ function checkSingleProxy(rawProxy, timeoutMs = 6000) {
       return resolve({ proxy: rawProxy, ok: false, latencyMs: null, exitIp: null, country: null, error: err.message });
     }
     if (!normalized) {
-      return resolve({ proxy: rawProxy, ok: false, latencyMs: null, exitIp: null, country: null, error: 'שורה ריקה' });
+      return resolve({ proxy: rawProxy, ok: false, latencyMs: null, exitIp: null, country: null, error: 'Empty line' });
     }
 
     const masked = maskProxyLabel(normalized);
@@ -447,21 +447,21 @@ async function checkProxiesBatch(proxyLines, concurrency = 5) {
 const TIER1_DEFAULT_COUNTRIES = ['US', 'GB', 'CA', 'AU', 'DE'];
 
 const COUNTRY_CATALOG = [
-  { code: 'US', nameHe: 'ארה״ב (US)', tier: 1 },
-  { code: 'GB', nameHe: 'בריטניה (GB)', tier: 1 },
-  { code: 'CA', nameHe: 'קנדה (CA)', tier: 1 },
-  { code: 'AU', nameHe: 'אוסטרליה (AU)', tier: 1 },
-  { code: 'DE', nameHe: 'גרמניה (DE)', tier: 1 },
-  { code: 'IL', nameHe: 'ישראל (IL)', tier: 2 },
-  { code: 'FR', nameHe: 'צרפת (FR)', tier: 2 },
-  { code: 'NL', nameHe: 'הולנד (NL)', tier: 2 },
-  { code: 'ES', nameHe: 'ספרד (ES)', tier: 2 },
-  { code: 'IT', nameHe: 'איטליה (IT)', tier: 2 },
-  { code: 'PL', nameHe: 'פולין (PL)', tier: 2 },
-  { code: 'SG', nameHe: 'סינגפור (SG)', tier: 2 },
-  { code: 'JP', nameHe: 'יפן (JP)', tier: 2 },
-  { code: 'BR', nameHe: 'ברזיל (BR)', tier: 3 },
-  { code: 'IN', nameHe: 'הודו (IN)', tier: 3 },
+  { code: 'US', nameEn: 'United States (US)', tier: 1 },
+  { code: 'GB', nameEn: 'United Kingdom (GB)', tier: 1 },
+  { code: 'CA', nameEn: 'Canada (CA)', tier: 1 },
+  { code: 'AU', nameEn: 'Australia (AU)', tier: 1 },
+  { code: 'DE', nameEn: 'Germany (DE)', tier: 1 },
+  { code: 'IL', nameEn: 'Israel (IL)', tier: 2 },
+  { code: 'FR', nameEn: 'France (FR)', tier: 2 },
+  { code: 'NL', nameEn: 'Netherlands (NL)', tier: 2 },
+  { code: 'ES', nameEn: 'Spain (ES)', tier: 2 },
+  { code: 'IT', nameEn: 'Italy (IT)', tier: 2 },
+  { code: 'PL', nameEn: 'Poland (PL)', tier: 2 },
+  { code: 'SG', nameEn: 'Singapore (SG)', tier: 2 },
+  { code: 'JP', nameEn: 'Japan (JP)', tier: 2 },
+  { code: 'BR', nameEn: 'Brazil (BR)', tier: 3 },
+  { code: 'IN', nameEn: 'India (IN)', tier: 3 },
 ];
 
 function normalizeCountryCode(raw) {

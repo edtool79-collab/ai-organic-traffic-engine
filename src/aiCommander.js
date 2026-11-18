@@ -820,14 +820,14 @@ async function runAiExploreStep(page, step = {}, ctx = {}) {
     : (providerPref === 'uncensoredllm' ? statusInfo.providers.uncensoredllm.configured : statusInfo.configured);
 
   if (!hasSelectedCred || ctx.aiConfig?.enabled === false) {
-    const fallbackNote = await runScanProductsStep(page, { value: '1', sameOriginOnly }, ctx).catch(() => 'בוצעה גלילה אנושית');
-    return `AI Agent (מצב Fallback ללא מפתח): ${fallbackNote}`;
+    const fallbackNote = await runScanProductsStep(page, { value: '1', sameOriginOnly }, ctx).catch(() => 'Human scroll performed');
+    return `AI Agent (Offline Fallback): ${fallbackNote}`;
   }
 
   const dom = await captureCompactDomForAi(page, Boolean(ctx.avoidAdClicks), { sameOriginOnly, excludeOutbound: onPrimaryOrigin });
   const hasDomTargets = Boolean(dom.url && dom.url !== 'about:blank' && (dom.headings.length || dom.inputs.length || dom.clickables.length));
   if (!hasDomTargets) {
-    return 'מוח AI: דולג (הדף עדיין ריק — נחסכה קריאת AI)';
+    return 'AI Agent: Skipped (page is blank — saved AI call)';
   }
 
   const cacheScope = sameOriginOnly ? 'int' : 'ext';
@@ -841,7 +841,7 @@ async function runAiExploreStep(page, step = {}, ctx = {}) {
       ? [...cached.planSteps].reverse().slice(0, maxSteps)
       : cached.planSteps.slice(0, maxSteps);
     const done = await executePlannedWorkerActions(page, picked, dom, { ...ctx, staySameOrigin: sameOriginOnly });
-    return `מוח AI [Cache Save ⚡ | ${cached.model}]: ${done.join(' -> ') || 'scroll'}`;
+    return `AI Agent [Cache Hit ⚡ | ${cached.model}]: ${done.join(' -> ') || 'scroll'}`;
   }
 
   const systemPrompt = [
@@ -883,7 +883,7 @@ async function runAiExploreStep(page, step = {}, ctx = {}) {
       usedModelLabel = `systemone:${model}`;
       if (pageState === 'error' || pageState === 'empty') {
         aiTokenSaverStats.lastPageState = pageState;
-        return `מוח AI [decision:${pageState}]: הדף אינו שמיש — לא בוצעה פעולה`;
+        return `AI Agent [decision:${pageState}]: Page unusable — no action taken`;
       }
       if (pick.act !== 'none') {
         planSteps = [{
@@ -931,8 +931,8 @@ async function runAiExploreStep(page, step = {}, ctx = {}) {
         });
     }
   } catch (err) {
-    const fb = await runScanProductsStep(page, { value: '1', sameOriginOnly }, ctx).catch(() => 'גלילה אנושית');
-    return `מוח AI (Fallback ${err.message}): ${fb}`;
+    const fb = await runScanProductsStep(page, { value: '1', sameOriginOnly }, ctx).catch(() => 'Human scroll');
+    return `AI Agent (Fallback ${err.message}): ${fb}`;
   }
 
   if (planSteps.length > 0) {
@@ -954,7 +954,7 @@ async function runAiExploreStep(page, step = {}, ctx = {}) {
     { ...ctx, staySameOrigin: sameOriginOnly }
   );
   const stateTag = pageState && pageState !== 'ready' ? ` [page:${pageState}]` : '';
-  return `מוח AI (${usedModelLabel})${stateTag}: ${actionsDone.join(' -> ') || 'scroll'}`;
+  return `AI Agent (${usedModelLabel})${stateTag}: ${actionsDone.join(' -> ') || 'scroll'}`;
 }
 
 /** Resolves Ollama credentials and asks the decision transport one typed question set. */
@@ -1165,7 +1165,7 @@ async function runAiSmartRecoveryStep(page, ctx = {}, failedHint = '') {
         : s
     ));
     const done = await executePlannedWorkerActions(page, patched, dom, ctx);
-    return done.length ? `התאוששות AI [Cache ⚡]: ${done.join(' -> ')}` : null;
+    return done.length ? `AI Recovery [Cache Hit ⚡]: ${done.join(' -> ')}` : null;
   }
 
   const emailPlaceholder = ctx.sessionInbox?.address || ctx.sessionInbox?.email || '';
@@ -1233,7 +1233,7 @@ async function runAiSmartRecoveryStep(page, ctx = {}, failedHint = '') {
       estTokens: Math.round((systemPrompt.length + userPrompt.length) / 3.5) + 50,
     });
     const done = await executePlannedWorkerActions(page, planSteps, dom, ctx);
-    return done.length ? `התאוששות AI (${usedRecoveryModel}): ${done.join(' -> ')}` : null;
+    return done.length ? `AI Recovery (${usedRecoveryModel}): ${done.join(' -> ')}` : null;
   } catch {
     return null;
   }
@@ -1253,30 +1253,30 @@ function buildLocalCommanderFallback({ message, runState = {}, config = {} }) {
   if (mem >= 85 && runState.status === 'running') {
     const safeConc = Math.max(1, Math.min(config.concurrency || 3, 2));
     directives.push({ type: 'set_concurrency', min: 1, max: safeConc });
-    lines.push(`⚠️ זיהיתי עומס RAM גבוה (${mem}%), מומלץ להגביל מקביליות ל-${safeConc} או להפעיל מצב חיסכון RAM (lite).`);
+    lines.push(`⚠️ High RAM usage detected (${mem}%). Recommend capping concurrency to ${safeConc} or enabling RAM saver mode (lite).`);
   }
   if (/pause|עצור זמנית|השהה/.test(lower) && runState.status === 'running') {
     directives.push({ type: 'pause' });
-    lines.push('מבצע השהיה זמנית של צי הדפדפנים.');
+    lines.push('Pausing browser fleet.');
   } else if (/resume|המשך/.test(lower) && runState.status === 'paused') {
     directives.push({ type: 'resume' });
-    lines.push('ממשיך את הרצת הצי.');
+    lines.push('Resuming browser fleet.');
   } else if (/boost|burst|מהר|הגבר/.test(lower)) {
     directives.push({ type: 'set_wave_mode', mode: 'burst' });
-    lines.push('מעביר פרופיל גלים למצב Burst ומתגבר תיאום.');
+    lines.push('Switching wave mode to Burst and increasing coordination.');
   }
 
   if (!lines.length) {
-    const waveInfo = config.waves?.enabled ? `מצב גלים פעיל (${config.waves.mode})` : 'גלים כבויים';
+    const waveInfo = config.waves?.enabled ? `Waves active (${config.waves.mode})` : 'Waves disabled';
     const countries = Array.isArray(config.proxy?.preferredCountries) && config.proxy.preferredCountries.length
       ? config.proxy.preferredCountries.join(', ')
-      : 'ללא סינון מדינות';
+      : 'No country filter';
     lines.push(
-      `סטטוס צי: ${runState.status || 'idle'} (${completed}/${planned} ביקורים | הצלחות: ${runState.succeeded || 0} | כשלים: ${runState.failed || 0}).`,
-      `תצורה נוכחית: ${waveInfo} | מדינות מועדפות: ${countries} | זיכרון: ${mem}%.`,
+      `Fleet status: ${runState.status || 'idle'} (${completed}/${planned} visits | succeeded: ${runState.succeeded || 0} | failed: ${runState.failed || 0}).`,
+      `Current config: ${waveInfo} | Preferred countries: ${countries} | RAM: ${mem}%.`,
       resolveOllamaConfig().configured
-        ? 'Ollama Cloud מוגדר ומוכן לפקודות תוך כדי ריצה.'
-        : 'Ollama Cloud אינו מוגדר (פועל במצב בקר מקומי בטוח). הוסף מפתח בסביבה OLLAMA_API_KEY לשליטה חכמה מלאה.'
+        ? 'Ollama Cloud is configured and ready for live directives.'
+        : 'Ollama Cloud is not configured (running in safe local advisor mode). Add OLLAMA_API_KEY in .env.local for full AI control.'
     );
   }
 
@@ -1364,8 +1364,8 @@ async function askFleetCommander({
     .slice(-24)
     .map(l => String(l?.message || l || '').slice(0, 180))
     .filter(Boolean);
-  const wasManualStop = trimmedLogs.some(m => /נעצרו ידנית|מתבצעת עצירה מבוקרת/.test(m));
-  const emptyTabNotes = trimmedLogs.filter(m => /נותר ללא קישורים|נותר ריק|סינון\/חסימת צד-ג/.test(m)).slice(-4);
+  const wasManualStop = trimmedLogs.some(m => /stopped manually|controlled stop|נעצרו ידנית|מתבצעת עצירה מבוקרת/i.test(m));
+  const emptyTabNotes = trimmedLogs.filter(m => /without navigation links|left blank|third-party filtering|נותר ללא קישורים|נותר ריק/i.test(m)).slice(-4);
 
   const telemetrySummary = {
     status: runState.status || 'idle',
@@ -1472,29 +1472,29 @@ async function askFleetCommander({
   };
 
   const systemPrompt = [
-    'אתה מפקד הצי העליון (Supreme AI Fleet Commander) המנהל 4 מפקדי צוותים ב-Ollama Cloud:',
-    'אלפא (deepseek-v4.1-flash — כלים), בראבו (beam — טאבים וזרימות עומק), צ׳ארלי (minimax-m3.1-flash — מדריכים), דלתא (gpt-oss:20b — ניווט וקבלת החלטות).',
-    'מודלים זולים נוספים להקצאה: nemotron-3-nano:30b, nemotron-3-super, gemma4:31b, deepseek-v4.1-flash:1017 (אין להשתמש ב-clef:27b).',
-    'כלל אמינות ברזל (אפס המצאות): הסתמך אך ורק על הנתונים האמיתיים ב-telemetrySummary (צעדי ההקלטה, הלוגים האחרונים, currentConfig והדיאגנוסטיקה).',
-    'כלל שפה חשוב: דבר בעברית טבעית, ברורה, פשוטה וזורמת — כמו עוזר אנושי חכם שמדבר עם בעל המערכת! אסור לכתוב בתשובה שמות משתנים טכניים באנגלית מתוך הקוד (אל תכתוב avgLoadMs, hasEmailFlow, emptyTabNotes, popup-empty, workerPct, failFastTriggers, conversionRate, resourceMode). במקום זאת תרגם הכל לעברית פשוטה: "זמן טעינה ממוצע", "אחוז המרות", "טאב חיצוני ריק", "דילוג מהיר", "מצב חיסכון מקסימלי".',
-    'אם אין שלב מייל בהקלטה — אל תתלונן על "0 מיילים". אם resourceMode כבר מוגדר כ-ultra_lite לחיסכון בפרוקסי וב-RAM — אל תשנה אותו בחזרה ל-lite!',
+    'You are the Supreme AI Fleet Commander managing 4 tactical squads on Ollama Cloud:',
+    'Alpha (deepseek-v4.1-flash — tools), Bravo (beam — tabs & deep flows), Charlie (minimax-m3.1-flash — guides), Delta (gpt-oss:20b — navigation & decisions).',
+    'Additional low-cost models: nemotron-3-nano:30b, nemotron-3-super, gemma4:31b, deepseek-v4.1-flash:1017 (do not assign clef:27b to chat).',
+    'Strict evidence rule (zero fabrication): Rely strictly on real data in telemetrySummary (recording steps, recent logs, currentConfig, and diagnostics).',
+    'Language rule: Speak in clear, concise, plain English for the operator. Avoid raw internal code variable names in prose; use clear terms like average load time, conversion rate, empty external tab, fast skip, and ultra-lite mode.',
+    'If there is no email step in the recording, do not complain about 0 emails. If resourceMode is already ultra_lite for RAM/proxy savings, do not downgrade it back to lite!',
     isAutoCheck
-      ? 'זו בדיקת מצב שוטפת: סכם בקצרה בעברית ברורה ונקייה (עד 140 מילים, שורה לכל נושא): תקלות/טאבים, מהירות, חיסכון בפרוקסי וב-AI, זיכרון פנוי, והחלטה מעשית.'
-      : 'זו פנייה ישירה של המפעיל! ענה קודם ישירות, חכם וברור בעברית על מה ששאל או ביקש, הצע פתרונות יצירתיים ומעשיים לבעיה אם יש כזו, ובצע מיד כל שינוי/אופטימיזציה שביקש דרך COMMAND_JSON!',
-    'כאשר יש לבצע פעולה או כשהמפעיל מבקש שינוי, הוסף בסוף התשובה בשורה נפרדת JSON מדויק בפורמט: COMMAND_JSON:{"directives":[...]} (אובייקט עם מפתח directives).',
-    'יש לך שליטה מלאה על כל המערכת! אתה יכול לשנות **כל ערך** בקונפיגורציה דרך update_config (patch חלקי על currentConfig — למשל devices, proxy, adSafety, sessionPersistence, schedule, stealthMode, referrerMode, pageMinMs, sessionTimeoutMs, keepBrowserOpenMs, interVisitDelayMs, firstPagePriority, pages, waves, ai, visitCount, concurrency, targetUrl):',
+      ? 'Routine status check: summarize concisely in plain English (under 140 words, one line per topic): errors/tabs, latency, proxy & AI cache savings, free RAM, and recommended action.'
+      : 'Direct operator query! Answer clearly and directly in English, suggest practical fixes if issues exist, and apply any requested configuration changes via COMMAND_JSON!',
+    'When taking action or applying requested changes, append a single line at the end: COMMAND_JSON:{"directives":[...]}.',
+    'You have full control over configuration via update_config (partial patch on currentConfig — e.g. devices, proxy, adSafety, sessionPersistence, schedule, stealthMode, referrerMode, pageMinMs, sessionTimeoutMs, keepBrowserOpenMs, interVisitDelayMs, firstPagePriority, pages, waves, ai, visitCount, concurrency, targetUrl):',
     '{"type":"update_config","patch":{"devices":{"iphone14":50,"pixel7":30,"desktopChrome":20},"adSafety":{"avoidAdClicks":true},"sessionPersistence":{"returningUserRate":70},"referrerMode":"google_organic"}},',
-    'ובנוסף פקודות ייעודיות:',
+    'Additional dedicated directives:',
     '{"type":"set_visits","visits":100}, {"type":"start_run","visits":25,"conversionRate":100,"headless":false,"streamMode":false}, {"type":"stop_run"}, {"type":"pause"}, {"type":"resume"},',
     '{"type":"set_concurrency","min":1,"max":3}, {"type":"set_conversion_rate","rate":100}, {"type":"set_worker_pct","pct":85},',
     '{"type":"set_headless","headless":true}, {"type":"set_task_mode","mode":"scenario|hybrid|behavior"}, {"type":"set_stream_mode","enabled":true},',
     '{"type":"set_wave_mode","mode":"off|steady|ramp_up|natural_peaks|burst"}, {"type":"set_resource_mode","mode":"full|lite|ultra_lite"},',
     '{"type":"set_exploration","extraPageChance":70,"scanProductsChance":80,"maxProducts":2}, {"type":"set_delays","interVisitDelayMs":1500},',
-    '{"type":"add_recording_step","afterTab":1,"step":{"type":"ai_explore|scan_products|human_browse|read_article|scroll|wait|goto|close_tab","tab":1,"value":"3","label":"תיאור הצעד"}},',
+    '{"type":"add_recording_step","afterTab":1,"step":{"type":"ai_explore|scan_products|human_browse|read_article|scroll|wait|goto|close_tab","tab":1,"value":"3","label":"Step label"}},',
     '{"type":"remove_recording_step","index":5}, {"type":"replace_task_steps","steps":[...]},',
     '{"type":"assign_squad_model","squadId":"alpha|bravo|charlie|delta|all","model":"beam|deepseek-v4.1-flash|minimax-m3.1-flash|gpt-oss:20b|nemotron-3-nano:30b|gemma4:31b"},',
-    '{"type":"focus_countries","countries":["US","GB","CA","DE","AU"]}, {"type":"dispatch_directive","directive":"הוראה מעשית חיה לצוותים"}.',
-    'אם אין מה לשנות/להפעיל, אל תכלול COMMAND_JSON.',
+    '{"type":"focus_countries","countries":["US","GB","CA","DE","AU"]}, {"type":"dispatch_directive","directive":"Live tactical instruction for squads"}.',
+    'If no changes are needed, omit COMMAND_JSON.',
   ].join(' ');
 
   const sanitizedHistory = (Array.isArray(history) ? history : [])
@@ -1507,7 +1507,7 @@ async function askFleetCommander({
     ...sanitizedHistory,
     {
       role: 'user',
-      content: `פקודה/שאלה מהמפעיל: ${message || 'תן תמונת מצב קצרה על הצי והמלצה'}\n\nטלמטריה חיה:\n${JSON.stringify(redactData(telemetrySummary))}`,
+      content: `Operator query/directive: ${message || 'Provide a concise fleet status summary and recommendation'}\n\nLive telemetry:\n${JSON.stringify(redactData(telemetrySummary))}`,
     },
   ];
 
@@ -1526,7 +1526,7 @@ async function askFleetCommander({
     const parsedReply = parseCommanderReply(resp.content || '');
 
     return {
-      reply: parsedReply.reply || 'פקודת הניטור התקבלה במפקד הצי.',
+      reply: parsedReply.reply || 'Monitoring directive received by AI Fleet Commander.',
       directives: parsedReply.directives,
       provider: resp.provider,
       model: resp.model,
@@ -1536,7 +1536,7 @@ async function askFleetCommander({
     const fallback = buildLocalCommanderFallback({ message, runState, config });
     return {
       ...fallback,
-      reply: `${fallback.reply}\n(הערת חיבור Cloud AI: ${err.message})`,
+      reply: `${fallback.reply}\n(Cloud AI note: ${err.message})`,
     };
   }
 }

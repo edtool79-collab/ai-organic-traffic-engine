@@ -73,7 +73,7 @@ async function ensureVisitInbox(ctx, emit) {
     if (typeof emit === 'function') emit(`[HirePulse Email] Inbox persist skipped: ${String((persistErr && persistErr.message) || persistErr).slice(0, 80)}`);
   }
   if (typeof emit === 'function') {
-    emit(`[HirePulse Email] נוצרה תיבת מייל חיה לסוכן: ${maskEmail(inbox.address)}`);
+    emit(`[HirePulse Email] Created live inbox for session: ${maskEmail(inbox.address)}`);
   }
   return ctx.sessionInbox;
 }
@@ -152,7 +152,7 @@ async function findOfferLikeAnchor(page, timeoutMs = 3500) {
     }, selfHost).catch(() => []);
     let best = null;
     for (const c of cands) {
-      // עדיפות VPN (בקשת המפעיל): טקסט VPN מנצח; "הורדה/Download" נותן בוסט קטן
+      // VPN priority: VPN text scores highest; "Download" gives a small boost
       const txt = String(c.text || '');
       const vpnBonus = /vpn/i.test(txt) ? 30 : 0;
       const dlBonus = /download|הורדה/i.test(txt) ? 8 : 0;
@@ -165,7 +165,7 @@ async function findOfferLikeAnchor(page, timeoutMs = 3500) {
   let hitFrame = null;
   let hitBest = null;
   while (Date.now() < deadline && !hitFrame) {
-    // בחירת המנצח הגלובלי חוצה-פריימים (במקום הפריים הראשון שנמצא) — כך עדיפות ה-VPN חלה על כל הפריימים
+    // Pick global highest-scoring candidate across frames
     let bestOverall = null;
     for (const fr of safeFrames(page)) {
       if (!fr || fr.isDetached()) continue;
@@ -201,7 +201,7 @@ async function enforceLockerDwellGate(step, ctx, emit) {
     if (elapsed < dwellMs) {
       const waitMs = Math.round((dwellMs - elapsed) + 1200 + Math.random() * 2200);
       if (typeof emit === 'function') {
-        emit(`[ייחוס] נשהה סגירת הלוקר ל־${Math.round(waitMs / 100) / 10}s כדי ש־iframe ההצעות ייטען והקליק יירשם אצל השותף`);
+        emit(`[Attribution] Settling locker close for ${Math.round(waitMs / 100) / 10}s to allow beacon completion`);
       }
       await sleep(Math.min(waitMs, 17000));
     }
@@ -211,7 +211,7 @@ async function enforceLockerDwellGate(step, ctx, emit) {
 
 async function resolveInteractiveLocator(page, rawSelector, timeoutMs = 20000) {
   const sel = String(rawSelector || '').trim();
-  if (!sel) throw new Error('חסר בורר (Selector) או טקסט לאלמנט.');
+  if (!sel) throw new Error('Missing element selector or text.');
 
   const primary = page.locator(sel).first();
   // Partner offer anchors (full https href selectors) render lazily inside lockers through proxies
@@ -322,8 +322,8 @@ async function dumpLockerAnchors(page, skippedSel) {
       const frUrl = String(fr.url() || '').slice(0, 60);
       for (const h of links) dump.push(`[${frUrl}] ${h.slice(0, 110)}`);
     }
-    console.log(`[אבחון לוקר] לא נמצא: ${String(skippedSel).slice(0, 70)} | פריימים: ${safeFrames(page).length}`);
-    console.log(dump.length ? dump.slice(0, 30).map(l => `  ${l}`).join('\n') : '  (אין עוגני http מקומיים בשום פריים — האיפריים לא נטען?)');
+    console.log(`[Container Debug] Not found: ${String(skippedSel).slice(0, 70)} | frames: ${safeFrames(page).length}`);
+    console.log(dump.length ? dump.slice(0, 30).map(l => `  ${l}`).join('\n') : '  (no http anchors found in any frame)');
   } catch {}
 }
 
@@ -434,7 +434,7 @@ async function performShieldedClick(page, loc, selectorStr, shouldShield, emit, 
             el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
           }
         });
-        emit(`[Overlay Shield] בוצעה לחיצה ישירה על "${selectorStr}" לאחר שחרור חסימה`);
+        emit(`[Overlay Shield] Clicked "${selectorStr}" directly after clearing blocking layer`);
       } else {
         throw retryErr;
       }
@@ -560,7 +560,7 @@ async function warmUpShortener(page, dest, ctx) {
   }
   // Small dwell so the WAF sees a real session, not an instant bounce.
   await sleep(900 + Math.round(Math.random() * 1600));
-  return ` + חימום דומיין ${host} (אישור קוקיז)`;
+  return ` + domain warm-up ${host} (cookie consent)`;
 }
 
 const STEP_HANDLERS = {
@@ -642,7 +642,7 @@ const STEP_HANDLERS = {
     }
     ctx.searchQuery = query;
     ctx.searchEngine = engine.id;
-    return `חיפוש אורגני ב-${engine.id}: "${query}" → מפנה אל היעד מתוצאות החיפוש`;
+    return `Organic search on ${engine.id}: "${query}" → navigating to target from SERP`;
   },
 
   /**
@@ -651,7 +651,7 @@ const STEP_HANDLERS = {
    */
   async ai_form_guard(page, step, ctx) {
     const identity = step.identity || ctx.identity || null;
-    if (!identity) return 'AI Form Guard: אין זהות לביקור — דולג';
+    if (!identity) return 'AI Form Guard: No session identity — skipped';
     const emit = msg => { if (ctx.onStep) ctx.onStep(msg); };
     // The identity stores the inbox as a template; resolve it here so the guard never types
     // the literal "{{AGENT_EMAIL}}" into a field that the visit cannot verify.
@@ -766,17 +766,17 @@ const STEP_HANDLERS = {
               appliedAi += 1;
             }
           }
-          if (appliedAi) aiNote = ` + ${appliedAi} שדות שהושלמו ע"י AI`;
+          if (appliedAi) aiNote = ` + ${appliedAi} fields completed by AI`;
         }
       } catch (err) {
-        aiNote = ` (AI Form Guard לא זמין: ${String(err?.message || err).slice(0, 60)})`;
+        aiNote = ` (AI Form Guard unavailable: ${String(err?.message || err).slice(0, 60)})`;
       }
     }
 
-    if (!filledNow.length && !unknown.length) return 'AI Form Guard: כל השדות הגלויים כבר מלאים';
+    if (!filledNow.length && !unknown.length) return 'AI Form Guard: All visible fields already populated';
     const summary = filledNow.map(f => `${f.selector || f.hint}=${String(f.filled).slice(0, 18)}`).join(', ');
-    emit(`[ביקור ${ctx.visitIndex + 1 ?? ''} | AI Form Guard] הושלמו ${filledNow.length} שדות${aiNote}`);
-    return `AI Form Guard: הושלמו ${filledNow.length} שדות ריקים${aiNote}${summary ? ` (${summary})` : ''}`;
+    emit(`[Visit ${ctx.visitIndex + 1 ?? ''} | AI Form Guard] Populated ${filledNow.length} fields${aiNote}`);
+    return `AI Form Guard: Populated ${filledNow.length} empty fields${aiNote}${summary ? ` (${summary})` : ''}`;
   },
 
   /**
@@ -784,7 +784,7 @@ const STEP_HANDLERS = {
    * continues the journey, and click it. Keeps a visit alive instead of dying on a wrong page.
    */
   async ai_route_repair(page, step, ctx) {
-    if (!page || page.isClosed()) return 'AI Route Repair: אין דף פעיל';
+    if (!page || page.isClosed()) return 'AI Route Repair: No active page';
     // Never let the model pick a link when the page already shows the signup form — clicking
     // "a better link" there would abandon a working funnel (and burn an API call).
     const formVisible = await page.evaluate(() => {
@@ -800,9 +800,9 @@ const STEP_HANDLERS = {
         return /mail|first|last|name|address|zip|phone|tel/.test(hint);
       });
     }).catch(() => false);
-    if (formVisible) return 'AI Route Repair: הטופס כבר על המסך — אין צורך לתקן מסלול';
+    if (formVisible) return 'AI Route Repair: Target form already visible — no repair needed';
     const dom = await captureCompactDomForAi(page, Boolean(ctx.avoidAdClicks), { sameOriginOnly: false });
-    if (!dom.clickables.length) return 'AI Route Repair: אין קישורים בדף';
+    if (!dom.clickables.length) return 'AI Route Repair: No clickable links on page';
     const goal = String(step.value || ctx.aiDirective || 'continue to the offer form').slice(0, 200);
     try {
       const res = await callAiChat({
@@ -819,18 +819,18 @@ const STEP_HANDLERS = {
       });
       const text = typeof res === 'string' ? res : (res?.text || res?.content || '');
       const match = String(text).match(/\{[\s\S]*\}/);
-      if (!match) return 'AI Route Repair: לא התקבלה הכרעה';
+      if (!match) return 'AI Route Repair: No decision returned';
       const picked = JSON.parse(match[0]);
       const target = dom.clickables.find(c => Number(c.id) === Number(picked.id));
-      if (!target || !target.selector) return 'AI Route Repair: היעד לא נמצא בדף';
+      if (!target || !target.selector) return 'AI Route Repair: Target not found on page';
       const loc = page.locator(target.selector).first();
-      if ((await loc.count().catch(() => 0)) === 0) return 'AI Route Repair: הסלקטור לא קיים';
+      if ((await loc.count().catch(() => 0)) === 0) return 'AI Route Repair: Selector not found';
       await loc.scrollIntoViewIfNeeded({ timeout: 2500 }).catch(() => {});
       await loc.click({ timeout: 6000 }).catch(() => {});
       await sleep(1200);
-      return `AI Route Repair: עבר ל-"${String(target.text || target.selector).slice(0, 40)}" (${String(picked.why || '').slice(0, 40)})`;
+      return `AI Route Repair: Navigated to "${String(target.text || target.selector).slice(0, 40)}" (${String(picked.why || '').slice(0, 40)})`;
     } catch (err) {
-      return `AI Route Repair נכשל: ${String(err?.message || err).slice(0, 60)}`;
+      return `AI Route Repair failed: ${String(err?.message || err).slice(0, 60)}`;
     }
   },
 
@@ -882,7 +882,7 @@ const STEP_HANDLERS = {
       const destHost = new URL(dest).hostname;
       const finalHost = new URL(page.url()).hostname;
       if (destHost && finalHost && !/(^|\.)google\./i.test(destHost) && /(^|\.)google\.[a-z.]+$/i.test(finalHost)) {
-        throw new Error(`net::ERR_OFFER_REDIRECT — היעד החזיר הפניה ל-${finalHost} (הפרוקסי חסום גיאוגרפית בהצעה)`);
+        throw new Error(`net::ERR_OFFER_REDIRECT — Target redirected to ${finalHost} (geo/proxy blocked)`);
       }
     } catch (geoErr) {
       if (/ERR_OFFER_REDIRECT/.test(String(geoErr?.message || ''))) throw geoErr;
@@ -893,9 +893,9 @@ const STEP_HANDLERS = {
     ctx.visitedUrls.push({ path: step.value || '/', url: page.url(), status, loadMs });
     await injectSnippet(page, ctx.parsedSnippet);
     if (typeof status === 'number' && status >= 400) {
-      throw new Error(`הדף ${dest} החזיר שגיאת HTTP ${status}`);
+      throw new Error(`Page ${dest} returned HTTP ${status}`);
     }
-    return `נטען ${page.url()} (HTTP ${status}, ${loadMs}ms)${warmNote}`;
+    return `Loaded ${page.url()} (HTTP ${status}, ${loadMs}ms)${warmNote}`;
   },
 
   async click(page, step, ctx) {
@@ -913,7 +913,7 @@ const STEP_HANDLERS = {
         await dismissBlockingOverlays(page, emit, selectorStr).catch(() => 0);
       }
       await humanBrowsePage(page, 3500, ctx.adSafety, emit);
-      return `נשאר באותו עמוד ומנווט בתוכו (${Math.round(stayChance * 100)}% מסלול הישארות, דולג מעבר ל-"${selectorStr}")`;
+      return `Staying on current page (${Math.round(stayChance * 100)}% dwell probability, skipped "${selectorStr}")`;
     }
 
     const beforeUrl = page.url();
@@ -932,7 +932,7 @@ const STEP_HANDLERS = {
       const fallbackLoc = canFallbackExt ? await resolveFallbackExternalClick(page, step).catch(() => null) : null;
       if (!fallbackLoc) throw selErr;
       loc = fallbackLoc;
-      emit(`[Tab #${step.tab}] המיקום "${selectorStr.slice(0, 35)}..." השתנה בדף — אותר יעד תואם בדף הטעון`);
+      emit(`[Tab #${step.tab}] Selector "${selectorStr.slice(0, 35)}..." shifted — located matching target on loaded page`);
     }
     if (ctx.adSafety?.avoidAdClicks !== false && !step.opensTab) {
       const strictBannerSelector = '.ad-slot-box, .ad-slot-box *, ins.adsbygoogle, .adsbygoogle, [id^="google_ads_iframe"], [id^="aswift_"], #google_vignette_container';
@@ -941,7 +941,7 @@ const STEP_HANDLERS = {
         strictBannerSelector
       ).catch(() => false);
       if (isAdTarget) {
-        throw new Error(`נחסמה לחיצה על אלמנט מודעה ("${selectorStr}") — מנגנון avoidAdClicks מופעל`);
+        throw new Error(`Blocked click on ad element ("${selectorStr}") — avoidAdClicks enabled`);
       }
     }
     const isLocVisible = await loc.isVisible().catch(() => false);
@@ -1030,7 +1030,7 @@ const STEP_HANDLERS = {
           ctx.emptyExternalTabs?.add(step.opensTab);
           let host = settledUrl;
           try { host = new URL(settledUrl).hostname; } catch {}
-          emit(`[Tab #${step.opensTab}] הדף החיצוני (${host}) נותר ללא קישורי ניווט לאחר הטעינה (סינון/חסימת צד-ג׳)`);
+          emit(`[Tab #${step.opensTab}] External page (${host}) loaded without navigation links (third-party filtering)`);
         } else {
           ctx.emptyExternalTabs?.delete(step.opensTab);
         }
@@ -1081,7 +1081,7 @@ const STEP_HANDLERS = {
           await loc.scrollIntoViewIfNeeded().catch(() => {});
           await performShieldedClick(page, loc, selectorStr, shouldShield, emit);
           await page.waitForURL(u => u.href !== beforeUrl, { timeout: isCrossOrigin ? 6000 : 2200, waitUntil: 'domcontentloaded' }).catch(() => {});
-          navNote = page.url() !== beforeUrl ? ' [לחיצה חוזרת אחרי פופ-אפ]' : ' [נשאר באותו עמוד]';
+          navNote = page.url() !== beforeUrl ? ' [retried after popup]' : ' [stayed on page]';
         }
       }
     }
@@ -1103,7 +1103,7 @@ const STEP_HANDLERS = {
     }
     const labelPart = targetMeta.text ? ` "${targetMeta.text}"` : '';
     const coordPart = clickPoint ? ` @[${clickPoint.x},${clickPoint.y}]` : '';
-    return `נלחץ "${selectorStr}" (<${targetMeta.tag}>${labelPart}${coordPart})${navNote}`;
+    return `Clicked "${selectorStr}" (<${targetMeta.tag}>${labelPart}${coordPart})${navNote}`;
   },
 
   async fill(page, step, ctx) {
@@ -1139,12 +1139,12 @@ const STEP_HANDLERS = {
           capability: inbox.capability,
           timeoutMs: isOtpField ? 18000 : 45000,
           pollIntervalMs: 2500,
-          onPoll: ({ attempts, status }) => emit(`[HirePulse OTP] בדיקה #${attempts} מול התיבה (${status})...`),
+          onPoll: ({ attempts, status }) => emit(`[HirePulse OTP] Poll #${attempts} on inbox (${status})...`),
         });
         if (otpRes && otpRes.code) {
           val = String(otpRes.code);
           registerSecret(val);
-          emit(`[HirePulse OTP] נשלף קוד אימות חי מהמייל והוזן אוטומטית (${val.length} תווים, הערך מוסתר מהיומן)`);
+          emit(`[HirePulse OTP] Retrieved verification code from inbox and filled (${val.length} chars, redacted)`);
         }
       }
     }
@@ -1188,11 +1188,11 @@ const STEP_HANDLERS = {
     if (usedLiveInbox) {
       // Live-inbox submissions are conversion surface — remember for end-of-session beacon flush
       ctx.partnerActivity = true;
-      return `הוזן אימייל סוכן חי בשדה ${step.selector}: ${maskEmail(val)}`;
+      return `Filled live agent email in ${step.selector}: ${maskEmail(val)}`;
     }
     return isSecretValue
-      ? `הוזן ערך רגיש בשדה ${step.selector} (${val.length} תווים, הערך מוסתר מהיומן)`
-      : `הוזן טקסט בשדה ${step.selector} (${val.length} תווים: "${redactText(val)}")`;
+      ? `Filled sensitive value in ${step.selector} (${val.length} chars, redacted)`
+      : `Filled text in ${step.selector} (${val.length} chars: "${redactText(val)}")`;
   },
 
   async fill_email(page, step, ctx) {
@@ -1201,7 +1201,7 @@ const STEP_HANDLERS = {
     const selector = String(step.selector || '').trim() ||
       'input[type="email"], input[name*="email" i], input[id*="email" i], input[placeholder*="mail" i]';
     const resText = await STEP_HANDLERS.fill(page, { ...step, selector, value: inbox.address }, ctx);
-    return `${resText} [אימייל סוכן חי: ${maskEmail(inbox.address)}]`;
+    return `${resText} [Live agent email: ${maskEmail(inbox.address)}]`;
   },
 
   async fill_otp(page, step, ctx) {
@@ -1212,12 +1212,12 @@ const STEP_HANDLERS = {
       inbox_id: inbox.inbox_id,
       capability: inbox.capability,
       timeoutMs,
-      onPoll: ({ attempts, status }) => emit(`[HirePulse OTP] ממתין לקוד אימות בתיבה ${maskEmail(inbox.address)} (ניסיון #${attempts}, סטטוס: ${status})...`),
+      onPoll: ({ attempts, status }) => emit(`[HirePulse OTP] Waiting for OTP in ${maskEmail(inbox.address)} (attempt #${attempts}, status: ${status})...`),
     });
     const selector = String(step.selector || '').trim() ||
       'input[autocomplete="one-time-code"], input[name*="code" i], input[name*="otp" i], input[id*="code" i], input[id*="otp" i]';
     await STEP_HANDLERS.fill(page, { ...step, selector, value: otpRes.code, secret: true, lockValue: true }, ctx);
-    return `הוזן קוד אימות OTP מהמייל (${otpRes.code.length} תווים, התקבל תוך ${Math.round(otpRes.elapsedMs / 100) / 10}s)`;
+    return `Filled email OTP code (${otpRes.code.length} chars, received in ${Math.round(otpRes.elapsedMs / 100) / 10}s)`;
   },
 
   async select(page, step) {
@@ -1238,7 +1238,7 @@ const STEP_HANDLERS = {
       await page.keyboard.press(key);
     }
     await sleep(250);
-    return `נלחץ מקש ${key}`;
+    return `Pressed key ${key}`;
   },
 
   async scroll(page, step) {
@@ -1249,7 +1249,7 @@ const STEP_HANDLERS = {
     const targetY = Math.floor((maxY * pct) / 100);
     await smoothScrollTo(page, targetY);
     await sleep(300);
-    return `גלילה אל ${pct}% מהעמוד`;
+    return `Scrolled to ${pct}% of page`;
   },
 
   async wait(page, step) {
@@ -1257,12 +1257,12 @@ const STEP_HANDLERS = {
       const timeout = Math.max(500, Math.min(30000, Number(step.value) || 10000));
       const loc = page.locator(String(step.selector).trim()).first();
       await loc.waitFor({ state: 'visible', timeout });
-      return `הופיע האלמנט ${step.selector}`;
+      return `Element appeared: ${step.selector}`;
     }
     const baseMs = Math.max(100, Math.min(30000, Number(step.value) || 1200));
     const ms = baseMs >= 400 ? withHumanJitter(baseMs, 300, 30000, 0.22) : baseMs;
     await sleep(ms);
-    return `המתין ${ms}ms`;
+    return `Waited ${ms}ms`;
   },
 
   async assert(page, step, ctx) {
@@ -1272,26 +1272,26 @@ const STEP_HANDLERS = {
     if (kind === 'status_ok') {
       const st = Number(ctx.lastStatus);
       if (!Number.isFinite(st) || st < 200 || st >= 400) {
-        throw new Error(`בדיקת סטטוס נכשלה: התקבל HTTP ${ctx.lastStatus}`);
+        throw new Error(`Status assertion failed: received HTTP ${ctx.lastStatus}`);
       }
-      return `PASS: סטטוס HTTP תקין (${st})`;
+      return `PASS: HTTP status OK (${st})`;
     }
 
     if (kind === 'url_contains') {
       const cur = page.url();
       if (!cur.includes(expected)) {
-        throw new Error(`בדיקת URL נכשלה: "${cur}" לא מכיל "${expected}"`);
+        throw new Error(`URL assertion failed: "${cur}" does not contain "${expected}"`);
       }
-      return `PASS: ה-URL מכיל "${expected}"`;
+      return `PASS: URL contains "${expected}"`;
     }
 
     if (kind === 'selector_visible') {
       const sel = String(step.selector || expected || '').trim();
       const visible = await page.locator(sel).first().isVisible().catch(() => false);
       if (!visible) {
-        throw new Error(`בדיקת נראות נכשלה: האלמנט "${sel}" אינו מוצג`);
+        throw new Error(`Visibility assertion failed: "${sel}" is not visible`);
       }
-      return `PASS: האלמנט "${sel}" מוצג`;
+      return `PASS: Element "${sel}" is visible`;
     }
 
     // default: text_contains
@@ -1303,9 +1303,9 @@ const STEP_HANDLERS = {
       actualText = await page.evaluate(() => document.body?.innerText || '').catch(() => '');
     }
     if (!actualText.includes(expected)) {
-      throw new Error(`בדיקת טקסט נכשלה ב-"${step.selector || 'body'}": הטקסט "${actualText.trim().slice(0, 80)}" אינו מכיל "${expected}"`);
+      throw new Error(`Text assertion failed on "${step.selector || 'body'}": "${actualText.trim().slice(0, 80)}" does not contain "${expected}"`);
     }
-    return `PASS: נמצא "${expected}"`;
+    return `PASS: Found "${expected}"`;
   },
 
   async read_article(page, step, ctx) {
@@ -1334,7 +1334,7 @@ const STEP_HANDLERS = {
     }
     const remaining = totalMs - (Date.now() - started);
     if (remaining > 150) await sleep(remaining);
-    return `קריאת מאמר אנושית (${checkpoints.length} עצירות גלילה, ${Math.round((Date.now() - started) / 100) / 10}s, ללא לחיצה על מודעות)`;
+    return `Human article reading (${checkpoints.length} scroll checkpoints, ${Math.round((Date.now() - started) / 100) / 10}s, zero ad clicks)`;
   },
 
   async hover(page, step, ctx) {
@@ -1353,13 +1353,13 @@ const STEP_HANDLERS = {
       await loc.hover().catch(() => {});
     }
     await sleep(pauseMs);
-    return `ריחוף עכבר אנושי על "${selectorStr}" (${pauseMs}ms)`;
+    return `Human hover on "${selectorStr}" (${pauseMs}ms)`;
   },
 
   async human_browse(page, step, ctx) {
     const budgetMs = withHumanJitter(Number(step.value) || 7000, 2000, 45000, 0.22);
     const secs = await humanBrowsePage(page, budgetMs, ctx.adSafety, ctx.onStep);
-    return `גלישה אנושית חופשית בדף (גלילות, עכבר, ריחוף ובחירת טקסט — ${secs}s)`;
+    return `Autonomous human browsing (scrolls, mouse, hover, selection — ${secs}s)`;
   },
 
   async scroll_to(page, step) {
@@ -1367,12 +1367,12 @@ const STEP_HANDLERS = {
     const loc = await resolveInteractiveLocator(page, selectorStr);
     await loc.scrollIntoViewIfNeeded().catch(() => {});
     await sleep(350);
-    return `גלילה אל "${selectorStr}" (ללא לחיצה)`;
+    return `Scrolled to "${selectorStr}" (no click)`;
   },
 
   async dismiss_overlays(page, _step, ctx) {
     const count = await dismissBlockingOverlays(page, msg => ctx.onStep && ctx.onStep(msg));
-    return `נסגרו ${count} שכבות Overlay צפות`;
+    return `Dismissed ${count} floating overlays`;
   },
 
   async audit_ads(page, _step, ctx) {
@@ -1384,7 +1384,7 @@ const STEP_HANDLERS = {
       return `${s.position}:${s.slotId}${ok ? '✓' : '○'}${dim ? `[${dim}]` : ''}`;
     }).join(', ');
     const adsenseNote = report.adsenseCount ? `, AdSense=${report.adsenseCount}` : '';
-    return `ביקורת מודעות: meta=${report.metaSlotsCount}, סלוטים=${report.slotsFound}${activeNames ? ` (${activeNames})` : ''}${adsenseNote}, שכבות=${report.overlaysFound}`;
+    return `Ad Audit: meta=${report.metaSlotsCount}, slots=${report.slotsFound}${activeNames ? ` (${activeNames})` : ''}${adsenseNote}, overlays=${report.overlaysFound}`;
   },
 
   async go_back(page, step, ctx) {
@@ -1394,12 +1394,12 @@ const STEP_HANDLERS = {
     const status = resp ? resp.status() : 'history';
     ctx.pagesVisited++;
     ctx.visitedUrls.push({ path: '(back)', url: page.url(), status, loadMs: 0 });
-    return `חזר אחורה בהיסטוריה אל ${page.url()} (מ-${beforeUrl})`;
+    return `Navigated back in history to ${page.url()} (from ${beforeUrl})`;
   },
 
   async close_tab(_page, step, ctx) {
     const tabId = Number.isInteger(step.tab) && step.tab > 0 ? step.tab : null;
-    if (!tabId) return 'דולג (לא סוגרים כרטיסייה ראשית)';
+    if (!tabId) return 'Skipped (cannot close primary tab)';
     const tabPage = ctx.tabs.get(tabId);
     if (tabPage && !tabPage.isClosed()) {
       const tabUrl = String(tabPage.url() || '');
@@ -1418,11 +1418,11 @@ const STEP_HANDLERS = {
       await mainPage.bringToFront().catch(() => {});
       ctx.activeTabId = 0;
     }
-    return `נסגרה כרטיסייה #${tabId} וחזרה לאתר הראשי`;
+    return `Closed Tab #${tabId} and returned to primary site`;
   },
 
   async screenshot(_page, step) {
-    return `צולם מסך: ${step.label || step.value || 'Checkpoint'}`;
+    return `Captured screenshot: ${step.label || step.value || 'Checkpoint'}`;
   },
 };
 
@@ -1565,7 +1565,7 @@ async function executeTaskSteps({
   try {
     if (alreadyNavigated) {
       await injectSnippet(page, parsedSnippet);
-      await captureFrameSafe(page, { visitIndex, label: 'דף כניסה למשימה', persona: personaName }, onFrame);
+      await captureFrameSafe(page, { visitIndex, label: 'Scenario entry page', persona: personaName }, onFrame);
     } else if (!steps.length || !['goto', 'search_entry'].includes(steps[0].type)) {
       // A leading `search_entry` is the entry point: navigating to the target here first would
       // hit the offer twice per visit (and before the search engine exists).
@@ -1579,7 +1579,7 @@ async function executeTaskSteps({
       ctx.lastStatus = entryResp ? entryResp.status() : 'n/a';
       ctx.pagesVisited = 1;
       await injectSnippet(page, parsedSnippet);
-      await captureFrameSafe(page, { visitIndex, label: 'פתיחת דף הבסיס', persona: personaName }, onFrame);
+      await captureFrameSafe(page, { visitIndex, label: 'Opened base page', persona: personaName }, onFrame);
     }
 
     const FAIL_FAST_SKIP_LIMIT = 4;
@@ -1599,7 +1599,7 @@ async function executeTaskSteps({
 
     for (let idx = 0; idx < steps.length; idx++) {
       if (page.isClosed()) {
-        emitStep(`[ביקור ${visitIndex + 1}] הסשן נסגר (תום זמן סשן או עצירה) — מסיים מסלול בצורה נקייה`);
+        emitStep(`[Visit ${visitIndex + 1}] Session closed (timeout or stop) — finishing cleanly`);
         break;
       }
       const step = steps[idx] || {};
@@ -1614,10 +1614,10 @@ async function executeTaskSteps({
         && !step.mustRun
         && (skipsByTabUrl.get(preFailKey) || 0) >= (stepTab > 0 ? 2 : FAIL_FAST_SKIP_LIMIT)
       ) {
-        const skippedDetail = `דולג מיידית (Fail-Fast: העמוד לא תואם אחרי ${skipsByTabUrl.get(preFailKey)} דילוגים רצופים)`;
+        const skippedDetail = `Skipped immediately (Fail-Fast: page mismatch after ${skipsByTabUrl.get(preFailKey)} consecutive skips)`;
         const label = safeStepLabel(step);
         stepResults.push({ index: idx + 1, type: step.type, label, ok: false, durationMs: 0, detail: skippedDetail });
-        emitStep(`[ביקור ${visitIndex + 1} | צעד ${idx + 1}/${steps.length}] ${skippedDetail}`);
+        emitStep(`[Visit ${visitIndex + 1} | Step ${idx + 1}/${steps.length}] ${skippedDetail}`);
         continue;
       }
 
@@ -1630,14 +1630,14 @@ async function executeTaskSteps({
         ctx.emptyExternalTabs.add(stepTab);
         await existingTabPage.close().catch(() => {});
         if (ctx.activeTabId === stepTab) ctx.activeTabId = 0;
-        emitStep(`[Tab #${stepTab}] זוהה דף "הצעה לא זמינה" — הטאב נסגר אוטומטית לחיסכון בזמן`);
+        emitStep(`[Tab #${stepTab}] Unavailable offer page detected — closed tab automatically`);
       }
 
       if (stepTab > 0 && ctx.emptyExternalTabs.has(stepTab) && !['ai_explore', 'ai_form_guard', 'ai_route_repair', 'scan_products', 'close_tab', 'goto'].includes(step.type) && !step.mustRun) {
-        const skippedDetail = `דולג מיידית (טאב #${stepTab} נותר ללא קישורים/תוכן ניווט בדף החיצוני)`;
+        const skippedDetail = `Skipped immediately (Tab #${stepTab} left without navigation links on external page)`;
         const label = safeStepLabel(step);
         stepResults.push({ index: idx + 1, type: step.type, label, ok: false, durationMs: 0, detail: skippedDetail });
-        emitStep(`[ביקור ${visitIndex + 1} | צעד ${idx + 1}/${steps.length}] ${skippedDetail}`);
+        emitStep(`[Visit ${visitIndex + 1} | Step ${idx + 1}/${steps.length}] ${skippedDetail}`);
         continue;
       }
 
@@ -1648,7 +1648,7 @@ async function executeTaskSteps({
             ? runAiExploreStep
             : STEP_HANDLERS[step.type];
       if (!handler) {
-        throw new Error(`סוג צעד לא מוכר במשימה: ${step.type}`);
+        throw new Error(`Unknown scenario step type: ${step.type}`);
       }
 
       const stepLabel = safeStepLabel(step);
@@ -1659,7 +1659,7 @@ async function executeTaskSteps({
       try {
         let tabPage = step.type === 'close_tab' ? page : await getStepPage(step, ctx);
         if (!tabPage && stepTab > 0) {
-          throw new Error(`טאב #${stepTab} לא נפתח`);
+          throw new Error(`Tab #${stepTab} did not open`);
         }
         if (
           ['ai_explore', 'scan_products', 'ai_form_guard', 'ai_route_repair'].includes(step.type)
@@ -1695,7 +1695,7 @@ async function executeTaskSteps({
         if (!recovered) {
           if (page.isClosed() || /Target page, context or browser has been closed/i.test(err?.message || '')) {
           if (!step.optional && page.isClosed()) {
-            emitStep(`[ביקור ${visitIndex + 1}] הדפדפן נסגר במהלך צעד ${idx + 1} — מסיים ביקור`);
+            emitStep(`[Visit ${visitIndex + 1}] Browser closed during step ${idx + 1} — ending visit`);
             break;
           }
         }
@@ -1713,7 +1713,7 @@ async function executeTaskSteps({
         }
         ok = false;
         const shortErr = redactText(err?.message || err).split('\n')[0].slice(0, 110);
-        detail = `דולג (האלמנט לא הופיע בדף הנוכחי): ${shortErr}`;
+        detail = `Skipped (element not present on current page): ${shortErr}`;
         }
       }
       const durationMs = Date.now() - started;
@@ -1727,7 +1727,7 @@ async function executeTaskSteps({
         detail: redactText(detail),
       });
 
-      emitStep(`[ביקור ${visitIndex + 1} | צעד ${idx + 1}/${steps.length}] ${detail}`);
+      emitStep(`[Visit ${visitIndex + 1} | Step ${idx + 1}/${steps.length}] ${detail}`);
 
       const postUrl = getNormalizedTabUrl(activeStepPage);
       const tabUrlKey = postUrl ? `${stepTab}|${postUrl}` : '';
@@ -1750,7 +1750,7 @@ async function executeTaskSteps({
           recoveredTabUrls.add(tabUrlKey);
           const recNote = await runAiSmartRecoveryStep(activeStepPage, ctx, step.type).catch(() => null);
           if (recNote) {
-            emitStep(`[ביקור ${visitIndex + 1} | AI Recovery] ${recNote}`);
+            emitStep(`[Visit ${visitIndex + 1} | AI Recovery] ${recNote}`);
           }
         }
       }
@@ -1761,7 +1761,7 @@ async function executeTaskSteps({
           : page;
         await captureFrameSafe(
           framePage,
-          { visitIndex, label: `צעד ${idx + 1}: ${stepLabel}`, persona: personaName },
+          { visitIndex, label: `Step ${idx + 1}: ${stepLabel}`, persona: personaName },
           onFrame
         );
       }
@@ -1789,7 +1789,7 @@ async function executeTaskSteps({
             : page;
           await activeP.goto(confirmUrl, { waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
           await sleep(1500);
-          emitStep(`[ביקור ${visitIndex + 1} | ✅ אישור מייל אוטומטי] נפתח קישור האימות שהתקבל בתיבת ${maskEmail(ctx.sessionInbox.address)}`);
+          emitStep(`[Visit ${visitIndex + 1} | ✅ Email Verified] Opened confirmation link from ${maskEmail(ctx.sessionInbox.address)}`);
           confirmed = true;
           break;
         }
@@ -1804,9 +1804,9 @@ async function executeTaskSteps({
             await otpLoc.fill(String(inboxCheck.code)).catch(() => {});
             await activeP.keyboard.press('Enter').catch(() => {});
             await sleep(1500);
-            emitStep(`[ביקור ${visitIndex + 1} | ✅ אישור קוד OTP אוטומטי] הוזן קוד אימות מתיבת ${maskEmail(ctx.sessionInbox.address)}`);
+            emitStep(`[Visit ${visitIndex + 1} | ✅ OTP Verified] Filled verification code from ${maskEmail(ctx.sessionInbox.address)}`);
           } else {
-            emitStep(`[ביקור ${visitIndex + 1} | תיבת דוח חיה] התקבל קוד/אישור בתיבת ${maskEmail(ctx.sessionInbox.address)}`);
+            emitStep(`[Visit ${visitIndex + 1} | Live Inbox] Received verification in ${maskEmail(ctx.sessionInbox.address)}`);
           }
           confirmed = true;
           break;
@@ -1816,13 +1816,13 @@ async function executeTaskSteps({
           ? msgsPayload.messages
           : (Array.isArray(msgsPayload?.items) ? msgsPayload.items : []);
         if (msgList.length > 0) {
-          emitStep(`[ביקור ${visitIndex + 1} | ✅ מייל התקבל בתיבת הסוכן] ${maskEmail(ctx.sessionInbox.address)}`);
+          emitStep(`[Visit ${visitIndex + 1} | ✅ Email Received] ${maskEmail(ctx.sessionInbox.address)}`);
           confirmed = true;
           break;
         }
 
         if (pollAttempt === 6 && inboxCheck) {
-          emitStep(`[ביקור ${visitIndex + 1} | תיבת דוח חיה] נבדקה תיבת ${maskEmail(ctx.sessionInbox.address)} (סטטוס: ${inboxCheck.status} — האתר החיצוני טרם שלח מייל אימות)`);
+          emitStep(`[Visit ${visitIndex + 1} | Live Inbox] Checked ${maskEmail(ctx.sessionInbox.address)} (status: ${inboxCheck.status} — no verification email yet)`);
         }
       }
     }
@@ -1888,7 +1888,7 @@ async function confirmRunInboxes({ maxPasses = 4, passDelayMs = 30000 } = {}) {
         }).catch(() => {});
         confirmedIds.add(entry.inbox_id);
         summary.confirmed++;
-        console.log(`📧 [Email Sweep] אישור מייל אוטומטי — נפתח קישור האימות שהתקבל בתיבת ${maskEmail(entry.address)}`);
+        console.log(`📧 [Email Sweep] Verified email — opened confirmation link from ${maskEmail(entry.address)}`);
       } catch {
         summary.failed++;
       }
@@ -1903,7 +1903,7 @@ async function confirmRunInboxes({ maxPasses = 4, passDelayMs = 30000 } = {}) {
       'utf8'
     );
   } catch {}
-  console.log(`📧 [Email Sweep] סיכום אימיילים: ${summary.confirmed}/${summary.total} אושרו (מיילים בלי קישור: ${summary.withoutLink}).`);
+  console.log(`📧 [Email Sweep] Summary: ${summary.confirmed}/${summary.total} confirmed (without link: ${summary.withoutLink}).`);
   return summary;
 }
 

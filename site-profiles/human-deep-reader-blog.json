@@ -1,7 +1,7 @@
 {
   "id": "human-deep-reader-blog",
-  "name": "בלוג ומאמרים: קריאה עמוקה והתנהגות אנושית (Hybrid)",
-  "description": "משלב צעדים מוגדרים (קריאת מאמר + גלישה אנושית + ריחוף + לחיצה על ניווט) עם המשך גלישה חופשית לפי פרסונות.",
+  "name": "Blog & Articles: Deep Reading & Human Behavior (Hybrid)",
+  "description": "Combines structured scenario steps (article reading + human browse + hover + navigation click) with autonomous persona browsing.",
   "category": "human_reading",
   "isBuiltin": true,
   "config": {
@@ -27,63 +27,63 @@
         "selector": "",
         "value": "/",
         "assertKind": "text_contains",
-        "label": "כניסה לדף הבית של האתר"
+        "label": "Open site home page"
       },
       {
         "type": "wait",
         "selector": "",
         "value": "1500",
         "assertKind": "text_contains",
-        "label": "השהיית קריאה ראשונית טבעית"
+        "label": "Initial natural reading pause"
       },
       {
         "type": "read_article",
         "selector": "",
         "value": "6500",
         "assertKind": "text_contains",
-        "label": "קריאה אנושית הדרגתית של התוכן"
+        "label": "Progressive human reading of primary content"
       },
       {
         "type": "human_browse",
         "selector": "",
         "value": "4500",
         "assertKind": "text_contains",
-        "label": "שליטה אנושית בעכבר, גלילות ובחירת טקסט"
+        "label": "Human mouse trajectories, scrolls, and text selection"
       },
       {
         "type": "hover",
         "selector": "nav a[href*=\"/about\"]",
         "value": "700",
         "assertKind": "text_contains",
-        "label": "ריחוף עכבר על קישור \"אודות\" בתפריט"
+        "label": "Hover mouse over \"About\" link in navigation"
       },
       {
         "type": "click",
         "selector": "nav a[href*=\"/about\"]",
         "value": "",
         "assertKind": "text_contains",
-        "label": "לחיצה על קישור אודות (כאן תוכל לשנות ללינק שלך)"
+        "label": "Click About link (customize to match your nav)"
       },
       {
         "type": "wait",
         "selector": "",
         "value": "1200",
         "assertKind": "text_contains",
-        "label": "המתנה לטעינת המאמר הפנימי"
+        "label": "Wait for internal page load"
       },
       {
         "type": "read_article",
         "selector": "",
         "value": "5000",
         "assertKind": "text_contains",
-        "label": "קריאת העמוד הפנימי"
+        "label": "Read internal article page"
       },
       {
         "type": "screenshot",
         "selector": "",
         "value": "Deep Reader Flow",
         "assertKind": "text_contains",
-        "label": "צילום סיום המסלול"
+        "label": "Capture end-of-journey screenshot"
       }
     ],
     "keepBrowserOpenMs": 2000,

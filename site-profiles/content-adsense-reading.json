@@ -1,7 +1,7 @@
 {
   "id": "content-adsense-reading",
-  "name": "אתר תוכן + Google AdSense (קריאה בטוחה)",
-  "description": "מותאם לאתרי תוכן ומאמרים עם AdSense: קריאה אנושית הדרגתית, שהייה טבעית ומעבר בין כתבות עם אפס לחיצות על מודעות.",
+  "name": "Content Site + Google AdSense (Safe Reading)",
+  "description": "Tailored for content and article sites with AdSense: progressive human reading, natural dwell time, and multi-article navigation with zero ad clicks.",
   "category": "content_adsense",
   "isBuiltin": true,
   "config": {
@@ -26,42 +26,42 @@
         "selector": "",
         "value": "/",
         "assertKind": "text_contains",
-        "label": "פתיחת דף ראשי / מאמר"
+        "label": "Open landing page / article"
       },
       {
         "type": "wait",
         "selector": "",
         "value": "2000",
         "assertKind": "text_contains",
-        "label": "המתנת טעינת יחידות AdSense (2s)"
+        "label": "Wait for AdSense units to load (2s)"
       },
       {
         "type": "dismiss_overlays",
         "selector": "",
         "value": "",
         "assertKind": "text_contains",
-        "label": "סגירת Vignette / שכבות אם מופיעות"
+        "label": "Dismiss vignette / blocking overlays if present"
       },
       {
         "type": "audit_ads",
         "selector": "",
         "value": "",
         "assertKind": "text_contains",
-        "label": "בדיקת נוכחות מודעות ו-AdSense (אפס קליק)"
+        "label": "Audit ad slots and AdSense presence (zero clicks)"
       },
       {
         "type": "read_article",
         "selector": "",
         "value": "8500",
         "assertKind": "text_contains",
-        "label": "קריאת תוכן אנושית (גלילה ועצירות קריאה)"
+        "label": "Human article reading (progressive scroll & pauses)"
       },
       {
         "type": "screenshot",
         "selector": "",
         "value": "Content AdSense Reading",
         "assertKind": "text_contains",
-        "label": "צילום דף בתום הקריאה"
+        "label": "Capture page screenshot after reading"
       }
     ],
     "keepBrowserOpenMs": 2000,

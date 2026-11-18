@@ -1,7 +1,7 @@
 {
   "id": "blank-human-starter-template",
-  "name": "תבנית התאמה עצמאית: התנהגות אנושית + מקום ללחיצה שלך",
-  "description": "נקודת פתיחה נקייה ללימוד עצמי: שנה רק את targetUrl ואת ה-Selector בצעד הלחיצה (צעד 6) לכל כפתור/לינק באתר שלך.",
+  "name": "Custom Starter Template: Human Behavior + Custom Click Slot",
+  "description": "Clean starting point: just update targetUrl and the selector in Step 6 to match any button or link on your own site.",
   "category": "starter_template",
   "isBuiltin": true,
   "config": {
@@ -24,56 +24,56 @@
         "selector": "",
         "value": "/",
         "assertKind": "text_contains",
-        "label": "שלב 1: שנה את targetUrl למעלה לכתובת האתר שלך"
+        "label": "Step 1: Set targetUrl above to your site URL"
       },
       {
         "type": "wait",
         "selector": "",
         "value": "1500",
         "assertKind": "text_contains",
-        "label": "שלב 2: המתנה לטעינת תסריטים בדף"
+        "label": "Step 2: Wait for page scripts to initialize"
       },
       {
         "type": "dismiss_overlays",
         "selector": "",
         "value": "",
         "assertKind": "text_contains",
-        "label": "שלב 3: סגירה אוטומטית של פופ-אפים חוסמים"
+        "label": "Step 3: Automatically dismiss blocking pop-ups"
       },
       {
         "type": "read_article",
         "selector": "",
         "value": "5000",
         "assertKind": "text_contains",
-        "label": "שלב 4: קריאה אנושית עם עצירות גלילה"
+        "label": "Step 4: Human reading with scroll checkpoints"
       },
       {
         "type": "human_browse",
         "selector": "",
         "value": "4500",
         "assertKind": "text_contains",
-        "label": "שלב 5: תנועת עכבר בזייה + ריחוף + בחירת טקסט"
+        "label": "Step 5: Bezier mouse movement + hover + text selection"
       },
       {
         "type": "click",
         "selector": "#hero-cta",
         "value": "",
         "assertKind": "text_contains",
-        "label": "שלב 6: שנה כאן את ה-Selector (או טקסט הכפתור) שלך!"
+        "label": "Step 6: Replace with your own button selector or text!"
       },
       {
         "type": "wait",
         "selector": "",
         "value": "1200",
         "assertKind": "text_contains",
-        "label": "שלב 7: המתנה קצרה אחרי הלחיצה"
+        "label": "Step 7: Brief settle wait after click"
       },
       {
         "type": "screenshot",
         "selector": "",
         "value": "My Custom Flow Result",
         "assertKind": "text_contains",
-        "label": "שלב 8: צילום הוכחה בסיום"
+        "label": "Step 8: Capture completion proof screenshot"
       }
     ],
     "keepBrowserOpenMs": 2500,

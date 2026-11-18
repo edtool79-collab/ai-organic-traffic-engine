@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>מקליט מוק — IP אמריקאי</title>
+<title>Mock Recorder — US IP</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -50,20 +50,20 @@
 </head>
 <body>
 <div class="card">
-  <h1>🎬 מקליט מוק — דפדפן עם IP אמריקאי</h1>
-  <p class="sub">פתיחת דפדפן אמיתי על דף ההמרות שלנו דרך פרוקסי מארה״ב — IP חדש בכל פעם. אין הקלטה אמיתית, רק אינדיקציה על המסך.</p>
+  <h1>🎬 Mock Recorder — Browser with US IP</h1>
+  <p class="sub">Opens a real browser on our conversion page through a US proxy — a fresh IP every time. Visual indicator only, no steps are recorded.</p>
   <div class="state">
     <span id="dot" class="dot"></span>
-    <span id="stateText">מוכן להתחלה</span>
+    <span id="stateText">Ready to start</span>
     <span id="timer" class="timer"></span>
   </div>
   <p id="hostLine" class="host"></p>
   <div class="row">
-    <button id="startBtn" class="start">▶ התחל הקלטה</button>
-    <button id="stopBtn" class="stop" disabled>■ סיום הקלטה</button>
+    <button id="startBtn" class="start">▶ Start Recording</button>
+    <button id="stopBtn" class="stop" disabled>■ Stop Recording</button>
   </div>
   <p id="note" class="note"></p>
-  <p class="foot">לאחר סיום ההקלטה אפשר ללחוץ שוב — בפעם הבאה ייפתח IP אחר.</p>
+  <p class="foot">After stopping, you can click start again to launch with a different IP.</p>
 </div>
 <script>
 (function () {
@@ -91,11 +91,11 @@
     stopBtn.disabled = !rec;
     dot.className = 'dot' + (rec ? ' live' : (lastStatus === 'completed' ? ' done' : ''));
     if (rec) {
-      stateText.innerHTML = '<span class="rec">● REC</span>&nbsp; דפדפן פתוח עם IP אמריקאי — גלוש בחופשיות';
+      stateText.innerHTML = '<span class="rec">● REC</span>&nbsp; Browser open with US IP — browse freely';
     } else if (lastStatus === 'completed') {
-      stateText.textContent = 'הדפדפן נסגר — מוכן להקלטה חדשה עם IP חדש';
+      stateText.textContent = 'Browser closed — ready for a new session with a fresh IP';
     } else {
-      stateText.textContent = 'מוכן להתחלה';
+      stateText.textContent = 'Ready to start';
     }
   }
 
@@ -120,9 +120,9 @@
       setUi(active);
       if (active) {
         if (rec.startedAt) startTick(rec.startedAt);
-        if (rec.mock && !lastProxyHost) hostLine.textContent = 'דפדפן פתוח (מוק) — ה-IP מוצג רק בפעילות רגילה';
+        if (rec.mock && !lastProxyHost) hostLine.textContent = 'Browser open (mock) — IP is displayed during standard runs';
       }
-    } catch { /* שרת לא נגיש כרגע — ממשיכים לנסות */ }
+    } catch { /* Server temporarily unreachable — keep polling */ }
   }
 
   pollTimer = setInterval(poll, 2500);
@@ -140,21 +140,21 @@
       const d = await r.json().catch(() => ({}));
       if (!r.ok || !d.ok) {
         startBtn.disabled = false;
-        const msg = d && d.error ? d.error : ('פתיחת הדפדפן נכשלה (HTTP ' + r.status + ')');
+        const msg = d && d.error ? d.error : ('Failed to launch browser (HTTP ' + r.status + ')');
         showNote(msg, 'err');
         poll();
         return;
       }
       lastProxyHost = d.proxyHost || '';
       hostLine.textContent = lastProxyHost && lastProxyHost !== 'DIRECT'
-        ? ('IP אמריקאי חדש נטען דרך שרת: ' + lastProxyHost)
-        : (d.proxyCountry === 'DIRECT' ? 'גישה ישירה מהמחשב (ללא פרוקסי)' : '');
+        ? ('Fresh US IP loaded via server: ' + lastProxyHost)
+        : (d.proxyCountry === 'DIRECT' ? 'Direct connection from local machine (no proxy)' : '');
       setUi(true);
       if (d.recorder && d.recorder.startedAt) startTick(d.recorder.startedAt);
-      showNote('הדפדפן נפתח. עבור לחלון הדפדפן, גלוש כרצונך, ואז חזרה לכאן ולחץ "סיום הקלטה".', 'ok');
+      showNote('Browser opened. Switch to the browser window, browse freely, then return here and click "Stop Recording".', 'ok');
     } catch (e) {
       startBtn.disabled = false;
-      showNote('שגיאת תקשורת עם השרת: ' + (e && e.message ? e.message : e), 'err');
+      showNote('Server communication error: ' + (e && e.message ? e.message : e), 'err');
     }
   });
 
@@ -166,16 +166,16 @@
       const d = await r.json().catch(() => ({}));
       if (!r.ok || !d.ok) {
         stopBtn.disabled = false;
-        showNote(d && d.error ? d.error : 'סיום ההקלטה נכשל (HTTP ' + r.status + ')', 'err');
+        showNote(d && d.error ? d.error : 'Failed to stop recording (HTTP ' + r.status + ')', 'err');
         return;
       }
       stopTick();
       hostLine.textContent = '';
       setUi(false);
-      showNote('הדפדפן נסגר. לחץ "התחל הקלטה" שוב — הפעם ייפתח עם IP אחר.', 'ok');
+      showNote('Browser closed. Click "Start Recording" again to launch with a different IP.', 'ok');
     } catch (e) {
       stopBtn.disabled = false;
-      showNote('שגיאת תקשורת עם השרת: ' + (e && e.message ? e.message : e), 'err');
+      showNote('Server communication error: ' + (e && e.message ? e.message : e), 'err');
     }
   });
 })();

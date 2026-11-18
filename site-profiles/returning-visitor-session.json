@@ -1,7 +1,7 @@
 {
   "id": "returning-visitor-session",
-  "name": "משתמש חוזר + שמירת עוגיות (Persistent Profiles)",
-  "description": "מדגים סשנים עם שמירת Cookies והיסטוריה בדיסק (returningUserRate=85%), התנהגות אנושית ולחיצות ניווט.",
+  "name": "Returning Visitor + Persistent Cookies (Persistent Profiles)",
+  "description": "Demonstrates sessions with on-disk cookies and browsing history (returningUserRate=85%), human browsing, and CTA interaction.",
   "category": "persistence",
   "isBuiltin": true,
   "config": {
@@ -26,28 +26,28 @@
         "selector": "",
         "value": "/",
         "assertKind": "text_contains",
-        "label": "טעינת דף הבית עם פרופיל עוגיות"
+        "label": "Load home page with persistent cookie profile"
       },
       {
         "type": "human_browse",
         "selector": "",
         "value": "4500",
         "assertKind": "text_contains",
-        "label": "גלישה טבעית עם פרופיל שמור"
+        "label": "Natural browsing with saved profile"
       },
       {
         "type": "click",
         "selector": "#hero-cta",
         "value": "",
         "assertKind": "text_contains",
-        "label": "לחיצת פעולה (תיעוד משתמש חדש/חוזר)"
+        "label": "Click primary CTA (logs returning vs. new visitor)"
       },
       {
         "type": "screenshot",
         "selector": "",
         "value": "Persistent Cookie Session",
         "assertKind": "text_contains",
-        "label": "צילום סיום סשן"
+        "label": "Capture end-of-session screenshot"
       }
     ],
     "keepBrowserOpenMs": 1500,

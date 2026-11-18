@@ -128,7 +128,7 @@ function installPopunderShield(context, primaryPage, enabled, onLog) {
         await newPage.close().catch(() => {});
       }
       const shortUrl = url && url.length > 90 ? `${url.slice(0, 90)}...` : (url || 'about:blank');
-      emit(`[Popunder Shield] נסגר טאב פופ-אפ / OnClick אוטומטי (${shortUrl})`);
+      emit(`[Popunder Shield] Closed unsolicited popunder/OnClick tab (${shortUrl})`);
     } catch {}
   };
 
@@ -166,7 +166,7 @@ async function dismissBlockingOverlays(page, onLog, targetSelector = null) {
         if (canClick) {
           await btn.click({ timeout: 2000 }).catch(() => {});
           dismissedCount++;
-          emit(`[Overlay Shield] הוסרה שכבת פרסומת (${name}) לפני לחיצה באתר`);
+          emit(`[Overlay Shield] Dismissed ad overlay (${name}) before site click`);
           break;
         }
       }
@@ -182,7 +182,7 @@ async function dismissBlockingOverlays(page, onLog, targetSelector = null) {
       if (visible) {
         await closeBtn.click({ timeout: 1500 }).catch(() => {});
         dismissedCount++;
-        emit('[Overlay Shield] נסגר חלון פרסומת צף מתוך iframe (Close)');
+        emit('[Overlay Shield] Closed floating iframe ad overlay (Close)');
       }
     }
 
@@ -297,7 +297,7 @@ async function dismissBlockingOverlays(page, onLog, targetSelector = null) {
 
     if (Array.isArray(neutralized) && neutralized.length) {
       dismissedCount += neutralized.length;
-      emit(`[Overlay Shield] נוטרלו ${neutralized.length} שכבות iframe/overlay שחסמו לחיצה: ${neutralized.join(', ')}`);
+      emit(`[Overlay Shield] Neutralized ${neutralized.length} blocking iframe/overlay layers: ${neutralized.join(', ')}`);
     }
   } catch {}
 

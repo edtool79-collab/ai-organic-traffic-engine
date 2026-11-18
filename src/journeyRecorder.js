@@ -555,7 +555,7 @@ async function startJourneyRecorder({
   if (activeSession) {
     const stillAlive = Boolean(activeSession.browser && activeSession.browser.isConnected && activeSession.browser.isConnected());
     if (stillAlive) {
-      throw new Error('כבר פועל סשן הקלטה חי בדפדפן. סיים קודם את ההקלטה הנוכחית.');
+      throw new Error('A live browser recording session is already active. Stop it before starting a new one.');
     }
     activeSession = null;
   }
@@ -568,7 +568,7 @@ async function startJourneyRecorder({
   ) {
     const deskName = desktop.currentDesktop || 'unknown';
     const err = new Error(
-      `שרת הדשבורד רץ כעת מסביבת רקע מבודדת (${deskName}) ולא מתוך שולחן העבודה הפעיל שלך (${desktop.inputDesktop || 'Default'}), ולכן חלון ההקלטה של Chromium לא ייראה על המסך. פתח את התיקייה והפעל בלחיצה כפולה את start-dashboard.bat כדי להריץ מתוך שולחן העבודה.`
+      `Dashboard server is running in an isolated background desktop (${deskName}) rather than your active interactive desktop (${desktop.inputDesktop || 'Default'}), so the Chromium recorder window will not be visible. Double-click start-dashboard.bat to launch interactively.`
     );
     err.code = 'NON_INTERACTIVE_DESKTOP';
     throw err;
@@ -578,13 +578,13 @@ async function startJourneyRecorder({
   try {
     startUrlObj = new URL(String(targetUrl || '').trim());
   } catch {
-    throw new Error('כתובת האתר להקלטה אינה תקינה.');
+    throw new Error('Invalid target URL for recording.');
   }
   if (!['http:', 'https:'].includes(startUrlObj.protocol)) {
-    throw new Error('ניתן להקליט רק כתובות http:// או https://');
+    throw new Error('Only http:// or https:// URLs can be recorded');
   }
   if (isDisallowedPrivateHost(startUrlObj.hostname)) {
-    throw new Error('הקלטה על כתובות רשת פרטיות/פנימיות אינה מורשית.');
+    throw new Error('Recording private/internal network addresses is not permitted.');
   }
 
   const normalizedStartUrl = startUrlObj.toString();
@@ -610,7 +610,7 @@ async function startJourneyRecorder({
       return await launcher.launch(opts);
     } catch (err) {
       if (opts.channel) {
-        console.log('[Recorder] ערוץ Chrome המותקן לא זמין — חוזר ל-Chromium המצורף.');
+        console.log('[Recorder] Installed Chrome channel unavailable — falling back to bundled Chromium.');
         const { channel, ...rest } = opts;
         return launcher.launch(rest);
       }
@@ -857,7 +857,7 @@ async function startJourneyRecorder({
             selector: '',
             value: toStepTarget(evtUrl, session.startOrigin),
             assertKind: 'text_contains',
-            label: `פתיחת דף ההתחלה (${toStepTarget(evtUrl, session.startOrigin)})`,
+            label: `Open start page (${toStepTarget(evtUrl, session.startOrigin)})`,
             _recordedAt: now,
           });
           return;
@@ -872,7 +872,7 @@ async function startJourneyRecorder({
             selector: '',
             value: '800',
             assertKind: 'text_contains',
-            label: `חזרה אחורה אל ${toStepTarget(evtUrl, session.startOrigin)}`,
+            label: `Navigate back to ${toStepTarget(evtUrl, session.startOrigin)}`,
             ...(isExtraTab ? { optional: true } : {}),
             _recordedAt: now,
           });
@@ -906,7 +906,7 @@ async function startJourneyRecorder({
             && now - (lastStep._recordedAt || 0) < 5500
           ) {
             lastStep.value = targetVal;
-            lastStep.label = `מעבר בכרטיסייה #${tabId} אל ${targetVal}`;
+            lastStep.label = `Navigate in Tab #${tabId} to ${targetVal}`;
             if (isExt) lastStep.followExternal = true;
             lastStep._recordedAt = now;
             emitUpdate();
@@ -918,7 +918,7 @@ async function startJourneyRecorder({
             selector: '',
             value: targetVal,
             assertKind: 'text_contains',
-            label: isExtraTab ? `מעבר בכרטיסייה #${tabId} אל ${targetVal}` : `מעבר אל ${targetVal}`,
+            label: isExtraTab ? `Navigate in Tab #${tabId} to ${targetVal}` : `Navigate to ${targetVal}`,
             ...(isExt ? { followExternal: true } : {}),
             ...(isExtraTab ? { optional: true } : {}),
             _recordedAt: now,
@@ -941,7 +941,7 @@ async function startJourneyRecorder({
             selector: '',
             value: '800',
             assertKind: 'text_contains',
-            label: `חזרה בהיסטוריה אל ${toStepTarget(evtUrl, session.startOrigin)}`,
+            label: `History back to ${toStepTarget(evtUrl, session.startOrigin)}`,
             ...(isExtraTab ? { optional: true } : {}),
             _recordedAt: now,
           });
@@ -965,7 +965,7 @@ async function startJourneyRecorder({
             selector: '',
             value: targetVal,
             assertKind: 'text_contains',
-            label: `מעבר אל ${targetVal}`,
+            label: `Navigate to ${targetVal}`,
             ...(isExt ? { followExternal: true } : {}),
             ...(isExtraTab ? { optional: true } : {}),
             _recordedAt: now,
@@ -984,7 +984,7 @@ async function startJourneyRecorder({
           selector: evt.selector,
           value: '',
           assertKind: 'text_contains',
-          label: `לחיצה על ${evt.selector}${desc}`,
+          label: `Click ${evt.selector}${desc}`,
           ...(evt.followExternal ? { followExternal: true } : {}),
           ...(isExtraTab ? { optional: true } : {}),
           _recordedAt: now,
@@ -1032,7 +1032,7 @@ async function startJourneyRecorder({
             value: fieldValue,
             ...(secretInput ? { secret: true } : {}),
             assertKind: 'text_contains',
-            label: `הקלדה בשדה ${evt.selector}`,
+            label: `Fill ${evt.selector}`,
             ...(isExtraTab ? { optional: true } : {}),
             _pageUrl: evtUrl,
             _recordedAt: now,
@@ -1044,7 +1044,7 @@ async function startJourneyRecorder({
           selector: evt.selector,
           value: 'Enter',
           assertKind: 'text_contains',
-          label: `לחיצת Enter בשדה ${evt.selector}`,
+          label: `Press Enter in ${evt.selector}`,
           ...(isExtraTab ? { optional: true } : {}),
           _recordedAt: now,
         });
@@ -1061,7 +1061,7 @@ async function startJourneyRecorder({
             selector: '',
             value: String(evt.pct ?? 50),
             assertKind: 'text_contains',
-            label: `גלילה לעומק ${evt.pct ?? 50}%`,
+            label: `Scroll to ${evt.pct ?? 50}%`,
             ...(isExtraTab ? { optional: true } : {}),
             _pageUrl: evtUrl,
             _recordedAt: now,
@@ -1123,7 +1123,7 @@ async function startJourneyRecorder({
               selector: '',
               value: '',
               assertKind: 'text_contains',
-              label: `סגירת כרטיסייה #${tid} וחזרה`,
+              label: `Close Tab #${tid} and return`,
               optional: true,
               _recordedAt: Date.now(),
             });
@@ -1163,7 +1163,7 @@ async function focusRecorderWindow() {
     return {
       ok: false,
       raised: 0,
-      reason: 'אין סשן הקלטה פעיל כרגע. לחץ קודם על "הקלט מסלול בדפדפן".',
+      reason: 'No active recording session. Click "Record Journey in Browser" first.',
       desktop,
     };
   }
@@ -1175,7 +1175,7 @@ async function focusRecorderWindow() {
     return {
       ok: false,
       raised: 0,
-      reason: `השרת רץ בסביבה מבודדת (${desktop.currentDesktop || 'non-Default'}) ולא בשולחן העבודה שלך — הפעל דרך start-dashboard.bat כדי לראות את החלון.`,
+      reason: `Server is running in an isolated desktop (${desktop.currentDesktop || 'non-Default'}) — launch via start-dashboard.bat to see the window.`,
       desktop,
     };
   }
@@ -1186,8 +1186,8 @@ async function focusRecorderWindow() {
   return {
     ...focusRes,
     reason: focusRes.ok
-      ? 'החלון הוקפץ לחזית.'
-      : 'לא אותר חלון דפדפן פתוח להקפצה בשולחן העבודה הנוכחי.',
+      ? 'Recorder window brought to front.'
+      : 'No open recorder browser window found on the current desktop.',
     desktop,
   };
 }

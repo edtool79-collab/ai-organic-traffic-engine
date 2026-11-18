@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -10,66 +10,66 @@
   <div class="app-shell">
     <header class="topbar">
       <div class="brand">
-        <h1>מערכת ניטור סינתטי, עומסים ו-UX (4 שכבות)</h1>
+        <h1>Synthetic Monitoring, Load &amp; UX QA Studio (4-Layer Suite)</h1>
         <p>Behavior Engine + Fingerprint Suite + Crawlee AutoscaledPool / PlaywrightCrawler + Proxy &amp; Persistent Contexts</p>
       </div>
       <div class="actions-bar">
-        <span id="run-status-badge" class="badge idle">מוכן להרצה</span>
-        <a class="btn-link" href="/demo-site/" target="_blank" rel="noopener">פתח אתר ניסיון מובנה ↗</a>
-        <button id="btn-demo-preset" type="button">טען בדיקת ניסיון גלויה (3 ביקורים)</button>
-        <button id="btn-save" type="button">שמור הגדרות</button>
+        <span id="run-status-badge" class="badge idle">Ready</span>
+        <a class="btn-link" href="/demo-site/" target="_blank" rel="noopener">Open Built-in Demo Site ↗</a>
+        <button id="btn-demo-preset" type="button">Load Visible Demo Preset (3 Visits)</button>
+        <button id="btn-save" type="button">Save Settings</button>
       </div>
     </header>
 
     <!-- Prominent Execution Control Strip -->
     <section class="hero-controls">
       <div class="inline-row" style="flex-wrap:wrap;">
-        <button id="btn-start" type="button" class="success" style="font-size:1rem;padding:11px 22px;">הפעל הרצה ▶</button>
-        <button id="btn-stream" type="button" class="primary" style="font-size:1rem;padding:11px 18px;" title="מפעיל נחלים רציפים עם ראשי צוות ב-AI (גלים אוטומטיים ללא הפסקה עד שתלחץ עצור)">🌊 הפעל נחל רציף (AI Stream)</button>
-        <button id="btn-pause" type="button" class="warning" disabled>השהה ⏸</button>
-        <button id="btn-resume" type="button" class="primary" disabled>המשך ▶</button>
-        <button id="btn-stop" type="button" class="danger" disabled>עצור הרצה ■</button>
+        <button id="btn-start" type="button" class="success" style="font-size:1rem;padding:11px 22px;">Start Run ▶</button>
+        <button id="btn-stream" type="button" class="primary" style="font-size:1rem;padding:11px 18px;" title="Launches continuous waves coordinated by AI squad leaders until you click Stop">🌊 Start Continuous AI Stream</button>
+        <button id="btn-pause" type="button" class="warning" disabled>Pause ⏸</button>
+        <button id="btn-resume" type="button" class="primary" disabled>Resume ▶</button>
+        <button id="btn-stop" type="button" class="danger" disabled>Stop Run ■</button>
       </div>
       <div class="inline-row" style="flex-wrap:wrap;">
-        <label class="badge" style="cursor:pointer;" title="כשכבוי (מומלץ), הדפדפנים רצים בשקט ברקע עם צריכת RAM נמוכה ואתה רואה את המסך החי בתוך הדאשבורד מימין">
+        <label class="badge" style="cursor:pointer;" title="When unchecked (recommended), browsers run silently in headless mode with low RAM usage and stream live preview frames into the dashboard panel on the right">
           <input id="quick-watch-mode" type="checkbox" style="width:16px;height:16px;margin:0;" />
-          <span>פתח חלונות דפדפן פיזיים על המסך (כבוי = ריצה ברקע + מסך חי בדאשבורד)</span>
+          <span>Open visible browser windows on desktop (unchecked = headless background + live dashboard preview)</span>
         </label>
-        <span id="crawlee-pool-badge" class="badge">Crawlee Pool: 0 פעילים (יעד: 1)</span>
+        <span id="crawlee-pool-badge" class="badge">Crawlee Pool: 0 active (target: 1)</span>
       </div>
     </section>
 
     <section class="kpi-grid">
       <div class="kpi-card">
-        <div class="kpi-label">סשנים שהושלמו</div>
+        <div class="kpi-label">Completed Sessions</div>
         <div id="kpi-completed" class="kpi-value">0 / 0</div>
-        <div id="kpi-breakdown" class="kpi-sub">הצלחה: 0 | פג תוקף: 0 | כשל: 0</div>
+        <div id="kpi-breakdown" class="kpi-sub">Succeeded: 0 | Timed Out: 0 | Failed: 0</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">מקביליות חיה (AutoscaledPool)</div>
+        <div class="kpi-label">Live Concurrency (AutoscaledPool)</div>
         <div id="kpi-concurrency" class="kpi-value">0 / 0</div>
-        <div id="kpi-concurrency-sub" class="kpi-sub">טווח מותר: 1–3 דפדפנים</div>
+        <div id="kpi-concurrency-sub" class="kpi-sub">Allowed range: 1–3 browsers</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">זמן טעינה ממוצע ושגיאות</div>
+        <div class="kpi-label">Average Load Time &amp; Errors</div>
         <div id="kpi-avg-load" class="kpi-value">—</div>
-        <div id="kpi-errors-sub" class="kpi-sub">שגיאות JS/קונסולה: 0</div>
+        <div id="kpi-errors-sub" class="kpi-sub">JS / Console errors: 0</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">משתמשים חוזרים / חדשים</div>
+        <div class="kpi-label">Returning / New Visitors</div>
         <div id="kpi-sessions" class="kpi-value">0 / 0</div>
-        <div id="kpi-profiles-count" class="kpi-sub">פרופילי Persistent בדיסק: 0</div>
+        <div id="kpi-profiles-count" class="kpi-sub">Persistent profiles on disk: 0</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">ניצול משאבי מחשב (חי)</div>
-        <div id="kpi-system" class="kpi-value">טוען...</div>
-        <div id="kpi-system-advice" class="kpi-sub">בודק RAM ו-CPU...</div>
+        <div class="kpi-label">System Resources (Live)</div>
+        <div id="kpi-system" class="kpi-value">Loading...</div>
+        <div id="kpi-system-advice" class="kpi-sub">Checking RAM &amp; CPU...</div>
       </div>
     </section>
 
     <section class="progress-wrap">
       <div class="progress-head">
-        <span id="progress-label">התקדמות הרצה: 0%</span>
+        <span id="progress-label">Run Progress: 0%</span>
         <span id="progress-target" dir="ltr"></span>
       </div>
       <div class="progress-bar">
@@ -79,19 +79,19 @@
 
     <section class="profiles-bar">
       <div class="profiles-bar-row">
-        <strong>פרופילי אתרים מוכנים:</strong>
+        <strong>Saved Site Profiles:</strong>
         <select id="site-profile-select"></select>
-        <button type="button" id="btn-profile-load" class="primary">טען פרופיל למערכת 📂</button>
-        <button type="button" id="btn-profile-update" class="small">שמור עדכון לפרופיל 💾</button>
-        <button type="button" id="btn-profile-new-toggle" class="small">+ שמור כפרופיל חדש</button>
-        <button type="button" id="btn-profile-delete" class="small danger">מחק פרופיל</button>
+        <button type="button" id="btn-profile-load" class="primary">Load Profile 📂</button>
+        <button type="button" id="btn-profile-update" class="small">Update Profile 💾</button>
+        <button type="button" id="btn-profile-new-toggle" class="small">+ Save as New Profile</button>
+        <button type="button" id="btn-profile-delete" class="small danger">Delete Profile</button>
       </div>
-      <div id="site-profile-desc" class="hint" style="margin:0;">טוען פרופילים שמורים...</div>
+      <div id="site-profile-desc" class="hint" style="margin:0;">Loading saved profiles...</div>
       <div id="new-profile-drawer" class="new-profile-drawer">
-        <input id="new-profile-name" type="text" placeholder="שם הפרופיל החדש (למשל: הבלוג שלי - AdSense)" style="flex:1;min-width:220px;" />
-        <input id="new-profile-desc" type="text" placeholder="תיאור קצר (אופציונלי): קריאת מאמרים בטוחה" style="flex:1;min-width:220px;" />
-        <button type="button" id="btn-profile-create" class="success">שמור פרופיל חדש ✓</button>
-        <button type="button" id="btn-profile-cancel" class="small">ביטול</button>
+        <input id="new-profile-name" type="text" placeholder="New profile name (e.g. My Blog - AdSense QA)" style="flex:1;min-width:220px;" />
+        <input id="new-profile-desc" type="text" placeholder="Short description (optional): Safe article reading flow" style="flex:1;min-width:220px;" />
+        <button type="button" id="btn-profile-create" class="success">Create Profile ✓</button>
+        <button type="button" id="btn-profile-cancel" class="small">Cancel</button>
       </div>
     </section>
 
@@ -99,123 +99,123 @@
       <!-- Left / Config Panel -->
       <section class="panel">
         <div class="tabs" id="config-tabs">
-          <button type="button" class="tab-btn active" data-tab="tab-general">יעד, עומס ותזמון</button>
-          <button type="button" class="tab-btn" data-tab="tab-tasks">משימה ספציפית (Task Builder)</button>
-          <button type="button" class="tab-btn" data-tab="tab-devices">מכשירים וטביעת אצבע</button>
-          <button type="button" class="tab-btn" data-tab="tab-personas">פרופילי התנהגות</button>
-          <button type="button" class="tab-btn" data-tab="tab-network">Proxy, עוגיות ואנליטיקס</button>
-          <button type="button" class="tab-btn" data-tab="tab-json">JSON גולמי</button>
+          <button type="button" class="tab-btn active" data-tab="tab-general">Target, Load &amp; Schedule</button>
+          <button type="button" class="tab-btn" data-tab="tab-tasks">Scenario &amp; Task Builder</button>
+          <button type="button" class="tab-btn" data-tab="tab-devices">Devices &amp; Fingerprints</button>
+          <button type="button" class="tab-btn" data-tab="tab-personas">Behavior Personas</button>
+          <button type="button" class="tab-btn" data-tab="tab-network">Proxy, Cookies &amp; Analytics</button>
+          <button type="button" class="tab-btn" data-tab="tab-json">Raw JSON</button>
         </div>
 
         <!-- TAB 1: Target, Crawlee Load, Schedule & Timing -->
         <div id="tab-general" class="tab-content active">
           <div class="section-title">
-            <span>כתובת יעד ועמודים פנימיים (Target &amp; Pages)</span>
+            <span>Target URL &amp; Internal Pages</span>
             <div class="inline-row">
-              <button type="button" class="small primary" id="btn-discover-pages">סרוק עמודים קיימים באתר 🔍</button>
-              <button type="button" class="small" id="btn-use-demo-url">הגדר אתר ניסיון מקומי</button>
+              <button type="button" class="small primary" id="btn-discover-pages">Discover Site Pages 🔍</button>
+              <button type="button" class="small" id="btn-use-demo-url">Use Local Demo Site</button>
             </div>
           </div>
 
           <div class="field">
-            <label for="targetUrl">כתובת האתר לבדיקה (<code>targetUrl</code>)</label>
+            <label for="targetUrl">Target Site URL (<code>targetUrl</code>)</label>
             <input id="targetUrl" type="url" class="ltr" placeholder="https://example.com" />
           </div>
 
           <div class="field">
-            <label>רשימת עמודים פנימיים (<code>pages</code>)</label>
+            <label>Internal Pages List (<code>pages</code>)</label>
             <div class="inline-row">
               <input id="new-page-input" type="text" class="ltr" placeholder="/tools/link-cleaner" />
-              <button type="button" id="btn-add-page">הוסף עמוד +</button>
+              <button type="button" id="btn-add-page">Add Page +</button>
             </div>
-            <div class="hint">חשוב: לחץ על "סרוק עמודים קיימים באתר 🔍" כשמחליפים אתר, כדי שלא ייכנס לעמודים שלא קיימים (404) כמו /pricing.</div>
+            <div class="hint">Tip: Click "Discover Site Pages 🔍" when switching sites to avoid visiting non-existent 404 routes.</div>
             <div id="pages-list" class="pages-list"></div>
           </div>
 
           <hr style="border:0;border-top:1px solid var(--border);margin:18px 0;" />
 
           <div class="section-title">
-            <span>ניהול עומסים ומקביליות חכמה (Crawlee AutoscaledPool)</span>
+            <span>Load Scaling &amp; Smart Concurrency (Crawlee AutoscaledPool)</span>
             <div style="display:flex; gap:6px; flex-wrap:wrap;">
-              <button type="button" class="small preset-scale-btn" data-visits="100" data-min="2" data-max="6" data-ram="lite" data-engine="crawlee_autoscaled">🚀 100 סשנים</button>
-              <button type="button" class="small preset-scale-btn" data-visits="500" data-min="3" data-max="8" data-ram="ultra_lite" data-engine="crawlee_autoscaled">🔥 500 סשנים</button>
-              <button type="button" class="small preset-scale-btn" data-visits="1000" data-min="4" data-max="10" data-ram="ultra_lite" data-engine="crawlee_autoscaled">⚡ 1,000 סשנים</button>
-              <button type="button" class="small preset-scale-btn" data-visits="2000" data-min="4" data-max="12" data-ram="ultra_lite" data-engine="crawlee_autoscaled">🌊 2,000 סשנים (נחיל)</button>
-              <button type="button" class="small preset-scale-btn" data-visits="5000" data-min="5" data-max="14" data-ram="ultra_lite" data-engine="crawlee_autoscaled">💥 5,000 סשנים</button>
-              <button type="button" class="small preset-scale-btn" data-visits="1000" data-min="20" data-max="50" data-ram="ultra_lite" data-engine="http_fast">🚄 1,000/דקה (HTTP Fast ללא דפדפן)</button>
-              <button type="button" class="small" id="btn-apply-recommended-conc">התאם לחומרת המחשב</button>
+              <button type="button" class="small preset-scale-btn" data-visits="100" data-min="2" data-max="6" data-ram="lite" data-engine="crawlee_autoscaled">🚀 100 Sessions</button>
+              <button type="button" class="small preset-scale-btn" data-visits="500" data-min="3" data-max="8" data-ram="ultra_lite" data-engine="crawlee_autoscaled">🔥 500 Sessions</button>
+              <button type="button" class="small preset-scale-btn" data-visits="1000" data-min="4" data-max="10" data-ram="ultra_lite" data-engine="crawlee_autoscaled">⚡ 1,000 Sessions</button>
+              <button type="button" class="small preset-scale-btn" data-visits="2000" data-min="4" data-max="12" data-ram="ultra_lite" data-engine="crawlee_autoscaled">🌊 2,000 Sessions (Swarm)</button>
+              <button type="button" class="small preset-scale-btn" data-visits="5000" data-min="5" data-max="14" data-ram="ultra_lite" data-engine="crawlee_autoscaled">💥 5,000 Sessions</button>
+              <button type="button" class="small preset-scale-btn" data-visits="1000" data-min="20" data-max="50" data-ram="ultra_lite" data-engine="http_fast">🚄 1,000/min (HTTP Fast Browserless)</button>
+              <button type="button" class="small" id="btn-apply-recommended-conc">Match Hardware Limits</button>
             </div>
           </div>
 
           <div class="form-grid">
             <div class="field">
-              <label for="engineMode">מנוע הפעלה (Crawlee Layer)</label>
+              <label for="engineMode">Execution Engine (Crawlee Layer)</label>
               <select id="engineMode">
-                <option value="crawlee_autoscaled">AutoscaledPool + Multi-Engine + Persistent Contexts (דפדפן אמיתי — מומלץ)</option>
-                <option value="crawlee_playwright">PlaywrightCrawler + RequestQueue + SessionPool (דפדפן אמיתי)</option>
-                <option value="http_fast">⚡ HTTP Fast (ללא דפדפן — 1,000+ בדקה עם פרוקסים + UTM, ללא JS/GA4)</option>
+                <option value="crawlee_autoscaled">AutoscaledPool + Multi-Engine + Persistent Contexts (Real Browser — Recommended)</option>
+                <option value="crawlee_playwright">PlaywrightCrawler + RequestQueue + SessionPool (Real Browser)</option>
+                <option value="http_fast">⚡ HTTP Fast (Browserless — 1,000+ req/min with Proxies + UTM, no JS/GA4)</option>
               </select>
             </div>
             <div class="field">
-              <label for="browserEngine">מנוע דפדפן (<code>browserEngine</code>)</label>
+              <label for="browserEngine">Browser Engine (<code>browserEngine</code>)</label>
               <select id="browserEngine">
-                <option value="chromium">Chromium + Chrome מותקן (ברירת מחדל)</option>
-                <option value="patchright">patchright (Chromium מוטמע, ללא דליפת CDP)</option>
-                <option value="camoufox">Camoufox (Firefox 158 ממוזג)</option>
+                <option value="chromium">Chromium + Installed Chrome (Default)</option>
+                <option value="patchright">patchright (Patched Chromium, zero CDP leak)</option>
+                <option value="camoufox">Camoufox (Hardened Firefox 158)</option>
               </select>
             </div>
             <div class="field">
-              <label for="visitCount">כמות סשנים כוללת (<code>visitCount</code>)</label>
+              <label for="visitCount">Total Planned Sessions (<code>visitCount</code>)</label>
               <input id="visitCount" type="number" min="1" max="100000" />
             </div>
             <div class="field">
-              <label for="minConcurrency">מינימום מקביליות (<code>minConcurrency</code>)</label>
+              <label for="minConcurrency">Min Concurrency (<code>minConcurrency</code>)</label>
               <input id="minConcurrency" type="number" min="1" max="128" />
             </div>
             <div class="field">
-              <label for="concurrency">מקסימום מקביליות (<code>concurrency</code>)</label>
+              <label for="concurrency">Max Concurrency (<code>concurrency</code>)</label>
               <input id="concurrency" type="number" min="1" max="128" />
             </div>
           </div>
-          <div id="concurrency-advice-box" class="advice-box">בודק המלצת חומרה...</div>
+          <div id="concurrency-advice-box" class="advice-box">Checking hardware recommendations...</div>
 
           <hr style="border:0;border-top:1px solid var(--border);margin:18px 0;" />
 
-          <div class="section-title"><span>תזמון שעות פעילות (Active Hours Scheduler) וזמני שהייה</span></div>
+          <div class="section-title"><span>Active Hours Scheduler &amp; Dwell Timings</span></div>
           <div class="switch-row">
             <div>
-              <strong>הגבל הרצה לחלון שעות פעילות</strong>
-              <div style="font-size:0.8rem;color:var(--muted);">כשמופעל, Crawlee משהה אוטומטית את התור מחוץ לטווח השעות וממשיך כשהחלון נפתח.</div>
+              <strong>Restrict execution to active hours window</strong>
+              <div style="font-size:0.8rem;color:var(--muted);">When enabled, Crawlee automatically pauses the queue outside the configured window and resumes when the window opens.</div>
             </div>
             <input id="schedule-enabled" type="checkbox" />
           </div>
           <div class="form-grid">
             <div class="field">
-              <label for="schedule-start">שעת התחלה (<code>startHour</code>)</label>
+              <label for="schedule-start">Start Hour (<code>startHour</code>)</label>
               <input id="schedule-start" type="text" class="ltr" placeholder="08:00" />
             </div>
             <div class="field">
-              <label for="schedule-end">שעת סיום (<code>endHour</code>)</label>
+              <label for="schedule-end">End Hour (<code>endHour</code>)</label>
               <input id="schedule-end" type="text" class="ltr" placeholder="22:00" />
             </div>
             <div class="field">
-              <label for="firstPagePriority">אחוז כניסה לעמוד הראשי (<code>firstPagePriority</code> %)</label>
+              <label for="firstPagePriority">Landing Page Entry Weight (<code>firstPagePriority</code> %)</label>
               <input id="firstPagePriority" type="number" min="0" max="100" />
             </div>
             <div class="field">
-              <label for="pageMinMs">זמן שהייה מינימלי בעמוד (<code>pageMinMs</code> ms)</label>
+              <label for="pageMinMs">Minimum Page Dwell Time (<code>pageMinMs</code> ms)</label>
               <input id="pageMinMs" type="number" min="0" max="120000" step="250" />
             </div>
             <div class="field">
-              <label for="sessionTimeoutMs">פסק זמן קשיח לסשן (<code>sessionTimeoutMs</code> ms)</label>
+              <label for="sessionTimeoutMs">Hard Session Timeout (<code>sessionTimeoutMs</code> ms)</label>
               <input id="sessionTimeoutMs" type="number" min="5000" max="600000" step="1000" />
             </div>
             <div class="field">
-              <label for="keepBrowserOpenMs">השהיה לפני סגירת חלון בצפייה (<code>keepBrowserOpenMs</code> ms)</label>
+              <label for="keepBrowserOpenMs">Post-Visit Close Delay (<code>keepBrowserOpenMs</code> ms)</label>
               <input id="keepBrowserOpenMs" type="number" min="0" max="30000" step="500" />
             </div>
             <div class="field">
-              <label for="interVisitDelayMs">השהיה בין ביקורים בלילה (<code>interVisitDelayMs</code> ms)</label>
+              <label for="interVisitDelayMs">Inter-Visit Pacing Delay (<code>interVisitDelayMs</code> ms)</label>
               <input id="interVisitDelayMs" type="number" min="0" max="120000" step="1000" />
             </div>
           </div>
@@ -224,139 +224,138 @@
         <!-- TAB 2: Specific Task / QA Scenario Builder -->
         <div id="tab-tasks" class="tab-content">
           <div class="section-title">
-            <span>הגדרת משימה ספציפית (Custom User Journey &amp; QA Assertions)</span>
-            <button type="button" class="small primary" id="btn-add-step">+ הוסף צעד</button>
+            <span>Custom User Journey &amp; QA Assertions</span>
+            <button type="button" class="small primary" id="btn-add-step">+ Add Step</button>
           </div>
 
           <div class="field">
-            <label for="taskMode">מה הדפדפן יבצע בכל ביקור? (<code>taskMode</code>)</label>
+            <label for="taskMode">Session Execution Mode (<code>taskMode</code>)</label>
             <select id="taskMode">
-              <option value="behavior">גלישה אנושית חופשית (קריאה, גלילה, קליקים ומילוי טפסים לפי פרסונות)</option>
-              <option value="scenario">משימה ספציפית צעד-אחר-צעד בלבד (בדיוק לפי הצעדים שתגדיר למטה)</option>
-              <option value="hybrid">משולב: קודם מבצע את המשימה הספציפית, ואז ממשיך לגלוש טבעית באתר</option>
+              <option value="behavior">Autonomous Human Browsing (reading, scrolling, clicking, and form interaction by persona)</option>
+              <option value="scenario">Step-by-Step Scenario Only (executes the exact steps configured below)</option>
+              <option value="hybrid">Hybrid: Execute Scenario Steps First, Then Continue Natural Persona Browsing</option>
             </select>
-            <div class="hint">במצב "משימה ספציפית" הדפדפן לא סתם מטייל אקראית — הוא מבצע בדיוק את הצעדים שקבעת, בודק תוצאות (Pass/Fail) ומשדר תמונת מסך חיה.</div>
+            <div class="hint">In Scenario mode, each session executes your exact step list, evaluates Pass/Fail assertions, and streams live DOM/screenshot previews.</div>
           </div>
 
           <div class="field">
-            <label>תבניות משימה מוכנות בלחיצת כפתור:</label>
+            <label>One-Click Scenario Templates:</label>
             <div class="inline-row" style="flex-wrap:wrap;">
-
-              <button type="button" class="small" id="btn-tpl-demosite">תבנית: מילוי טופס באתר הדמו (/demo-site)</button>
-              <button type="button" class="small" id="btn-tpl-landing">תבנית: בדיקת דף בית + גלילה + צילום</button>
-              <button type="button" class="small danger" id="btn-clear-steps">נקה צעדים</button>
+              <button type="button" class="small" id="btn-tpl-demosite">Template: Form Fill &amp; Assert (/demo-site)</button>
+              <button type="button" class="small" id="btn-tpl-landing">Template: Landing Page + Scroll + Screenshot</button>
+              <button type="button" class="small danger" id="btn-clear-steps">Clear Steps</button>
             </div>
           </div>
 
           <div class="field" style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
-            <div style="font-weight:700;margin-bottom:6px;">מדריך ב־10 שניות — איך מכוונים את הבוט ומסתכלים עליו עובד:</div>
-            <ul style="margin:0 0 10px 0;padding-right:18px;font-size:0.84rem;color:var(--muted);line-height:1.6;">
-              <li><strong style="color:var(--text);">כבר הכנו לך הכל למטה (10 צעדים מוכנים):</strong> פשוט הסתכל על הרשימה ולחץ למעלה משמאל על הכפתור הירוק <strong>"הפעל הרצה ▶"</strong> — ייפתח דפדפן אמיתי ותוכל לראות הכול בעיניים.</li>
-              <li><strong style="color:var(--text);">רוצה להגיע לדף או לאזור מודעה בלי ללחוץ עליו?</strong> הוסף צעד <code>goto</code> (עמוד) או <code>scroll_to</code> (גלילה אל <code>aside.ad-slot-box[...]</code>).</li>
-              <li><strong style="color:var(--text);">רוצה ללחוץ על כפתור באתר שלך?</strong> הוסף צעד <code>click</code> וכתוב בשדה "בורר" את שם הכפתור (כמו <code>#lc-clean</code>). שכבות הפרסומת והפופ־אפים נסגרים מעצמם!</li>
+            <div style="font-weight:700;margin-bottom:6px;">10-Second Quick Guide — How to Configure &amp; Watch a Journey:</div>
+            <ul style="margin:0 0 10px 0;padding-left:18px;font-size:0.84rem;color:var(--muted);line-height:1.6;">
+              <li><strong style="color:var(--text);">Ready-to-run steps below:</strong> Review the step cards and click the green <strong>"Start Run ▶"</strong> button at the top to watch the live browser execute them.</li>
+              <li><strong style="color:var(--text);">Want to navigate or scroll to an ad slot without clicking it?</strong> Add a <code>goto</code> step (URL/path) or <code>scroll_to</code> step (e.g. <code>aside.ad-slot-box[...]</code>).</li>
+              <li><strong style="color:var(--text);">Want to click a button on your site?</strong> Add a <code>click</code> step and enter its CSS selector or visible button text (e.g. <code>#lc-clean</code>). Floating ad overlays and pop-ups are dismissed automatically!</li>
             </ul>
-            <label style="margin-bottom:6px;">כפתורי קיצור — לחיצה אחת מוסיפה צעד מוכן לרשימה:</label>
+            <label style="margin-bottom:6px;">Quick Step Shortcuts — Click to append a step to your journey:</label>
             <div class="inline-row" style="flex-wrap:wrap;gap:6px;" id="quick-selectors-bar">
-              <button type="button" class="small" data-qtype="goto" data-qsel="" data-qval="/tools/link-cleaner" data-qlbl="פתיחת דף Link Cleaner">+ דף: /tools/link-cleaner</button>
-              <button type="button" class="small" data-qtype="click" data-qsel=".main-nav a[href='/tools']" data-qval="" data-qlbl="לחיצה על Tools בתפריט">+ קליק: תפריט Tools</button>
-              <button type="button" class="small" data-qtype="click" data-qsel=".main-nav a[href='/guides']" data-qval="" data-qlbl="לחיצה על Guides בתפריט">+ קליק: תפריט Guides</button>
-              <button type="button" class="small" data-qtype="click" data-qsel="#lc-clean" data-qval="" data-qlbl="הפעלת מנקה לינקים (#lc-clean)">+ קליק: #lc-clean</button>
-              <button type="button" class="small" data-qtype="click" data-qsel="#pf-build" data-qval="" data-qlbl="הפעלת Prompt Formatter (#pf-build)">+ קליק: #pf-build</button>
-              <button type="button" class="small" data-qtype="click" data-qsel="#pe-gen" data-qval="" data-qlbl="הפעלת Password Entropy (#pe-gen)">+ קליק: #pe-gen</button>
-              <button type="button" class="small" data-qtype="dismiss_overlays" data-qsel="" data-qval="" data-qlbl="סגירת Vignette/Push חוסמים">+ סגור Overlays</button>
-              <button type="button" class="small" data-qtype="audit_ads" data-qsel="" data-qval="" data-qlbl="ביקורת מודעות קריאה בלבד">+ בדוק מודעות (Audit)</button>
-              <button type="button" class="small" data-qtype="hover" data-qsel="nav a" data-qval="800" data-qlbl="ריחוף עכבר אנושי על ניווט">+ ריחוף עכבר אנושי (Hover)</button>
-              <button type="button" class="small" data-qtype="read_article" data-qsel="" data-qval="8500" data-qlbl="קריאת תוכן אנושית (8.5s)">+ קריאת מאמר אנושית (AdSense Safe)</button>
-              <button type="button" class="small" data-qtype="human_browse" data-qsel="" data-qval="7000" data-qlbl="גלישה אנושית חופשית בדף (7s)">+ התנהגות גלישה אנושית בדף (Human Browse)</button>
-              <button type="button" class="small" data-qtype="scan_products" data-qsel="" data-qval="2" data-qlbl="סריקת מוצרים / קישורים אנושית">+ סריקת מוצרים / קישורים</button>
-              <button type="button" class="small" data-qtype="ai_explore" data-qsel="" data-qval="2" data-qlbl="גלישה ואינטראקציה חכמה (AI Brain)">+ סוכן AI אוטונומי</button>
-              <button type="button" class="small" data-qtype="fill_email" data-qsel="input[type='email'], input[name*='email' i], input[id*='email' i]" data-qval="" data-qlbl="הזנת אימייל סוכן חי (HirePulse Inbox)">📧 + הזן אימייל סוכן חי</button>
-              <button type="button" class="small" data-qtype="fill_otp" data-qsel="input[autocomplete='one-time-code'], input[name*='code' i], input[name*='otp' i]" data-qval="45000" data-qlbl="המתנה והזנת קוד אימות מהמייל (OTP)">🔑 + המתן והזן קוד אימות (OTP)</button>
-              <button type="button" class="small" data-qtype="go_back" data-qsel="" data-qval="1200" data-qlbl="חזור לדף/אתר הקודם בהיסטוריה">+ חזור אחורה (Go Back)</button>
-              <button type="button" class="small" data-qtype="scroll_to" data-qsel="aside.ad-slot-box[data-ad-position='in_content_mid']" data-qval="" data-qlbl="גלילה בטוחה ל-in_content_mid">+ גלילה: מודעה באמצע הדף</button>
-              <button type="button" class="small" data-qtype="scroll_to" data-qsel="aside.ad-slot-box[data-ad-position='sidebar_rect']" data-qval="" data-qlbl="גלילה בטוחה ל-sidebar_rect">+ גלילה: סיידבר ימני (300x250)</button>
-              <button type="button" class="small" data-qtype="scroll_to" data-qsel="aside.ad-slot-box[data-ad-position='footer_native']" data-qval="" data-qlbl="גלילה בטוחה ל-footer_native">+ גלילה: מודעה תחתונה (Footer)</button>
+              <button type="button" class="small" data-qtype="goto" data-qsel="" data-qval="/tools/link-cleaner" data-qlbl="Open Link Cleaner page">+ Page: /tools/link-cleaner</button>
+              <button type="button" class="small" data-qtype="click" data-qsel=".main-nav a[href='/tools']" data-qval="" data-qlbl="Click Tools in navigation">+ Click: Tools Nav</button>
+              <button type="button" class="small" data-qtype="click" data-qsel=".main-nav a[href='/guides']" data-qval="" data-qlbl="Click Guides in navigation">+ Click: Guides Nav</button>
+              <button type="button" class="small" data-qtype="click" data-qsel="#lc-clean" data-qval="" data-qlbl="Trigger Link Cleaner (#lc-clean)">+ Click: #lc-clean</button>
+              <button type="button" class="small" data-qtype="click" data-qsel="#pf-build" data-qval="" data-qlbl="Trigger Prompt Formatter (#pf-build)">+ Click: #pf-build</button>
+              <button type="button" class="small" data-qtype="click" data-qsel="#pe-gen" data-qval="" data-qlbl="Trigger Password Entropy (#pe-gen)">+ Click: #pe-gen</button>
+              <button type="button" class="small" data-qtype="dismiss_overlays" data-qsel="" data-qval="" data-qlbl="Dismiss blocking Vignette/Push overlays">+ Dismiss Overlays</button>
+              <button type="button" class="small" data-qtype="audit_ads" data-qsel="" data-qval="" data-qlbl="Read-only ad slot audit">+ Audit Ad Slots</button>
+              <button type="button" class="small" data-qtype="hover" data-qsel="nav a" data-qval="800" data-qlbl="Human mouse hover on navigation">+ Human Hover</button>
+              <button type="button" class="small" data-qtype="read_article" data-qsel="" data-qval="8500" data-qlbl="Human article reading (8.5s)">+ Read Article (AdSense Safe)</button>
+              <button type="button" class="small" data-qtype="human_browse" data-qsel="" data-qval="7000" data-qlbl="Natural human page browsing (7s)">+ Human Browse</button>
+              <button type="button" class="small" data-qtype="scan_products" data-qsel="" data-qval="2" data-qlbl="Scan product cards / links">+ Scan Products / Links</button>
+              <button type="button" class="small" data-qtype="ai_explore" data-qsel="" data-qval="2" data-qlbl="Autonomous AI exploration (AI Brain)">+ Autonomous AI Agent</button>
+              <button type="button" class="small" data-qtype="fill_email" data-qsel="input[type='email'], input[name*='email' i], input[id*='email' i]" data-qval="" data-qlbl="Fill live agent email (HirePulse Inbox)">📧 + Fill Live Agent Email</button>
+              <button type="button" class="small" data-qtype="fill_otp" data-qsel="input[autocomplete='one-time-code'], input[name*='code' i], input[name*='otp' i]" data-qval="45000" data-qlbl="Wait for and fill email OTP verification code">🔑 + Wait &amp; Fill OTP Code</button>
+              <button type="button" class="small" data-qtype="go_back" data-qsel="" data-qval="1200" data-qlbl="Navigate back in browser history">+ Go Back</button>
+              <button type="button" class="small" data-qtype="scroll_to" data-qsel="aside.ad-slot-box[data-ad-position='in_content_mid']" data-qval="" data-qlbl="Safe scroll to in_content_mid">+ Scroll: Mid-Content Ad</button>
+              <button type="button" class="small" data-qtype="scroll_to" data-qsel="aside.ad-slot-box[data-ad-position='sidebar_rect']" data-qval="" data-qlbl="Safe scroll to sidebar_rect">+ Scroll: Right Sidebar (300x250)</button>
+              <button type="button" class="small" data-qtype="scroll_to" data-qsel="aside.ad-slot-box[data-ad-position='footer_native']" data-qval="" data-qlbl="Safe scroll to footer_native">+ Scroll: Footer Ad</button>
             </div>
 
             <details class="self-learn-guide">
-              <summary>📚 מדריך עצמאי מלא — איך מגדירים לבד צעדים, לחיצות (Selectors) והתנהגות אנושית</summary>
+              <summary>📚 Complete Self-Service Reference — Step Types, Selectors &amp; Human Behavior</summary>
               <div class="self-learn-body">
-                <p><strong>איך בוחרים על מה ללחוץ (<code>Selector</code>):</strong></p>
+                <p><strong>How to target an element (<code>Selector</code>):</strong></p>
                 <ul>
-                  <li><strong>הדרך הפשוטה (טקסט):</strong> כתוב רק את המילים שעל הכפתור/קישור (למשל <code>קרא עוד</code> או <code>About</code>). בלי <code>#</code> או <code>.</code> — המערכת מוצאת אותו לבד.</li>
-                  <li><strong>מזהה או מחלקה (CSS):</strong> לפי ID ← <code>#submit-btn</code> | לפי Class ← <code>.read-more</code> | לפי קישור ← <code>a[href*="/article"]</code>.</li>
-                  <li><strong>העתקה ב-3 שניות מ-Chrome:</strong> קליק ימני על הכפתור באתר ← <em>בדיקה (Inspect)</em> ← קליק ימני בקוד ← <em>Copy &rarr; Copy selector</em> ← הדבקה בשדה <code>בורר</code>.</li>
+                  <li><strong>Plain Text (Easiest):</strong> Type the visible text on the button or link (e.g. <code>Read More</code> or <code>About</code>) without <code>#</code> or <code>.</code> — the runner locates it automatically.</li>
+                  <li><strong>CSS Selector:</strong> By ID &rarr; <code>#submit-btn</code> | By Class &rarr; <code>.read-more</code> | By Href &rarr; <code>a[href*="/article"]</code>.</li>
+                  <li><strong>3-Second Chrome Copy:</strong> Right-click the element on your page &rarr; <em>Inspect</em> &rarr; right-click the highlighted DOM node &rarr; <em>Copy &rarr; Copy selector</em> &rarr; paste into the <code>Selector</code> field.</li>
                 </ul>
-                <p><strong>מילון כל 16 סוגי הצעדים במערכת:</strong></p>
+                <p><strong>Scenario Step Dictionary:</strong></p>
                 <table class="guide-table">
-                  <thead><tr><th>צעד</th><th>מה הוא עושה</th><th>מה לכתוב ב-<code>בורר</code></th><th>מה לכתוב ב-<code>ערך</code></th></tr></thead>
+                  <thead><tr><th>Step</th><th>Behavior</th><th><code>Selector</code> Field</th><th><code>Value</code> Field</th></tr></thead>
                   <tbody>
-                    <tr><td><code>goto</code></td><td>פתיחת עמוד באתר (או URL חיצוני מלא)</td><td>ריק</td><td><code>/about</code> או <code>https://...</code></td></tr>
-                    <tr><td><code>click</code></td><td>לחיצה אנושית (עכבר בזייה + סגירת חוסמים)</td><td><code>#id</code> / <code>.class</code> / טקסט כפתור</td><td>ריק</td></tr>
-                    <tr><td><code>go_back</code></td><td>חזרה בכפתור Back של הדפדפן לדף/אתר הקודם</td><td>ריק</td><td>השהיה במילישניות (למשל <code>1200</code>)</td></tr>
-                    <tr><td><code>hover</code></td><td>ריחוף עכבר טבעי על אלמנט</td><td><code>#id</code> / <code>.menu a</code> / טקסט</td><td>זמן במילישניות (למשל <code>800</code>)</td></tr>
-                    <tr><td><code>fill</code></td><td>הקלדה אנושית אות-אחר-אות בשדה</td><td><code>input[name="q"]</code> / <code>#email</code></td><td>הטקסט להקלדה</td></tr>
-                    <tr><td><code>select</code></td><td>בחירת אופציה בתפריט <code>&lt;select&gt;</code></td><td><code>select[name="topic"]</code></td><td>ערך/טקסט האופציה</td></tr>
-                    <tr><td><code>press</code></td><td>לחיצת מקש במקלדת</td><td>(אופציונלי) בורר שדה</td><td><code>Enter</code> / <code>Tab</code> / <code>Escape</code></td></tr>
-                    <tr><td><code>read_article</code></td><td>קריאת מאמר מדורגת (5 עצירות + עכבר)</td><td>ריק</td><td>זמן קריאה במילישניות (<code>8500</code>)</td></tr>
-                    <tr><td><code>human_browse</code></td><td>גלישה חופשית בדף (גלילות, בזייה, ריחוף ובחירת טקסט)</td><td>ריק</td><td>משך גלישה במילישניות (<code>7000</code>)</td></tr>
-                    <tr><td><code>scroll</code></td><td>גלילה חלקה לאחוז מגובה העמוד</td><td>ריק</td><td><code>0</code> עד <code>100</code> (למשל <code>65</code>)</td></tr>
-                    <tr><td><code>scroll_to</code></td><td>גלילה ישירות לאלמנט בלי ללחוץ</td><td>בורר האלמנט</td><td>ריק</td></tr>
-                    <tr><td><code>wait</code></td><td>השהיית זמן או המתנה להופעת אלמנט</td><td>ריק לזמן, או בורר אלמנט</td><td>מילישניות (<code>2000</code>)</td></tr>
-                    <tr><td><code>dismiss_overlays</code></td><td>סגירה אקטיבית של חלונות קופצים חוסמים</td><td>ריק</td><td>ריק</td></tr>
-                    <tr><td><code>audit_ads</code></td><td>בדיקת מידות ונוכחות מודעות (קריאה בלבד)</td><td>ריק</td><td>ריק</td></tr>
-                    <tr><td><code>scan_products</code></td><td>סריקת כרטיסי מוצרים/קישורים, פתיחה וגלילה טבעית</td><td>(אופציונלי) בורר אזור מוצרים</td><td>כמות מוצרים לפתיחה (<code>2</code>)</td></tr>
-                    <tr><td><code>ai_explore</code></td><td>החלטה אוטונומית של סוכן AI (Ollama Cloud)</td><td>ריק</td><td>מספר פעולות (<code>2</code>)</td></tr>
-                    <tr><td><code>assert</code></td><td>אימות Pass/Fail של טקסט/כתובת/סטטוס</td><td>בורר או ריק</td><td>טקסט צפוי / חלק מ-URL</td></tr>
-                    <tr><td><code>screenshot</code></td><td>שמירת פריים הוכחה לתצוגה החיה</td><td>ריק</td><td>שם התיאור</td></tr>
+                    <tr><td><code>goto</code></td><td>Open an internal path or full external URL</td><td>Empty</td><td><code>/about</code> or <code>https://...</code></td></tr>
+                    <tr><td><code>click</code></td><td>Human Bezier mouse curve + overlay dismissal + click</td><td><code>#id</code> / <code>.class</code> / button text</td><td>Empty</td></tr>
+                    <tr><td><code>go_back</code></td><td>Navigate back in browser history</td><td>Empty</td><td>Post-wait in ms (e.g. <code>1200</code>)</td></tr>
+                    <tr><td><code>hover</code></td><td>Natural mouse hover over element</td><td><code>#id</code> / <code>.menu a</code> / text</td><td>Dwell in ms (e.g. <code>800</code>)</td></tr>
+                    <tr><td><code>fill</code></td><td>Human character-by-character typing into input</td><td><code>input[name="q"]</code> / <code>#email</code></td><td>Text to type</td></tr>
+                    <tr><td><code>select</code></td><td>Select option in a <code>&lt;select&gt;</code> dropdown</td><td><code>select[name="topic"]</code></td><td>Option value or label</td></tr>
+                    <tr><td><code>press</code></td><td>Press a keyboard key</td><td>(Optional) field selector</td><td><code>Enter</code> / <code>Tab</code> / <code>Escape</code></td></tr>
+                    <tr><td><code>read_article</code></td><td>Staged article reading (5 scroll checkpoints + mouse movement)</td><td>Empty</td><td>Reading duration in ms (<code>8500</code>)</td></tr>
+                    <tr><td><code>human_browse</code></td><td>Free human page browsing (scrolls, Bezier curves, hovers, text selection)</td><td>Empty</td><td>Duration in ms (<code>7000</code>)</td></tr>
+                    <tr><td><code>scroll</code></td><td>Smooth scroll to percentage of page height</td><td>Empty</td><td><code>0</code> to <code>100</code> (e.g. <code>65</code>)</td></tr>
+                    <tr><td><code>scroll_to</code></td><td>Smooth scroll directly to element without clicking</td><td>Element selector</td><td>Empty</td></tr>
+                    <tr><td><code>wait</code></td><td>Wait for duration or until element appears</td><td>Empty for timer, or CSS selector</td><td>Milliseconds (<code>2000</code>)</td></tr>
+                    <tr><td><code>dismiss_overlays</code></td><td>Actively dismiss floating pop-ups and ad overlays</td><td>Empty</td><td>Empty</td></tr>
+                    <tr><td><code>audit_ads</code></td><td>Inspect ad slot dimensions and visibility (read-only)</td><td>Empty</td><td>Empty</td></tr>
+                    <tr><td><code>scan_products</code></td><td>Scan product/article cards, open links, and scroll naturally</td><td>(Optional) container selector</td><td>Number of items to open (<code>2</code>)</td></tr>
+                    <tr><td><code>ai_explore</code></td><td>Autonomous AI agent action (Ollama Cloud / UncensoredLLM)</td><td>Empty</td><td>Number of actions (<code>2</code>)</td></tr>
+                    <tr><td><code>assert</code></td><td>Verify Pass/Fail condition on text, URL, visibility, or HTTP status</td><td>Element selector or empty</td><td>Expected text or URL substring</td></tr>
+                    <tr><td><code>screenshot</code></td><td>Capture proof frame to the live preview stream</td><td>Empty</td><td>Caption label</td></tr>
                   </tbody>
                 </table>
-                <p style="margin-top:8px;"><strong>טיפ להתנהגות אנושית מקסימלית:</strong> בחר למעלה <code>taskMode = hybrid</code> — המערכת תבצע קודם את כל הצעדים שהגדרת במדויק, ואז תמשיך לגלוש טבעית בין הדפים לפי הפרסונות (<code>engaged_reader</code>, <code>window_shopper</code> וכו').</p>
+                <p style="margin-top:8px;"><strong>Pro Tip for Realistic Sessions:</strong> Choose <code>taskMode = hybrid</code> above — each session will execute your exact scenario steps first, then continue browsing internal pages naturally according to your configured personas (<code>engaged_reader</code>, <code>window_shopper</code>, etc.).</p>
               </div>
             </details>
           </div>
 
           <div class="recorder-box" id="journey-recorder-box">
             <div class="section-title" style="margin-bottom:8px;">
-              <span><span class="recorder-dot" id="recorder-dot"></span>🎥 הקלטת מסלול חי בדפדפן (בלי לכתוב סלקטורים לבד)</span>
-              <span class="muted" id="recorder-status-meta">מוכן להקלטה על כתובת היעד</span>
+              <span><span class="recorder-dot" id="recorder-dot"></span>🎥 Interactive Browser Journey Recorder (No Manual Selectors Needed)</span>
+              <span class="muted" id="recorder-status-meta">Ready to record on target URL</span>
             </div>
             <div id="recorder-desktop-warning" style="display:none; background:#3b1419; border:1px solid #f87171; color:#fecaca; padding:10px 12px; border-radius:8px; margin-bottom:10px; font-size:0.86rem; line-height:1.5;"></div>
             <div id="recorder-challenge-warning" style="display:none; background:#3a2a10; border:1px solid #fbbf24; color:#fde68a; padding:10px 12px; border-radius:8px; margin-bottom:10px; font-size:0.86rem; line-height:1.5;"></div>
             <p class="hint" style="margin-bottom:10px;">
-              לחץ על <strong>"🔴 הקלט מסלול בדפדפן"</strong> ← ייפתח חלון כרום גלוי על האתר שלך. תגלוש כרגיל (קישורים, כפתורים, טפסים, גלילה, חזרה אחורה), ובסיום הצעדים ייטענו אוטומטית לרשימה למטה ותוכל לשמור כפרופיל בלחיצה על <strong>"+ שמור כפרופיל חדש"</strong>.
+              Click <strong>"🔴 Record Journey in Browser"</strong> &rarr; a visible Chromium window will open on your target site. Browse naturally (links, buttons, forms, scrolling, back navigation); when you stop, all recorded steps load automatically into the Task Builder below and can be saved via <strong>"+ Save as New Profile"</strong>.
             </p>
             <div class="inline-row" style="margin-bottom:8px; flex-wrap:wrap; gap:8px;">
-              <button type="button" class="primary" id="btn-recorder-start">🔴 הקלט מסלול בדפדפן</button>
-              <button type="button" class="danger" id="btn-recorder-stop" disabled>⏹️ סיים הקלטה וטען צעדים</button>
-              <button type="button" class="small" id="btn-recorder-focus" disabled title="שלוף את חלון ההקלטה לקדמת המסך">🪟 הקפץ חלון לחזית</button>
-              <button type="button" class="small" id="btn-recorder-load-last" disabled>📥 טען הקלטה אחרונה לצעדים</button>
-              <select id="recorder-proxy-mode" title="בחירת רשת ומיקום גיאוגרפי לפתיחת חלון ההקלטה">
-                <option value="direct">🇮🇱 רשת הקלטה: ישיר מהמחשב (ישראל)</option>
-                <option value="resi:us">🇺🇸 רשת הקלטה: ארה״ב (רזידנציאלי)</option>
-                <option value="resi:gb">🇬🇧 רשת הקלטה: בריטניה (רזידנציאלי)</option>
-                <option value="resi:ca">🇨🇦 רשת הקלטה: קנדה (רזידנציאלי)</option>
-                <option value="resi:au">🇦🇺 רשת הקלטה: אוסטרליה (רזידנציאלי)</option>
-                <option value="resi:de">🇩🇪 רשת הקלטה: גרמניה (רזידנציאלי)</option>
-                <option value="resi:fr">🇫🇷 רשת הקלטה: צרפת (רזידנציאלי)</option>
-                <option value="resi:nl">🇳🇱 רשת הקלטה: הולנד (רזידנציאלי)</option>
-                <option value="resi:">🌍 רשת הקלטה: אקראי — כל המדינות (רזידנציאלי)</option>
-                <option value="datacenter">🏢 רשת הקלטה: דאטה־סנטר (פרוקסי זול — לא צורך רזידנציאל)</option>
-                <optgroup label="בחירה ידנית לפי מדינה" id="recorder-proxy-country-group"></optgroup>
+              <button type="button" class="primary" id="btn-recorder-start">🔴 Record Journey in Browser</button>
+              <button type="button" class="danger" id="btn-recorder-stop" disabled>⏹️ Stop Recording &amp; Load Steps</button>
+              <button type="button" class="small" id="btn-recorder-focus" disabled title="Bring the recording browser window to the front">🪟 Bring Window to Front</button>
+              <button type="button" class="small" id="btn-recorder-load-last" disabled>📥 Reload Last Recording</button>
+              <select id="recorder-proxy-mode" title="Select network route and exit country for the recording browser">
+                <option value="direct">🌐 Recorder Network: Direct Connection (Local IP)</option>
+                <option value="resi:us">🇺🇸 Recorder Network: United States (Residential)</option>
+                <option value="resi:gb">🇬🇧 Recorder Network: United Kingdom (Residential)</option>
+                <option value="resi:ca">🇨🇦 Recorder Network: Canada (Residential)</option>
+                <option value="resi:au">🇦🇺 Recorder Network: Australia (Residential)</option>
+                <option value="resi:de">🇩🇪 Recorder Network: Germany (Residential)</option>
+                <option value="resi:fr">🇫🇷 Recorder Network: France (Residential)</option>
+                <option value="resi:nl">🇳🇱 Recorder Network: Netherlands (Residential)</option>
+                <option value="resi:">🌍 Recorder Network: Random — All Countries (Residential)</option>
+                <option value="datacenter">🏢 Recorder Network: Datacenter (Cheap Proxy — 0MB Residential)</option>
+                <optgroup label="Manual Proxy Selection by Country" id="recorder-proxy-country-group"></optgroup>
               </select>
-              <button type="button" class="small" id="btn-recorder-proxy-refresh" title="רענן את רשימת הפרוקסים והמדינות">🔄 רענן רשימת פרוקסים</button>
-              <select id="recorder-mode" title="כיצד לטעון צעדים מוקלטים">
-                <option value="replace">טעינה: החלף צעדים קיימים</option>
-                <option value="append">טעינה: הוסף לסוף הרשימה</option>
+              <button type="button" class="small" id="btn-recorder-proxy-refresh" title="Refresh proxy list and geo metadata">🔄 Refresh Proxy List</button>
+              <select id="recorder-mode" title="How to import recorded steps">
+                <option value="replace">Import: Replace Existing Steps</option>
+                <option value="append">Import: Append to Existing Steps</option>
               </select>
-              <select id="recorder-post-taskmode" title="מצב המשימה לאחר סיום ההקלטה">
-                <option value="scenario">בסיום: הגדר כמשימה ספציפית (Scenario)</option>
-                <option value="hybrid">בסיום: התחל כמשולב (Hybrid — משימה + גלישה חופשית)</option>
+              <select id="recorder-post-taskmode" title="Task mode to set after recording finishes">
+                <option value="scenario">On Finish: Set Mode to Scenario</option>
+                <option value="hybrid">On Finish: Set Mode to Hybrid (Scenario + Browse)</option>
               </select>
             </div>
-            <div class="muted" id="recorder-proxy-status" style="font-size:0.85rem; margin-bottom:8px;">📍 IP הקלטה: עדיין לא נבחר — בחר מדינה ולחץ "הקלט מסלול"</div>
+            <div class="muted" id="recorder-proxy-status" style="font-size:0.85rem; margin-bottom:8px;">📍 Recorder IP: Not selected yet — choose a location and click "Record Journey"</div>
             <div class="recorder-preview-list" id="recorder-live-preview">
-              <div class="muted" style="font-size:0.84rem;">הצעדים שתבצע בדפדפן ההקלטה יופיעו כאן בזמן אמת...</div>
+              <div class="muted" style="font-size:0.84rem;">Actions you perform in the recording browser will appear here in real time...</div>
             </div>
           </div>
 
@@ -377,27 +376,27 @@
 
           <div class="mapper-box" id="page-mapper-box">
             <div class="section-title" style="margin-bottom:8px;">
-              <span>🗺️ ממפה חלקי העמוד (לדעת בדיוק על מה מגדירים קליק)</span>
+              <span>🗺️ Live Page DOM &amp; Ad-Slot Inspector</span>
               <span id="mapper-status-meta" class="hint" style="margin:0;"></span>
             </div>
             <div class="inline-row" style="gap:8px;flex-wrap:wrap;">
-              <input id="mapper-page-input" class="ltr" list="mapper-pages-datalist" type="text" value="/" placeholder="/ או /tools/password-entropy או URL מלא" style="flex:1;min-width:220px;" />
+              <input id="mapper-page-input" class="ltr" list="mapper-pages-datalist" type="text" value="/" placeholder="/ or /tools/password-entropy or full URL" style="flex:1;min-width:220px;" />
               <datalist id="mapper-pages-datalist"></datalist>
-              <button type="button" class="small primary" id="btn-inspect-page">🔍 מפה את כל חלקי העמוד</button>
+              <button type="button" class="small primary" id="btn-inspect-page">🔍 Inspect Page Elements</button>
             </div>
             <div class="hint" style="margin-top:6px;">
-              טוען את העמוד בדפדפן אמיתי, ממפה את כל הכפתורים, הקישורים, השדות והאזורים הקיימים ויוצר בורר מדויק (<code>Selector</code>) ללחיצה. אזורי מודעות מסומנים בנפרד לגלילה בטוחה בלבד.
+              Loads the page in a real browser, maps all interactive buttons, links, inputs, sections, and ad slots, and generates exact CSS selectors. Ad slots are flagged separately for safe scrolling and read-only auditing.
             </div>
             <div id="page-mapper-results" style="display:none;margin-top:10px;">
               <div class="inline-row" style="gap:8px;flex-wrap:wrap;justify-content:space-between;margin-bottom:8px;">
                 <div class="mapper-tabs" id="mapper-category-tabs">
-                  <button type="button" class="small active" data-mcat="buttons">כפתורים (<span id="mcnt-buttons">0</span>)</button>
-                  <button type="button" class="small" data-mcat="links">קישורים (<span id="mcnt-links">0</span>)</button>
-                  <button type="button" class="small" data-mcat="inputs">שדות (<span id="mcnt-inputs">0</span>)</button>
-                  <button type="button" class="small" data-mcat="sections">אזורים (<span id="mcnt-sections">0</span>)</button>
-                  <button type="button" class="small" data-mcat="adSlots">מודעות (<span id="mcnt-ads">0</span>)</button>
+                  <button type="button" class="small active" data-mcat="buttons">Buttons (<span id="mcnt-buttons">0</span>)</button>
+                  <button type="button" class="small" data-mcat="links">Links (<span id="mcnt-links">0</span>)</button>
+                  <button type="button" class="small" data-mcat="inputs">Inputs (<span id="mcnt-inputs">0</span>)</button>
+                  <button type="button" class="small" data-mcat="sections">Sections (<span id="mcnt-sections">0</span>)</button>
+                  <button type="button" class="small" data-mcat="adSlots">Ad Slots (<span id="mcnt-ads">0</span>)</button>
                 </div>
-                <input id="mapper-filter-input" type="text" placeholder="סנן לפי שם, טקסט או selector..." style="max-width:250px;" />
+                <input id="mapper-filter-input" type="text" placeholder="Filter by text, label, or selector..." style="max-width:250px;" />
               </div>
               <div id="mapper-list" class="mapper-list"></div>
             </div>
@@ -405,64 +404,64 @@
 
           <div id="waves-config-box" class="waves-box">
             <div class="section-title" style="margin-bottom:8px;">
-              <span>🌊 מנוע גלים חכמים ו"ילדים" מההקלטה (Smart Waves &amp; Children)</span>
-              <span class="badge" style="font-size:0.76rem;color:#38bdf8;">מיצירת תנועה מגוונת אוטומטית</span>
+              <span>🌊 Smart Waves &amp; Child Journey Variations</span>
+              <span class="badge" style="font-size:0.76rem;color:#38bdf8;">Automated Organic Journey Mutation</span>
             </div>
             <div class="switch-row" style="margin-bottom:8px;">
               <div>
-                <strong>הפעל יצירת "ילדים" וגלי תנועה חכמים מההקלטה</strong>
-                <div style="font-size:0.8rem;color:var(--muted);">כל סשן מקבל וריאציית מסלול אורגנית: שינוי זמנים, קפיצה לעמוד פנימי, מילוי טפסים מגוון וסריקת מוצרים/קישורים בכרטיסיות חיצוניות בלי לשנות את הקלטת האב.</div>
+                <strong>Enable Smart Waves &amp; Child Journey Variations from Recording</strong>
+                <div style="font-size:0.8rem;color:var(--muted);">Each session receives an organic journey variation: randomized dwell pacing, extra internal page visits, varied form inputs, and product/link scanning without mutating the parent recording.</div>
               </div>
               <input id="waves-enabled" type="checkbox" />
             </div>
             <div class="form-grid">
               <div class="field">
-                <label for="waves-mode">עקומת גלי תנועה (<code>waves.mode</code>)</label>
+                <label for="waves-mode">Wave Pacing Curve (<code>waves.mode</code>)</label>
                 <select id="waves-mode">
-                  <option value="natural_peaks">גאות ושפל טבעיים (Natural Peaks — מומלץ)</option>
-                  <option value="ramp_up">התגברות הדרגתית (Ramp Up)</option>
-                  <option value="burst">פרצי תנועה חכמים (Smart Bursts)</option>
-                  <option value="steady">גלים מאוזנים (Steady)</option>
-                  <option value="off">כבוי (חזרה קבועה ללא גלים)</option>
+                  <option value="natural_peaks">Natural Peaks &amp; Troughs (Recommended)</option>
+                  <option value="ramp_up">Gradual Ramp Up</option>
+                  <option value="burst">Smart Bursts (Zero-Delay High Throughput)</option>
+                  <option value="steady">Steady Pacing</option>
+                  <option value="off">Off (Identical Replay Without Waves)</option>
                 </select>
               </div>
               <div class="field">
-                <label for="waves-conversion-rate" style="color:#4ade80;font-weight:700;">🎯 אחוז המרה ורישום מהקלטה (<code>%</code> — מומלץ 10–30)</label>
-                <input id="waves-conversion-rate" type="number" min="0" max="100" value="25" title="רק אחוז זה מהסוכנים ילחצו על קישור השותפים/הרשמה וירשמו עם אימייל חי ויאשרו אותו; כל השאר יגלשו אורגנית בשאר העמודים באתר" />
+                <label for="waves-conversion-rate" style="color:#4ade80;font-weight:700;">🎯 Conversion &amp; Signup Rate (<code>%</code> — recommended 10–30)</label>
+                <input id="waves-conversion-rate" type="number" min="0" max="100" value="25" title="Percentage of sessions that execute the full conversion/signup flow with a live inbox; remaining sessions perform organic site browsing across internal pages" />
               </div>
               <div class="field">
-                <label for="waves-mutation-rate">שיעור גיוון ילדים (<code>%</code>)</label>
+                <label for="waves-mutation-rate">Child Variation Rate (<code>%</code>)</label>
                 <input id="waves-mutation-rate" type="number" min="0" max="100" />
               </div>
               <div class="field">
-                <label for="waves-scan-chance">סיכוי סריקת מוצרים/קישורים (<code>%</code>)</label>
+                <label for="waves-scan-chance">Product / Link Scan Chance (<code>%</code>)</label>
                 <input id="waves-scan-chance" type="number" min="0" max="100" />
               </div>
               <div class="field">
-                <label for="waves-extra-page-chance">סיכוי לעמוד פנימי נוסף (<code>%</code>)</label>
+                <label for="waves-extra-page-chance">Extra Internal Page Chance (<code>%</code>)</label>
                 <input id="waves-extra-page-chance" type="number" min="0" max="100" />
               </div>
               <div class="field">
-                <label for="waves-max-products">מקסימום מוצרים לפתיחה בכל סשן</label>
+                <label for="waves-max-products">Max Products / Links per Session</label>
                 <input id="waves-max-products" type="number" min="1" max="4" />
               </div>
               <div class="field" style="display:flex;align-items:center;gap:8px;padding-top:18px;">
                 <input id="waves-mutate-forms" type="checkbox" style="width:18px;height:18px;" />
-                <label for="waves-mutate-forms" style="margin:0;cursor:pointer;">גוון אוטומטית שדות טפסים וחיפושים בכל ביקור</label>
+                <label for="waves-mutate-forms" style="margin:0;cursor:pointer;">Automatically vary form &amp; search inputs on each visit</label>
               </div>
               <div class="field">
-                <label for="referrer-mode">מקור התנועה שיופיע בדוח (<code>referrerMode</code>)</label>
+                <label for="referrer-mode">Traffic Referrer Distribution (<code>referrerMode</code>)</label>
                 <select id="referrer-mode">
-                  <option value="mixed">מעורב — חיפוש בעיקר + רשתות חברתיות + מעט ישיר (מומלץ)</option>
-                  <option value="search_engines">מנועי חיפוש בלבד (בלי ישיר בכלל)</option>
-                  <option value="google_organic">גוגל אורגני בלבד</option>
-                  <option value="social">רשתות חברתיות בלבד (YouTube, Reddit, X...)</option>
-                  <option value="direct">ישיר (ללא מפנה — לא מומלץ)</option>
+                  <option value="mixed">Mixed — Search Engines + Social + Small Direct Tail (Recommended)</option>
+                  <option value="search_engines">Search Engines Only (Zero Direct)</option>
+                  <option value="google_organic">Google Organic Only</option>
+                  <option value="social">Social Networks Only (YouTube, Reddit, X...)</option>
+                  <option value="direct">Direct Only (No Referer Header)</option>
                 </select>
               </div>
             </div>
             <div class="field" style="margin-top:8px;">
-              <label for="waves-form-inputs">מאגר ביטויי חיפוש / טפסים לגלים (שורה לכל ערך — אופציונלי)</label>
+              <label for="waves-form-inputs">Custom Search Queries / Form Inputs Pool (one per line — optional)</label>
               <textarea id="waves-form-inputs" rows="2" class="ltr" placeholder="wireless earbuds&#10;smart watch review&#10;desk setup accessories"></textarea>
             </div>
           </div>
@@ -470,58 +469,58 @@
           <div id="task-steps-container"></div>
         </div>
 
-        <!-- TAB 2: Devices & Fingerprint Suite -->
+        <!-- TAB 3: Devices & Fingerprint Suite -->
         <div id="tab-devices" class="tab-content">
           <div class="section-title">
-            <span>חלוקת מכשירים, דפדפנים וטביעת אצבע (Fingerprint Suite)</span>
+            <span>Device Distribution, Browsers &amp; Fingerprint Suite</span>
             <div class="inline-row">
-              <button type="button" class="small" id="btn-dev-default">ברירת מחדל</button>
-              <button type="button" class="small" id="btn-dev-mobile">רוב מובייל</button>
-              <button type="button" class="small" id="btn-dev-desktop">דסקטופ בלבד</button>
+              <button type="button" class="small" id="btn-dev-default">Default Mix</button>
+              <button type="button" class="small" id="btn-dev-mobile">Mobile Heavy</button>
+              <button type="button" class="small" id="btn-dev-desktop">Desktop Only</button>
             </div>
           </div>
           <p style="color:var(--muted);font-size:0.86rem;margin-top:0;">
-            כל סשן מקבל פרופיל רזולוציה, כותרות, GPU/WebGL ו-Navigator עקבי דרך <code>FingerprintGenerator</code> + <code>FingerprintInjector</code> יחד עם Stealth למניעת חסימות בוטים.
+            Every session receives a consistent viewport, User-Agent/Client-Hints, GPU/WebGL, and Navigator profile via <code>FingerprintGenerator</code> + <code>FingerprintInjector</code> paired with Stealth evasions.
           </p>
           <div id="devices-container"></div>
         </div>
 
-        <!-- TAB 3: Personas -->
+        <!-- TAB 4: Personas -->
         <div id="tab-personas" class="tab-content">
           <div class="section-title">
-            <span>פרופילי התנהגות גולשים (Behavior Engine Personas)</span>
+            <span>Visitor Behavior Personas (Behavior Engine)</span>
             <div class="inline-row">
-              <button type="button" class="small" id="btn-add-persona">+ הוסף פרופיל</button>
-              <button type="button" class="small" id="btn-reset-personas">אפס פרופילים</button>
+              <button type="button" class="small" id="btn-add-persona">+ Add Persona</button>
+              <button type="button" class="small" id="btn-reset-personas">Reset Personas</button>
             </div>
           </div>
           <p style="color:var(--muted);font-size:0.86rem;margin-top:0;">
-            שומר על מנגנון הפרופילינג, עקומות בזייה לעכבר, גלילה הדרגתית, מילוי טפסים וניווט פנימי של <code>Violet329/web-traffic-generation</code>.
+            Controls behavioral profiling, Bezier mouse trajectories, progressive reading scrolls, form interactions, and internal page navigation.
           </p>
           <div id="personas-container"></div>
         </div>
 
-        <!-- TAB 4: Proxy Rotation, Persistent Contexts, Snippet -->
+        <!-- TAB 5: Proxy Rotation, Persistent Contexts, Snippet -->
         <div id="tab-network" class="tab-content">
           <div class="section-title">
-            <span>🌍 בחירת מדינות איכותיות (Geo Routing &amp; Tier-1 Defaults)</span>
+            <span>🌍 Geo Routing &amp; Tier-1 Country Filtering</span>
             <div class="inline-row">
-              <button type="button" class="small primary" id="btn-countries-tier1">בחר Tier-1 איכותיות (ברירת מחדל)</button>
-              <button type="button" class="small" id="btn-countries-all">סמן הכל</button>
-              <button type="button" class="small" id="btn-countries-clear">נקה</button>
+              <button type="button" class="small primary" id="btn-countries-tier1">Select Tier-1 Defaults</button>
+              <button type="button" class="small" id="btn-countries-all">Select All</button>
+              <button type="button" class="small" id="btn-countries-clear">Clear</button>
             </div>
           </div>
           <div class="switch-row">
             <div>
-              <strong>תעדוף וסנן שרתי Proxy לפי המדינות המסומנות למטה</strong>
-              <div style="font-size:0.8rem;color:var(--muted);">תומך בתבניות <code>{country}</code> בכתובת הפרוקסי (למשל <code>user-country-{country}</code> ב-Webshare) וגם בבדיקת Geo אוטומטית.</div>
+              <strong>Prioritize and filter proxy servers by the selected countries below</strong>
+              <div style="font-size:0.8rem;color:var(--muted);">Supports <code>{country}</code> username templates (e.g. <code>user-country-{country}</code> on Webshare) as well as automatic Geo-IP lookup.</div>
             </div>
             <input id="proxy-country-filter" type="checkbox" />
           </div>
           <div class="switch-row">
             <div>
-              <strong>גיבוי אוטומטי אם אין התאמת מדינה ברשימה (<code>fallbackToAnyIfEmpty</code>)</strong>
-              <div style="font-size:0.8rem;color:var(--muted);">שומר על רציפות ההרצה עם הפרוקסי הקיימים עד שתוסיף שרתי Tier-1.</div>
+              <strong>Fallback to any available proxy if no country matches (<code>fallbackToAnyIfEmpty</code>)</strong>
+              <div style="font-size:0.8rem;color:var(--muted);">Keeps runs moving with existing proxies when no entry matches the selected country list.</div>
             </div>
             <input id="proxy-country-fallback" type="checkbox" />
           </div>
@@ -530,108 +529,108 @@
           <hr style="border:0;border-top:1px solid var(--border);margin:14px 0;" />
 
           <div class="section-title">
-            <span>שרתי Proxy לבדיקות גיאוגרפיות (<code>proxies.txt</code>)</span>
-            <button type="button" class="small primary" id="btn-test-proxies">בדוק תקינות Proxies</button>
+            <span>Proxy Servers for Geo Testing (<code>proxies.txt</code>)</span>
+            <button type="button" class="small primary" id="btn-test-proxies">Test Proxies</button>
           </div>
           <div class="switch-row">
             <div>
-              <strong>הפעל רוטציית פרוקסי דרך Crawlee ProxyConfiguration</strong>
-              <div style="font-size:0.8rem;color:var(--muted);">כשהמתג כבוי, הסקריפט עובד בחיבור ישיר ללא פרוקסי (אידיאלי לבדיקות מקומיות).</div>
+              <strong>Enable proxy rotation via Crawlee ProxyConfiguration</strong>
+              <div style="font-size:0.8rem;color:var(--muted);">When disabled, sessions connect directly without a proxy (ideal for local loopback testing).</div>
             </div>
             <input id="proxy-enabled" type="checkbox" />
           </div>
           <div class="form-grid">
             <div class="field">
-              <label for="proxy-tier">סוג פרוקסי להרצות — זול מול יקר (<code>proxy.tier</code>)</label>
+              <label for="proxy-tier">Proxy Pool Tier — Datacenter vs. Residential (<code>proxy.tier</code>)</label>
               <select id="proxy-tier">
-                <option value="datacenter">🏢 פרוקסי זול — דאטה־סנטר בלבד (מומלץ לבדיקות ואתרים פנימיים, 0MB רזידנציאל)</option>
-                <option value="residential">🌍 פרוקסי יקר — רזידנציאלי איכותי (מכסת 1GB, לאתרים מוגנים)</option>
-                <option value="auto">⚙️ אוטומטי — לפי רשימת השרתים למטה (ברירת מחדל)</option>
+                <option value="datacenter">🏢 Datacenter Only — Cheap Pool (Recommended for QA &amp; internal sites, 0MB residential usage)</option>
+                <option value="residential">🌍 Residential Pool — Metered High-Trust IPs (1GB budget guard, for protected targets)</option>
+                <option value="auto">⚙️ Auto — Follow Configured Server List Below (Default)</option>
               </select>
             </div>
             <div class="field">
-              <label for="proxy-residential-country">מדינת יציאה בפרוקסי היקר (<code>proxy.residential.country</code>)</label>
+              <label for="proxy-residential-country">Residential Exit Country (<code>proxy.residential.country</code>)</label>
               <select id="proxy-residential-country">
-                <option value="">🌍 אקראי — כל המדינות (ברירת מחדל)</option>
-                <option value="us">🇺🇸 ארה״ב (US)</option>
-                <option value="gb">🇬🇧 בריטניה (GB)</option>
-                <option value="ca">🇨🇦 קנדה (CA)</option>
-                <option value="au">🇦🇺 אוסטרליה (AU)</option>
-                <option value="de">🇩🇪 גרמניה (DE)</option>
-                <option value="fr">🇫🇷 צרפת (FR)</option>
-                <option value="nl">🇳🇱 הולנד (NL)</option>
+                <option value="">🌍 Random — All Countries (Default)</option>
+                <option value="us">🇺🇸 United States (US)</option>
+                <option value="gb">🇬🇧 United Kingdom (GB)</option>
+                <option value="ca">🇨🇦 Canada (CA)</option>
+                <option value="au">🇦🇺 Australia (AU)</option>
+                <option value="de">🇩🇪 Germany (DE)</option>
+                <option value="fr">🇫🇷 France (FR)</option>
+                <option value="nl">🇳🇱 Netherlands (NL)</option>
               </select>
             </div>
             <div class="field">
-              <label for="proxy-mode">שיטת בחירה (<code>proxy.mode</code>)</label>
+              <label for="proxy-mode">Selection Mode (<code>proxy.mode</code>)</label>
               <select id="proxy-mode">
-                <option value="round_robin">סבב סדרתי (Round Robin)</option>
-                <option value="random">בחירה אקראית (Random)</option>
+                <option value="round_robin">Sequential (Round Robin)</option>
+                <option value="random">Random Selection</option>
               </select>
             </div>
           </div>
           <div class="field">
-            <label for="proxy-servers">רשימת שרתי Proxy (מסונכרן אוטומטית עם <code>proxies.txt</code>)</label>
+            <label for="proxy-servers">Proxy Server List (automatically synced with <code>proxies.txt</code>)</label>
             <textarea id="proxy-servers" class="ltr" rows="4" placeholder="http://host:port&#10;socks5://5.6.7.8:1080&#10;1.2.3.4:8080"></textarea>
             <div id="proxy-test-results" class="proxy-results"></div>
-            <div id="residential-status" class="advice-box">מאגר רזידנציאלי: טוען נתונים...</div>
+            <div id="residential-status" class="advice-box">Residential Pool: Loading status...</div>
           </div>
 
           <hr style="border:0;border-top:1px solid var(--border);margin:18px 0;" />
 
           <div class="section-title">
-            <span>Persistent Contexts — שמירת עוגיות והיסטוריה למשתמשים חוזרים</span>
-            <button type="button" class="small danger" id="btn-clear-profiles">נקה פרופילים שמורים</button>
+            <span>Persistent Contexts — Cookie &amp; Storage Retention for Returning Visitors</span>
+            <button type="button" class="small danger" id="btn-clear-profiles">Clear Saved Profiles</button>
           </div>
           <div class="switch-row">
             <div>
-              <strong>הפעל Persistent Contexts (תיקיות פרופיל אמיתיות ב-<code>session-profiles/</code>)</strong>
-              <div style="font-size:0.8rem;color:var(--muted);">מדמה משתמשים חוזרים עם Cookies, LocalStorage והיסטוריה שמורה לצד משתמשים חדשים.</div>
+              <strong>Enable Persistent Contexts (real browser profile directories in <code>session-profiles/</code>)</strong>
+              <div style="font-size:0.8rem;color:var(--muted);">Simulates returning visitors with saved Cookies, LocalStorage, and browsing history alongside fresh sessions.</div>
             </div>
             <input id="session-enabled" type="checkbox" />
           </div>
           <div class="form-grid">
             <div class="field">
-              <label for="session-returning-rate">אחוז משתמשים חוזרים (<code>returningUserRate</code> %)</label>
+              <label for="session-returning-rate">Returning Visitor Rate (<code>returningUserRate</code> %)</label>
               <input id="session-returning-rate" type="number" min="0" max="100" />
             </div>
             <div class="field">
-              <label for="session-pool-size">גודל מאגר פרופילים בדיסק (<code>profilePoolSize</code>)</label>
+              <label for="session-pool-size">On-Disk Profile Pool Size (<code>profilePoolSize</code>)</label>
               <input id="session-pool-size" type="number" min="1" max="200" />
             </div>
           </div>
-          <div id="profiles-list" class="hint">טוען רשימת פרופילים...</div>
+          <div id="profiles-list" class="hint">Loading profile list...</div>
 
           <hr style="border:0;border-top:1px solid var(--border);margin:18px 0;" />
 
           <div class="section-title">
-            <span>הגנת מודעות וטלמטריה (<code>Ad-Safe QA &amp; Telemetry Shield</code>)</span>
+            <span>Ad-Safe QA &amp; Telemetry Shield</span>
           </div>
           <div class="switch-row">
             <div>
-              <strong>חסימת לחיצה מקרית על מודעות בגלישה אוטומטית (<code>avoidAdClicks</code>)</strong>
-              <div style="font-size:0.8rem;color:var(--muted);">מסנן החוצה <code>.ad-slot-box</code>, <code>a.smartlink-btn</code>, <code>iframe</code> ו-overlays כדי לא לייצר קליקים לא רצויים ברשתות מודעות.</div>
+              <strong>Prevent accidental clicks on ad elements during autonomous browsing (<code>avoidAdClicks</code>)</strong>
+              <div style="font-size:0.8rem;color:var(--muted);">Excludes <code>.ad-slot-box</code>, <code>a.smartlink-btn</code>, <code>iframe</code>, and ad overlays from automated click targets.</div>
             </div>
             <input id="ad-avoid-clicks" type="checkbox" />
           </div>
           <div class="switch-row">
             <div>
-              <strong>סגירה אוטומטית של Overlays חוסמים לפני קליקים (<code>dismissOverlays</code>)</strong>
-              <div style="font-size:0.8rem;color:var(--muted);">סוגר <code>monetag_vignette</code> ("Close") ו-<code>monetag_in_page_push</code> ("Hide") לפני לחיצה על כפתורי האתר.</div>
+              <strong>Automatically dismiss blocking overlays before clicking (<code>dismissOverlays</code>)</strong>
+              <div style="font-size:0.8rem;color:var(--muted);">Closes vignette ("Close") and in-page push ("Hide") overlays before interacting with site buttons.</div>
             </div>
             <input id="ad-dismiss-overlays" type="checkbox" />
           </div>
           <div class="switch-row">
             <div>
-              <strong>Popunder Shield — סגירה שקטה של חלונות קופצים (<code>closePopunders</code>)</strong>
-              <div style="font-size:0.8rem;color:var(--muted);">סוגר אוטומטית טאבים משניים שנפתחים מ-OnClick / Popunder בלי לדווח כשל באתר.</div>
+              <strong>Popunder Shield — silently close unsolicited pop-up tabs (<code>closePopunders</code>)</strong>
+              <div style="font-size:0.8rem;color:var(--muted);">Automatically closes secondary tabs spawned by OnClick/popunder scripts without failing the visit.</div>
             </div>
             <input id="ad-close-popunders" type="checkbox" />
           </div>
           <div class="switch-row">
             <div>
-              <strong>שליחת כותרת דילוג טלמטריה לדומיין היעד בלבד (<code>X-Lab-Skip-Telemetry: 1</code>)</strong>
-              <div style="font-size:0.8rem;color:var(--muted);">מוזרקת אך ורק לבקשות לדומיין המוגדר ב-<code>targetUrl</code> (ללא פגיעה ב-CORS של סקריפטים חיצוניים).</div>
+              <strong>Send origin-scoped telemetry skip header to target domain only (<code>X-Lab-Skip-Telemetry: 1</code>)</strong>
+              <div style="font-size:0.8rem;color:var(--muted);">Injected strictly on requests matching the <code>targetUrl</code> origin (preserves third-party script CORS).</div>
             </div>
             <input id="ad-skip-telemetry" type="checkbox" />
           </div>
@@ -639,33 +638,33 @@
           <hr style="border:0;border-top:1px solid var(--border);margin:18px 0;" />
 
           <div class="section-title">
-            <span>🛡️ הסוואה מירבית וביצועי מקביליות (Stealth &amp; RAM Mode)</span>
+            <span>🛡️ Stealth Profile &amp; Resource / CDP Mode</span>
           </div>
           <div class="form-grid" style="margin-bottom:14px;">
             <div class="field">
-              <label for="stealth-mode">רמת הסוואה (<code>stealthMode</code>)</label>
+              <label for="stealth-mode">Stealth Level (<code>stealthMode</code>)</label>
               <select id="stealth-mode">
-                <option value="maximum">הסוואה מקסימלית (WebRTC Leak Shield, Chrome Runtime, Canvas/Audio Seed, Permissions)</option>
-                <option value="standard">סטנדרטי (Playwright Stealth + FingerprintInjector)</option>
+                <option value="maximum">Maximum Stealth (WebRTC Leak Shield, Chrome Runtime, Canvas/Audio Seed, Permissions)</option>
+                <option value="standard">Standard (Playwright Stealth + FingerprintInjector)</option>
               </select>
             </div>
             <div class="field">
-              <label for="resource-mode">צריכת RAM ומנועי GitHub (<code>resourceMode</code>)</label>
+              <label for="resource-mode">RAM Saver &amp; CDP Engines (<code>resourceMode</code>)</label>
               <select id="resource-mode">
-                <option value="full">מלא (טעינת תמונות, מדיה ופונטים מלאה)</option>
-                <option value="lite">חיסכון פרוקסי ו-RAM חכם (JS/CSS Cache + חסימת טראקרים ותמונות צד-ג׳)</option>
-                <option value="ultra_lite">חיסכון RAM מקסימלי (לריצות ענק מקבילות — HTML/JS/CSS בלבד)</option>
-                <option value="browserless_cdp">Browserless CDP Engine (בריכת דפדפנים ב-CDP + Proxy-Chain)</option>
-                <option value="lightpanda_cdp">Lightpanda Ultra-Light CDP (פרופיל אולטרה-קל ~25MB לסוכן)</option>
+                <option value="full">Full (Load all images, media, and web fonts)</option>
+                <option value="lite">Smart Proxy &amp; RAM Saver (JS/CSS RAM Cache + block third-party trackers &amp; media)</option>
+                <option value="ultra_lite">Maximum RAM Saver (High-concurrency runs — HTML/JS/CSS only)</option>
+                <option value="browserless_cdp">Browserless CDP Engine (External CDP pool + Proxy-Chain)</option>
+                <option value="lightpanda_cdp">Lightpanda Ultra-Light CDP (~25MB RAM per worker)</option>
               </select>
             </div>
           </div>
 
           <div class="section-title">
-            <span>הזרקת סקריפט אנליטיקס / ניטור (<code>snippet</code>)</span>
+            <span>Custom Analytics / Diagnostics Init Script (<code>snippet</code>)</span>
             <div class="inline-row">
-              <button type="button" class="small" id="btn-sample-snippet">טען סקריפט בדיקה לדוגמה</button>
-              <button type="button" class="small" id="btn-clear-snippet">נקה</button>
+              <button type="button" class="small" id="btn-sample-snippet">Load Sample Diagnostic Snippet</button>
+              <button type="button" class="small" id="btn-clear-snippet">Clear</button>
             </div>
           </div>
           <div class="field">
@@ -673,13 +672,13 @@
           </div>
         </div>
 
-        <!-- TAB 5: Raw JSON -->
+        <!-- TAB 6: Raw JSON -->
         <div id="tab-json" class="tab-content">
           <div class="section-title">
-            <span>תצוגת <code>config.json</code> בזמן אמת</span>
+            <span>Live <code>config.json</code> Preview</span>
             <div class="inline-row">
-              <button type="button" class="small" id="btn-copy-json">העתק JSON</button>
-              <button type="button" class="small danger" id="btn-reset-config">איפוס לברירת מחדל</button>
+              <button type="button" class="small" id="btn-copy-json">Copy JSON</button>
+              <button type="button" class="small danger" id="btn-reset-config">Reset to Defaults</button>
             </div>
           </div>
           <pre id="json-preview" class="json-preview"></pre>
@@ -691,135 +690,135 @@
         <div class="live-screen-box" id="live-screen-box">
           <div class="live-screen-meta">
             <div class="live-screen-meta-text">
-              <strong id="live-screen-label">מסך חי של הדפדפן (Live Preview)</strong>
-              <code id="live-screen-url" dir="ltr">ממתין להרצה...</code>
+              <strong id="live-screen-label">Live Browser Preview</strong>
+              <code id="live-screen-url" dir="ltr">Waiting for run...</code>
             </div>
             <div class="inline-row" style="gap:6px;flex-shrink:0;">
-              <button type="button" class="small" id="btn-live-pause" title="עצור עדכון תמונות כדי לקרוא בנוחות">⏸️ השהה תצוגה</button>
-              <button type="button" class="small" id="btn-live-toggle" title="הסתר או הצג את חלון התצוגה המקדימה">🙈 הסתר</button>
+              <button type="button" class="small" id="btn-live-pause" title="Pause frame updates to inspect current view">⏸️ Pause Preview</button>
+              <button type="button" class="small" id="btn-live-toggle" title="Collapse or expand the live preview pane">🙈 Hide</button>
             </div>
           </div>
           <div id="live-screen-body">
             <div id="live-rrweb-container" class="live-rrweb-container" style="display:none;"></div>
-            <img id="live-screen-img" class="live-screen-frame" style="display:none;" alt="תצוגת מסך חיה של הדפדפן" />
+            <img id="live-screen-img" class="live-screen-frame" style="display:none;" alt="Live browser preview frame" />
             <div id="live-screen-empty" class="live-screen-empty">
-              כשתפעיל הרצה (גם ב-Headless וגם בצפייה חיה), תופיע כאן תמונת המסך החיה של מה שהבוט רואה ומבצע בכל רגע.
+              When a run starts (in either headless or visible mode), live DOM/screenshot frames of what the browser sees and executes will stream here in real time.
             </div>
           </div>
         </div>
 
         <div class="tabs" id="monitor-tabs">
-          <button type="button" class="tab-btn active" data-mtab="mtab-logs">לוגים וצעדים (Live)</button>
-          <button type="button" class="tab-btn" data-mtab="mtab-report">דוח מסלולים ושגיאות (<span id="visit-details-count">0</span>)</button>
-          <button type="button" class="tab-btn" data-mtab="mtab-ai">🤖 מפקח צי AI (Cloud)</button>
-          <button type="button" class="tab-btn" data-mtab="mtab-demo">אנליטיקס מאתר הניסיון (<span id="demo-events-count">0</span>)</button>
+          <button type="button" class="tab-btn active" data-mtab="mtab-logs">Live Logs &amp; Steps</button>
+          <button type="button" class="tab-btn" data-mtab="mtab-report">Visit Routes &amp; Errors (<span id="visit-details-count">0</span>)</button>
+          <button type="button" class="tab-btn" data-mtab="mtab-ai">🤖 AI Fleet Commander</button>
+          <button type="button" class="tab-btn" data-mtab="mtab-demo">Demo Site Analytics (<span id="demo-events-count">0</span>)</button>
         </div>
 
         <div id="mtab-logs" class="tab-content active" style="padding:0;">
           <div class="monitor-header">
-            <span style="font-size:0.88rem;color:var(--muted);">פלט ישיר של <code>Crawlee Runner</code></span>
-            <a id="btn-download-pdf-report" href="/api/reports/latest/pdf" target="_blank" class="small" style="background:linear-gradient(135deg,#0284c7,#2563eb);color:#fff;padding:5px 11px;border-radius:6px;text-decoration:none;font-weight:700;font-size:0.78rem;margin-left:8px;display:inline-block;">📄 הורד דוח PDF מסכם (AI)</a>
-              <button type="button" class="small" id="btn-clear-logs">נקה מסך</button>
+            <span style="font-size:0.88rem;color:var(--muted);">Live output from <code>Crawlee Runner</code></span>
+            <a id="btn-download-pdf-report" href="/api/reports/latest/pdf" target="_blank" class="small" style="background:linear-gradient(135deg,#0284c7,#2563eb);color:#fff;padding:5px 11px;border-radius:6px;text-decoration:none;font-weight:700;font-size:0.78rem;margin-left:8px;display:inline-block;">📄 Download Summary PDF Report (AI)</a>
+            <button type="button" class="small" id="btn-clear-logs">Clear Logs</button>
           </div>
           <div id="log-box" class="log-box" style="height:320px;"></div>
         </div>
 
         <div id="mtab-report" class="tab-content" style="padding:0;">
           <div class="monitor-header">
-            <span style="font-size:0.88rem;color:var(--muted);">אילו עמודים נפתחו, ציוני 404/200 ופירוט שגיאות מדויק</span>
+            <span style="font-size:0.88rem;color:var(--muted);">Visited page trails, HTTP status codes (200/404), and detailed step outcomes</span>
           </div>
           <div id="visit-details-list" class="demo-events-list" style="max-height:360px;">
-            <p style="color:var(--muted);padding:12px;">עדיין אין דוחות ביקור מפורטים. לחץ "הפעל הרצה ▶".</p>
+            <p style="color:var(--muted);padding:12px;">No visit reports yet. Click "Start Run ▶" to begin.</p>
           </div>
         </div>
 
         <div id="mtab-demo" class="tab-content" style="padding:0;">
           <div class="monitor-header">
-            <span style="font-size:0.88rem;color:var(--muted);">ביקורים, קליקים, UTMs ועוגיות שנקלטו ב-<code>/demo-site</code></span>
-            <button type="button" class="small" id="btn-clear-demo">נקה אירועים</button>
+            <span style="font-size:0.88rem;color:var(--muted);">Pageviews, clicks, UTMs, and cookies captured on <code>/demo-site</code></span>
+            <button type="button" class="small" id="btn-clear-demo">Clear Events</button>
           </div>
           <div id="demo-events-list" class="demo-events-list" style="max-height:360px;">
-            <p style="color:var(--muted);padding:12px;">עדיין לא נקלטו אירועים מאתר הניסיון המובנה.</p>
+            <p style="color:var(--muted);padding:12px;">No events captured from the built-in demo site yet.</p>
           </div>
         </div>
 
         <div id="mtab-ai" class="tab-content" style="padding:12px;">
           <div class="monitor-header" style="padding:0 0 10px 0;margin-bottom:10px;border-bottom:1px solid var(--border);">
-            <span style="font-weight:700;">🤖 צ׳אט ומפקח צי AI (Cloud AI)</span>
+            <span style="font-weight:700;">🤖 Cloud AI Fleet Commander &amp; Chat</span>
             <div class="inline-row" style="gap:8px;">
-              <button type="button" class="small" id="btn-ai-expand">⛶ הרחב חלון צ׳אט</button>
-              <span id="ai-cred-badge" class="badge idle">בודק חיבור...</span>
+              <button type="button" class="small" id="btn-ai-expand">⛶ Expand Chat</button>
+              <span id="ai-cred-badge" class="badge idle">Checking connection...</span>
             </div>
           </div>
 
           <details class="ai-settings-drawer">
-            <summary>⚙️ הגדרות מודלים, אחוזי AI והנחיית סוכנים (לחץ לפתיחה/סגירה)</summary>
+            <summary>⚙️ AI Models, Worker Allocation &amp; Live Fleet Directives (click to toggle)</summary>
             <div class="form-grid" style="margin-top:10px;">
               <label class="switch-row" style="margin:0;padding:8px 10px;">
-                <span style="font-size:0.84rem;"><strong>אפשר מוח AI לסוכנים ומפקד</strong></span>
+                <span style="font-size:0.84rem;"><strong>Enable AI Brain for Workers &amp; Commander</strong></span>
                 <input id="ai-enabled" type="checkbox" />
               </label>
               <label class="switch-row" style="margin:0;padding:8px 10px;">
-                <span style="font-size:0.84rem;"><strong>ניטור וניהול אוטומטי תוך כדי ריצה</strong></span>
+                <span style="font-size:0.84rem;"><strong>Autonomous In-Run Telemetry Management</strong></span>
                 <input id="ai-auto-manage" type="checkbox" />
               </label>
               <div class="field" style="grid-column:span 2;">
-                <label for="ai-provider">ספק ענן וניהול תקציב (<code>ai.provider</code>)</label>
+                <label for="ai-provider">Cloud Provider &amp; Failover Policy (<code>ai.provider</code>)</label>
                 <select id="ai-provider">
-                  <option value="auto">אוטומטי (Ollama Cloud ← מעבר אוטומטי ל-UncensoredLLM במודל הזול $0.105/M)</option>
-                  <option value="uncensoredllm">UncensoredLLM ישיר (מודלים זולים במיוחד עד שתטעין את Ollama)</option>
-                  <option value="ollama_cloud">Ollama Cloud בלבד</option>
+                  <option value="auto">Auto (Ollama Cloud &rarr; automatic failover to UncensoredLLM at $0.105/M)</option>
+                  <option value="uncensoredllm">UncensoredLLM Direct (Ultra-low-cost models)</option>
+                  <option value="ollama_cloud">Ollama Cloud Only</option>
                 </select>
               </div>
               <div class="field">
-                <label for="ai-commander-model">מודל מפקח הצי (Commander)</label>
+                <label for="ai-commander-model">Fleet Commander Model</label>
                 <input id="ai-commander-model" type="text" class="ltr" list="ai-cheap-models" placeholder="glm-5.3-flash" />
               </div>
               <div class="field">
-                <label for="ai-worker-model">מודל סוכני שטח (Workers)</label>
+                <label for="ai-worker-model">Field Worker Model</label>
                 <input id="ai-worker-model" type="text" class="ltr" list="ai-cheap-models" placeholder="deepseek-v4.1-flash" />
               </div>
               <div class="field">
-                <label for="ai-all-squads-model">מודל אחד לכל ארבעת הצוותים (<code>allSquadsModel</code> — ריק = מודל נפרד לכל צוות)</label>
+                <label for="ai-all-squads-model">Unified Model for All 4 Squads (<code>allSquadsModel</code> — empty = per-squad defaults)</label>
                 <input id="ai-all-squads-model" type="text" class="ltr" list="ai-cheap-models" placeholder="deepseek-v4.1-flash" />
               </div>
               <div class="field">
-                <label for="ai-recovery-model">מודל התאוששות מתקלות (<code>recoveryModel</code> — ריק = לפי המפקד)</label>
+                <label for="ai-recovery-model">Error Recovery Model (<code>recoveryModel</code> — empty = follow Commander)</label>
                 <input id="ai-recovery-model" type="text" class="ltr" list="ai-cheap-models" placeholder="clef:27b" />
               </div>
               <label class="switch-row" style="margin:0;padding:8px 10px;">
-                <span style="font-size:0.84rem;"><strong>מילוי חכם של שדות חסרים לפני כל שליחה</strong></span>
+                <span style="font-size:0.84rem;"><strong>Smart Form Guard (complete missing fields before submit)</strong></span>
                 <input id="ai-form-assist" type="checkbox" />
               </label>
               <label class="switch-row" style="margin:0;padding:8px 10px;">
-                <span style="font-size:0.84rem;"><strong>תיקון מסלול אוטומטי כשנוחתים בעמוד הלא נכון</strong></span>
+                <span style="font-size:0.84rem;"><strong>AI Route Repair (recover when landing on unexpected pages)</strong></span>
                 <input id="ai-route-repair" type="checkbox" />
               </label>
               <datalist id="ai-cheap-models">
-                <option value="clef:27b">Ollama Cloud — Clef 27B (מודל החלטות מהיר, 0 טוקני פלט — מומלץ ל-Workers / Recovery)</option>
-                <option value="deepseek-v4.1-flash">Ollama Cloud — DeepSeek v4.1 Flash (0.8s, מהיר, חסכוני ומדויק לסוכנים)</option>
-                <option value="beam">Ollama Cloud — Beam (יעיל במיוחד בחיסכון טוקנים וכלים)</option>
-                <option value="minimax-m3.1-flash">Ollama Cloud — MiniMax M3.1 Flash (1.3s, מהיר למדריכים ותוכן)</option>
-                <option value="gpt-oss:20b">Ollama Cloud — GPT-OSS 20B (קוד מהיר וחסכוני 128K)</option>
-                <option value="nemotron-3-nano:30b">Ollama Cloud — NVIDIA Nemotron 3 Nano 30B (מהיר)</option>
-                <option value="gemma4:31b">Ollama Cloud — Google Gemma 4 31B (ראייה והיסק חכם)</option>
-                <option value="nemotron-3-super">Ollama Cloud — NVIDIA Nemotron 3 Super (12B פעיל MoE)</option>
-                <option value="deepseek-v4.1-flash:1017">Ollama Cloud — DeepSeek v4.1 Flash (1017 החדש)</option>
-                <option value="glm-5.3-flash">Ollama Cloud — GLM 5.3 Flash (מומלץ למפקד וראשי צוות)</option>
-                <option value="glm-5.3-flash-uncensored">הזול ביותר ב-UncensoredLLM ($0.105 in / $0.369 out per 1M)</option>
-                <option value="manta-flash-1.0">זול מהיר 16K ב-UncensoredLLM ($0.07 in / $0.56 out per 1M)</option>
-                <option value="manta-mini-1.0">מיני זול ב-UncensoredLLM ($0.07 in / $0.56 out per 1M)</option>
-                <option value="glm-5.3-uncensored">חכם חסכוני ב-UncensoredLLM ($0.282 in / $0.846 out per 1M)</option>
+                <option value="clef:27b">Ollama Cloud — Clef 27B (Fast decision model, 0 output tokens — recommended for Workers / Recovery)</option>
+                <option value="deepseek-v4.1-flash">Ollama Cloud — DeepSeek v4.1 Flash (0.8s, fast &amp; accurate worker model)</option>
+                <option value="beam">Ollama Cloud — Beam (Token-efficient tool &amp; flow specialist)</option>
+                <option value="minimax-m3.1-flash">Ollama Cloud — MiniMax M3.1 Flash (1.3s, fast content &amp; guide reader)</option>
+                <option value="gpt-oss:20b">Ollama Cloud — GPT-OSS 20B (Fast 128K navigation &amp; reasoning)</option>
+                <option value="nemotron-3-nano:30b">Ollama Cloud — NVIDIA Nemotron 3 Nano 30B (Fast)</option>
+                <option value="gemma4:31b">Ollama Cloud — Google Gemma 4 31B (Vision &amp; deep reasoning)</option>
+                <option value="nemotron-3-super">Ollama Cloud — NVIDIA Nemotron 3 Super (12B active MoE)</option>
+                <option value="deepseek-v4.1-flash:1017">Ollama Cloud — DeepSeek v4.1 Flash (1017 build)</option>
+                <option value="glm-5.3-flash">Ollama Cloud — GLM 5.3 Flash (Recommended for Fleet Commander)</option>
+                <option value="glm-5.3-flash-uncensored">UncensoredLLM — GLM 5.3 Flash ($0.105 in / $0.369 out per 1M)</option>
+                <option value="manta-flash-1.0">UncensoredLLM — Manta Flash 1.0 16K ($0.07 in / $0.56 out per 1M)</option>
+                <option value="manta-mini-1.0">UncensoredLLM — Manta Mini 1.0 ($0.07 in / $0.56 out per 1M)</option>
+                <option value="glm-5.3-uncensored">UncensoredLLM — GLM 5.3 ($0.282 in / $0.846 out per 1M)</option>
               </datalist>
               <div class="field">
-                <label for="ai-worker-pct">אחוז סוכנים עם מוח AI (% מהביקורים)</label>
+                <label for="ai-worker-pct">AI-Enabled Worker Share (% of visits)</label>
                 <input id="ai-worker-pct" type="number" min="0" max="100" />
               </div>
               <div class="field">
-                <label for="ai-directive-input">הנחיית משימה חיה לסוכנים</label>
+                <label for="ai-directive-input">Live Tactical Directive for Field Agents</label>
                 <div class="inline-row">
-                  <input id="ai-directive-input" type="text" placeholder="למשל: חפש כרטיסי מוצרים והוסף סריקה של 2 פריטים" />
-                  <button type="button" class="small primary" id="btn-ai-send-directive">שגר לצי</button>
+                  <input id="ai-directive-input" type="text" placeholder="e.g. Scan product cards and open 2 items per visit" />
+                  <button type="button" class="small primary" id="btn-ai-send-directive">Dispatch to Fleet</button>
                 </div>
               </div>
             </div>
@@ -827,17 +826,17 @@
 
           <div class="ai-chat-toolbar">
             <div class="inline-row" style="flex-wrap:wrap;gap:6px;">
-              <button type="button" class="small ai-quick-btn" data-aiprompt="נתח את ההקלטה הנוכחית והטלמטריה ותן תמונת מצב קצרה">ניתוח הקלטה ומצב</button>
-              <button type="button" class="small ai-quick-btn" data-aiprompt="עבור למצב גלים burst והנחה את הסוכנים לחקור כלים ומדריכים">הפעל Burst + חקירה</button>
-              <button type="button" class="small ai-quick-btn" data-aiprompt="אם יש עומס זיכרון או כשלים הורד מקביליות ל-2">אזן מקביליות</button>
+              <button type="button" class="small ai-quick-btn" data-aiprompt="Analyze the current recording and live telemetry and provide a concise status summary">Analyze Recording &amp; Status</button>
+              <button type="button" class="small ai-quick-btn" data-aiprompt="Switch wave mode to burst and instruct agents to explore tools and guides">Enable Burst + Explore</button>
+              <button type="button" class="small ai-quick-btn" data-aiprompt="If memory usage is high or failures occur, reduce concurrency to 2">Balance Concurrency</button>
             </div>
-            <button type="button" class="small ai-scroll-btn" id="btn-ai-scroll-bottom">⬇️ חזור לתחתית הצ׳אט</button>
+            <button type="button" class="small ai-scroll-btn" id="btn-ai-scroll-bottom">⬇️ Scroll to Bottom</button>
           </div>
 
           <div id="ai-chat-feed" class="ai-chat-feed"></div>
           <div class="inline-row" style="margin-top:8px;">
-            <input id="ai-chat-input" type="text" placeholder="דבר עם מפקח ה-AI או תן פקודה חיה לצי..." style="flex:1;" />
-            <button type="button" class="primary" id="btn-ai-chat-send">שלח למפקד ↗</button>
+            <input id="ai-chat-input" type="text" placeholder="Ask the AI Fleet Commander or issue a live fleet directive..." style="flex:1;" />
+            <button type="button" class="primary" id="btn-ai-chat-send">Send to Commander ↗</button>
           </div>
         </div>
       </section>

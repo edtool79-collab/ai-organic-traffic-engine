@@ -8,14 +8,14 @@ const DEVICE_META = [
 ];
 
 const STATUS_LABELS = {
-  idle: 'מוכן להרצה',
-  running: 'רץ כעת...',
-  paused: 'מושהה (Paused)',
-  waiting_schedule: 'ממתין לשעות פעילות',
-  stopping: 'עוצר תהליכים...',
-  completed: 'הסתיים בהצלחה',
-  stopped: 'נעצר ידנית',
-  error: 'הסתיים עם שגיאה',
+  idle: 'Ready',
+  running: 'Running...',
+  paused: 'Paused',
+  waiting_schedule: 'Waiting for Schedule',
+  stopping: 'Stopping...',
+  completed: 'Completed',
+  stopped: 'Stopped',
+  error: 'Error',
 };
 
 const state = {
@@ -43,30 +43,30 @@ const state = {
 };
 
 const STEP_TYPE_META = {
-  goto:             { label: 'נווט לעמוד (Goto URL / Path)', selectorHint: '(לא חובה)', valueHint: '/tools/link-cleaner או https://...' },
-  click:            { label: 'לחץ על אלמנט (Click)', selectorHint: '#lc-clean או .main-nav a[href="/tools"]', valueHint: '(לא חובה)' },
-  go_back:          { label: 'חזור לדף/אתר הקודם (Go Back)', selectorHint: '(אוטומטי — השאר ריק)', valueHint: '1200 (השהיה במילישניות)' },
-  close_tab:        { label: 'סגור כרטיסייה חיצונית וחזור (Close Tab)', selectorHint: '(אוטומטי)', valueHint: '(אוטומטי)' },
-  fill:             { label: 'הקלד בשדה (Fill Input)', selectorHint: '#lc-input או input[name="email"]', valueHint: 'טקסט או {{AGENT_EMAIL}} / {{OTP_CODE}}' },
-  fill_email:       { label: '📧 הזן אימייל סוכן חי (HirePulse Inbox)', selectorHint: 'input[type="email"] (או השאר לזיהוי אוטומטי)', valueHint: '(אוטומטי — יוצר תיבה חיה לכל סוכן)' },
-  fill_otp:         { label: '🔑 המתן והזן קוד אימות מהמייל (OTP Code)', selectorHint: 'input[name*="code"] (או השאר לזיהוי אוטומטי)', valueHint: '45000 (זמן המתנה מקסימלי במילישניות)' },
-  select:           { label: 'בחר ברשימה (Select)', selectorHint: 'select[name="topic"]', valueHint: 'ערך או תווית באופציה' },
-  press:            { label: 'לחץ מקש (Key Press)', selectorHint: '(אופציונלי) בורר שדה', valueHint: 'Enter / Tab / Escape' },
-  hover:            { label: 'ריחוף עכבר אנושי (Hover)', selectorHint: '#hero-cta או nav a (עכבר בזייה)', valueHint: '800 (השהיה במילישניות)' },
-  scroll:           { label: 'גלול בעמוד לפי אחוז (Scroll %)', selectorHint: '(לא חובה)', valueHint: '70 (אחוז גלילה 0–100)' },
-  scroll_to:        { label: 'גלול לאלמנט ללא לחיצה (Scroll To)', selectorHint: 'aside.ad-slot-box[data-ad-position="in_content_mid"]', valueHint: '(ללא צורך בערך)' },
-  read_article:     { label: 'קריאת מאמר אנושית (AdSense Safe)', selectorHint: '(אוטומטי — השאר ריק)', valueHint: '8500 (זמן קריאה במילישניות)' },
-  human_browse:     { label: 'גלישה אנושית חופשית בדף (Human Browse)', selectorHint: '(אוטומטי — השאר ריק)', valueHint: '7000 (משך גלישה במילישניות)' },
-  scan_products:    { label: 'סריקת מוצרים / קישורים אנושית (Scan Products)', selectorHint: '(אופציונלי — בורר אזור מוצרים)', valueHint: '2 (כמות מוצרים לפתיחה)' },
-  search_entry:     { label: 'חיפוש אורגני טרום-כניסה (Search Entry)', selectorHint: '(אוטומטי — השאר ריק)', valueHint: '(אופציונלי — שאילתת חיפוש)' },
-  ai_explore:       { label: 'סוכן AI אוטונומי (Ollama Cloud Brain)', selectorHint: '(אוטומטי — השאר ריק)', valueHint: '2 (כמות פעולות AI בדף)' },
-  ai_route_repair:  { label: 'תיקון מסלול AI (AI Route Repair)', selectorHint: '(אוטומטי — השאר ריק)', valueHint: 'הנחיית יעד להמשך הזרימה' },
-  ai_form_guard:    { label: 'שומר טפסים AI (AI Form Guard)', selectorHint: '(אוטומטי — השאר ריק)', valueHint: '1' },
-  wait:             { label: 'המתן זמן או לאלמנט (Wait)', selectorHint: '(ריק להמתנת זמן, או CSS Selector)', valueHint: '2000 (מילישניות)' },
-  dismiss_overlays: { label: 'סגור Overlays צפים (Dismiss Ads)', selectorHint: '(אוטומטי — השאר ריק)', valueHint: '(אוטומטי)' },
-  audit_ads:        { label: 'ביקורת סלוטי מודעות (Audit Ads DOM)', selectorHint: '(אוטומטי — השאר ריק)', valueHint: '(אוטומטי)' },
-  assert:           { label: 'בדיקת אימות QA (Assert Pass/Fail)', selectorHint: '#lc-output (או ריק לבדיקת כל הדף)', valueHint: 'הטקסט או ה-URL הצפוי' },
-  screenshot:       { label: 'צלם מסך (Screenshot)', selectorHint: '(לא חובה)', valueHint: 'תיאור לצילום' },
+  goto:             { label: 'Navigate to Page (Goto URL / Path)', selectorHint: '(optional)', valueHint: '/tools/link-cleaner or https://...' },
+  click:            { label: 'Click Element (Click)', selectorHint: '#lc-clean or .main-nav a[href="/tools"]', valueHint: '(optional)' },
+  go_back:          { label: 'Go Back (Browser History)', selectorHint: '(auto — leave empty)', valueHint: '1200 (delay in ms)' },
+  close_tab:        { label: 'Close External Tab & Return (Close Tab)', selectorHint: '(auto)', valueHint: '(auto)' },
+  fill:             { label: 'Fill Input Field (Fill)', selectorHint: '#lc-input or input[name="email"]', valueHint: 'Text or {{AGENT_EMAIL}} / {{OTP_CODE}}' },
+  fill_email:       { label: '📧 Fill Live Agent Email (HirePulse Inbox)', selectorHint: 'input[type="email"] (or leave blank for auto-detect)', valueHint: '(auto — creates a live inbox per session)' },
+  fill_otp:         { label: '🔑 Wait & Fill Email OTP Code', selectorHint: 'input[name*="code"] (or leave blank for auto-detect)', valueHint: '45000 (max wait in ms)' },
+  select:           { label: 'Select Dropdown Option (Select)', selectorHint: 'select[name="topic"]', valueHint: 'Option value or label' },
+  press:            { label: 'Press Keyboard Key (Key Press)', selectorHint: '(optional) field selector', valueHint: 'Enter / Tab / Escape' },
+  hover:            { label: 'Human Mouse Hover (Hover)', selectorHint: '#hero-cta or nav a (Bezier curve)', valueHint: '800 (dwell in ms)' },
+  scroll:           { label: 'Scroll Page by Percentage (Scroll %)', selectorHint: '(optional)', valueHint: '70 (scroll percentage 0–100)' },
+  scroll_to:        { label: 'Scroll to Element Without Clicking (Scroll To)', selectorHint: 'aside.ad-slot-box[data-ad-position="in_content_mid"]', valueHint: '(no value needed)' },
+  read_article:     { label: 'Human Article Reading (AdSense Safe)', selectorHint: '(auto — leave empty)', valueHint: '8500 (reading time in ms)' },
+  human_browse:     { label: 'Autonomous Human Browsing (Human Browse)', selectorHint: '(auto — leave empty)', valueHint: '7000 (duration in ms)' },
+  scan_products:    { label: 'Scan Product Cards / Links (Scan Products)', selectorHint: '(optional container selector)', valueHint: '2 (items to open)' },
+  search_entry:     { label: 'Pre-Entry Organic Search (Search Entry)', selectorHint: '(auto — leave empty)', valueHint: '(optional search query)' },
+  ai_explore:       { label: 'Autonomous AI Agent (Cloud AI Brain)', selectorHint: '(auto — leave empty)', valueHint: '2 (number of AI actions)' },
+  ai_route_repair:  { label: 'AI Route Repair', selectorHint: '(auto — leave empty)', valueHint: 'Target guidance for continuing the flow' },
+  ai_form_guard:    { label: 'AI Form Guard', selectorHint: '(auto — leave empty)', valueHint: '1' },
+  wait:             { label: 'Wait Duration or Selector (Wait)', selectorHint: '(empty for timer, or CSS selector)', valueHint: '2000 (milliseconds)' },
+  dismiss_overlays: { label: 'Dismiss Floating Overlays (Dismiss Ads)', selectorHint: '(auto — leave empty)', valueHint: '(auto)' },
+  audit_ads:        { label: 'Audit Ad Slots DOM (Read-Only)', selectorHint: '(auto — leave empty)', valueHint: '(auto)' },
+  assert:           { label: 'QA Assertion Check (Assert Pass/Fail)', selectorHint: '#lc-output (or empty for full page)', valueHint: 'Expected text or URL substring' },
+  screenshot:       { label: 'Capture Screenshot', selectorHint: '(optional)', valueHint: 'Screenshot caption' },
 };
 
 const $ = id => document.getElementById(id);
@@ -322,7 +322,7 @@ function renderPages() {
       tag.className = 'badge';
       tag.style.padding = '2px 8px';
       tag.style.fontSize = '0.75rem';
-      tag.textContent = 'עמוד נחיתה ראשי';
+      tag.textContent = 'Primary Landing';
       left.appendChild(tag);
     }
 
@@ -333,7 +333,7 @@ function renderPages() {
       const upBtn = document.createElement('button');
       upBtn.type = 'button';
       upBtn.className = 'small';
-      upBtn.textContent = 'העלה ראשון';
+      upBtn.textContent = 'Make Primary';
       upBtn.onclick = () => {
         const [item] = state.config.pages.splice(idx, 1);
         state.config.pages.unshift(item);
@@ -346,7 +346,7 @@ function renderPages() {
     const delBtn = document.createElement('button');
     delBtn.type = 'button';
     delBtn.className = 'small danger';
-    delBtn.textContent = 'הסר';
+    delBtn.textContent = 'Remove';
     delBtn.disabled = pages.length <= 1;
     delBtn.onclick = () => {
       state.config.pages.splice(idx, 1);
@@ -383,7 +383,7 @@ function appendMappedStep(stepObj) {
   });
   renderTaskSteps();
   renderJsonPreview();
-  showToast(`נוסף צעד #${state.config.taskSteps.length}: ${stepObj.label || stepObj.type}`);
+  showToast(`Added step #${state.config.taskSteps.length}: ${stepObj.label || stepObj.type}`);
 }
 
 function renderPageMapperResults() {
@@ -408,7 +408,7 @@ function renderPageMapperResults() {
   $('mcnt-ads').textContent = String((els.adSlots || []).length);
 
   if (metaEl) {
-    metaEl.textContent = `HTTP ${data.status} | ${data.url} (${data.title || 'ללא כותרת'})`;
+    metaEl.textContent = `HTTP ${data.status} | ${data.url} (${data.title || 'Untitled'})`;
   }
 
   document.querySelectorAll('#mapper-category-tabs button').forEach(btn => {
@@ -425,7 +425,7 @@ function renderPageMapperResults() {
   if (!filtered.length) {
     const empty = document.createElement('div');
     empty.className = 'hint';
-    empty.textContent = items.length ? 'לא נמצאו חלקים התואמים לסינון.' : 'אין רכיבים בקטגוריה זו בעמוד שנסרק.';
+    empty.textContent = items.length ? 'No elements match your filter.' : 'No elements found in this category.';
     listEl.appendChild(empty);
     return;
   }
@@ -443,14 +443,14 @@ function renderPageMapperResults() {
     if (item.isAd) {
       const warnBadge = document.createElement('span');
       warnBadge.className = 'mapper-badge ad-warn';
-      warnBadge.textContent = `אזור מודעה (${item.visible ? 'גלוי' : 'מוסתר'} · ${item.size})`;
+      warnBadge.textContent = `Ad Slot (${item.visible ? 'visible' : 'hidden'} · ${item.size})`;
       title.appendChild(warnBadge);
-      title.appendChild(document.createTextNode(` ${item.position} — לצפייה וביקורת בלבד (ללא קליק)`));
+      title.appendChild(document.createTextNode(` ${item.position} — View & Audit Only (no click)`));
     } else {
       const badge = document.createElement('span');
       badge.className = 'mapper-badge';
       badge.textContent = item.category === 'link'
-        ? (item.external ? 'קישור חיצוני' : 'קישור פנימי')
+        ? (item.external ? 'External Link' : 'Internal Link')
         : (item.inputType || item.tag || item.category);
       title.appendChild(badge);
       const labelTxt = item.text || item.label || item.href || item.selector;
@@ -477,24 +477,24 @@ function renderPageMapperResults() {
       const scrollBtn = document.createElement('button');
       scrollBtn.type = 'button';
       scrollBtn.className = 'small';
-      scrollBtn.textContent = '+ גלילה בטוחה';
+      scrollBtn.textContent = '+ Safe Scroll';
       scrollBtn.onclick = () => appendMappedStep({
         type: 'scroll_to',
         selector: item.selector,
         value: '',
-        label: `גלילה בטוחה לסלוט ${item.position}`,
+        label: `Safe scroll to slot ${item.position}`,
       });
       actions.appendChild(scrollBtn);
 
       const auditBtn = document.createElement('button');
       auditBtn.type = 'button';
       auditBtn.className = 'small';
-      auditBtn.textContent = '+ ביקורת מודעה';
+      auditBtn.textContent = '+ Audit Ad Slot';
       auditBtn.onclick = () => appendMappedStep({
         type: 'audit_ads',
         selector: '',
         value: '',
-        label: `ביקורת סלוטי מודעות (${item.position})`,
+        label: `Audit ad slots (${item.position})`,
       });
       actions.appendChild(auditBtn);
     } else {
@@ -503,24 +503,24 @@ function renderPageMapperResults() {
         const fillBtn = document.createElement('button');
         fillBtn.type = 'button';
         fillBtn.className = 'small primary';
-        fillBtn.textContent = isSel ? '+ בחירה' : '+ מילוי';
+        fillBtn.textContent = isSel ? '+ Select' : '+ Fill';
         fillBtn.onclick = () => appendMappedStep({
           type: isSel ? 'select' : 'fill',
           selector: item.selector,
           value: isSel ? (item.options?.[0] || '') : 'sample input value',
-          label: `${isSel ? 'בחירה ב-' : 'הזנה בשדה '}${item.label}`,
+          label: `${isSel ? 'Select ' : 'Fill '}${item.label}`,
         });
         actions.appendChild(fillBtn);
       } else {
         const clickBtn = document.createElement('button');
         clickBtn.type = 'button';
         clickBtn.className = 'small primary';
-        clickBtn.textContent = '+ קליק';
+        clickBtn.textContent = '+ Click';
         clickBtn.onclick = () => appendMappedStep({
           type: 'click',
           selector: item.selector,
           value: '',
-          label: `לחיצה על: ${(item.text || item.label || item.selector).slice(0, 40)}`,
+          label: `Click: ${(item.text || item.label || item.selector).slice(0, 40)}`,
           followExternal: Boolean(item.external && item.targetBlank),
         });
         actions.appendChild(clickBtn);
@@ -529,24 +529,24 @@ function renderPageMapperResults() {
       const hoverBtn = document.createElement('button');
       hoverBtn.type = 'button';
       hoverBtn.className = 'small';
-      hoverBtn.textContent = '+ ריחוף';
+      hoverBtn.textContent = '+ Hover';
       hoverBtn.onclick = () => appendMappedStep({
         type: 'hover',
         selector: item.selector,
         value: '700',
-        label: `ריחוף על: ${(item.text || item.label || item.selector).slice(0, 40)}`,
+        label: `Hover: ${(item.text || item.label || item.selector).slice(0, 40)}`,
       });
       actions.appendChild(hoverBtn);
 
       const scrollToBtn = document.createElement('button');
       scrollToBtn.type = 'button';
       scrollToBtn.className = 'small';
-      scrollToBtn.textContent = '+ גלילה אל';
+      scrollToBtn.textContent = '+ Scroll To';
       scrollToBtn.onclick = () => appendMappedStep({
         type: 'scroll_to',
         selector: item.selector,
         value: '',
-        label: `גלילה אל: ${(item.text || item.label || item.selector).slice(0, 40)}`,
+        label: `Scroll to: ${(item.text || item.label || item.selector).slice(0, 40)}`,
       });
       actions.appendChild(scrollToBtn);
     }
@@ -554,11 +554,11 @@ function renderPageMapperResults() {
     const copyBtn = document.createElement('button');
     copyBtn.type = 'button';
     copyBtn.className = 'small';
-    copyBtn.textContent = 'העתק בורר';
+    copyBtn.textContent = 'Copy Selector';
     copyBtn.onclick = async () => {
       try {
         await navigator.clipboard.writeText(item.selector);
-        showToast(`הבורר הועתק: ${item.selector}`);
+        showToast(`Selector copied: ${item.selector}`);
       } catch {
         showToast(item.selector);
       }
@@ -616,9 +616,9 @@ async function importRecordedSteps(rec, opts = {}) {
       syncFormFromConfig();
       renderJsonPreview();
     }
-    showToast(`נטענו ונשמרו ${clonedSteps.length} צעדים מוקלטים! אפשר עכשיו ללחוץ "+ שמור כפרופיל חדש".`);
+    showToast(`Loaded and saved ${clonedSteps.length} recorded steps! You can now click "+ Save as New Profile".`);
   } catch (err) {
-    showToast(`הצעדים נטענו לממשק, אך השמירה נכשלה: ${err.message}`, true);
+    showToast(`Steps loaded into UI, but saving failed: ${err.message}`, true);
   }
   return true;
 }
@@ -646,7 +646,7 @@ function renderRecorderState(rec) {
   if (desktopWarnEl) {
     if (hiddenDesktop) {
       desktopWarnEl.style.display = 'block';
-      desktopWarnEl.textContent = `⚠️ השרת רץ כעת ברקע מתוך סביבה מבודדת (${desk.currentDesktop || 'non-Default'}) ולא משולחן העבודה שלך — לכן חלונות הדפדפן אינם גלויים על המסך. לחץ לחיצה כפולה על start-dashboard.bat בתיקייה (web-traffic-generation) כדי להפעיל עצמאית על שולחן העבודה.`;
+      desktopWarnEl.textContent = `⚠️ Server is currently running in an isolated background desktop (${desk.currentDesktop || 'non-Default'}) rather than your interactive desktop — browser windows are not visible. Double-click start-dashboard.bat to launch interactively.`;
     } else {
       desktopWarnEl.style.display = 'none';
       desktopWarnEl.textContent = '';
@@ -663,11 +663,11 @@ function renderRecorderState(rec) {
     if (challenge && challenge.detected) {
       const labelText = Array.isArray(challenge.labels) && challenge.labels.length
         ? challenge.labels.join(' + ')
-        : (challenge.interstitial ? 'דף אימות של Cloudflare' : 'אתגר כללי');
+        : (challenge.interstitial ? 'Cloudflare verification interstitial' : 'Bot challenge');
       challengeEl.style.display = 'block';
       challengeEl.textContent = challenge.solved
-        ? `✅ זוהה ${labelText} — נראה שכבר עברת את הבדיקה. אפשר להמשיך לגלוש.`
-        : `🤖 זוהה ${labelText} בעמוד — יש לאשר אותו ידנית בחלון ההקלטה (לחיצה על התיבה), ואז להמשיך לגלוש.`;
+        ? `✅ Detected ${labelText} — verification appears passed. You may continue browsing.`
+        : `🤖 Detected ${labelText} on page — please complete it manually in the recording browser window, then continue browsing.`;
     } else {
       challengeEl.style.display = 'none';
       challengeEl.textContent = '';
@@ -677,21 +677,21 @@ function renderRecorderState(rec) {
   box.classList.toggle('recording', active);
   if (dot) dot.classList.toggle('recording', active);
   startBtn.disabled = active || hiddenDesktop;
-  if (!active && startBtn.textContent !== '🔴 הקלט מסלול בדפדפן') {
-    startBtn.textContent = '🔴 הקלט מסלול בדפדפן';
+  if (!active && startBtn.textContent !== '🔴 Record Journey in Browser') {
+    startBtn.textContent = '🔴 Record Journey in Browser';
   }
   stopBtn.disabled = !active;
   if (focusBtn) focusBtn.disabled = !active || hiddenDesktop;
   if (loadLastBtn) loadLastBtn.disabled = active || steps.length === 0;
 
   if (active) {
-    metaEl.textContent = `מקליט כעת (${steps.length} צעדים) — ${rec.currentUrl || rec.targetUrl || ''}`;
+    metaEl.textContent = `Recording (${steps.length} steps) — ${rec.currentUrl || rec.targetUrl || ''}`;
   } else if (rec?.status === 'error') {
-    metaEl.textContent = `שגיאת הקלטה: ${rec.error || 'לא ידוע'}`;
+    metaEl.textContent = `Recording error: ${rec.error || 'Unknown'}`;
   } else if (rec?.status === 'completed' && steps.length) {
-    metaEl.textContent = `הוקלטו ${steps.length} צעדים ומוכנים ב-Task Builder`;
+    metaEl.textContent = `Recorded ${steps.length} steps — ready in Task Builder`;
   } else {
-    metaEl.textContent = 'מוכן להקלטה על כתובת היעד';
+    metaEl.textContent = 'Ready to record on target URL';
   }
 
   listEl.innerHTML = '';
@@ -700,8 +700,8 @@ function renderRecorderState(rec) {
     empty.className = 'muted';
     empty.style.fontSize = '0.84rem';
     empty.textContent = active
-      ? 'ממתין לפעולות בדפדפן... לחץ, גלול, מלא טופס או חזור אחורה.'
-      : 'הצעדים שתבצע בדפדפן ההקלטה יופיעו כאן בזמן אמת...';
+      ? 'Waiting for browser actions... click, scroll, fill forms, or navigate back.'
+      : 'Actions you perform in the recording browser will appear here in real time...';
     listEl.appendChild(empty);
   } else {
     steps.forEach((step, idx) => {
@@ -710,7 +710,7 @@ function renderRecorderState(rec) {
 
       const desc = document.createElement('span');
       const labelText = step.label || step.type;
-      const tabBadge = Number.isInteger(step.tab) && step.tab > 0 ? ` [טאב #${step.tab}]` : '';
+      const tabBadge = Number.isInteger(step.tab) && step.tab > 0 ? ` [Tab #${step.tab}]` : '';
       desc.textContent = `${idx + 1}. [${step.type}]${tabBadge} ${labelText}`;
 
       const targetCode = document.createElement('code');
@@ -736,7 +736,7 @@ function renderTaskSteps() {
   if (!steps.length) {
     const empty = document.createElement('div');
     empty.className = 'advice-box';
-    empty.textContent = 'עדיין לא הוגדרו צעדי משימה ספציפיים. לחץ על "+ הוסף צעד" או בחר אחת מהתבניות למעלה.';
+    empty.textContent = 'No scenario steps defined yet. Click "+ Add Step" or select a template above.';
     container.appendChild(empty);
     return;
   }
@@ -750,9 +750,9 @@ function renderTaskSteps() {
     head.className = 'task-step-head';
 
     const title = document.createElement('strong');
-    const tabTag = Number.isInteger(step.tab) && step.tab > 0 ? ` [כרטיסייה #${step.tab}]` : '';
-    const optTag = step.optional ? ' [אופציונלי]' : '';
-    title.textContent = `צעד ${idx + 1}: ${meta.label}${tabTag}${optTag}`;
+    const tabTag = Number.isInteger(step.tab) && step.tab > 0 ? ` [Tab #${step.tab}]` : '';
+    const optTag = step.optional ? ' [optional]' : '';
+    title.textContent = `Step ${idx + 1}: ${meta.label}${tabTag}${optTag}`;
 
     const controls = document.createElement('div');
     controls.className = 'inline-row';
@@ -786,7 +786,7 @@ function renderTaskSteps() {
     const del = document.createElement('button');
     del.type = 'button';
     del.className = 'small danger';
-    del.textContent = 'מחק';
+    del.textContent = 'Delete';
     del.onclick = () => {
       steps.splice(idx, 1);
       renderTaskSteps();
@@ -804,7 +804,7 @@ function renderTaskSteps() {
     // Step Type
     const typeWrap = document.createElement('div');
     const typeLbl = document.createElement('label');
-    typeLbl.textContent = 'סוג פעולה';
+    typeLbl.textContent = 'Action Type';
     typeLbl.style.fontSize = '0.78rem';
     typeLbl.style.color = 'var(--muted)';
     const typeSel = document.createElement('select');
@@ -828,15 +828,15 @@ function renderTaskSteps() {
     if (step.type === 'assert') {
       const aWrap = document.createElement('div');
       const aLbl = document.createElement('label');
-      aLbl.textContent = 'סוג אימות (Assertion)';
+      aLbl.textContent = 'Assertion Type';
       aLbl.style.fontSize = '0.78rem';
       aLbl.style.color = 'var(--muted)';
       const aSel = document.createElement('select');
       [
-        ['text_contains', 'טקסט בדף/אלמנט מכיל'],
-        ['url_contains', 'כתובת ה-URL מכילה'],
-        ['selector_visible', 'אלמנט מוצג על המסך'],
-        ['status_ok', 'סטטוס HTTP תקין (200-399)'],
+        ['text_contains', 'Page/Element Text Contains'],
+        ['url_contains', 'URL Contains'],
+        ['selector_visible', 'Element Is Visible'],
+        ['status_ok', 'HTTP Status OK (200-399)'],
       ].forEach(([k, txt]) => {
         const opt = document.createElement('option');
         opt.value = k;
@@ -870,9 +870,9 @@ function renderTaskSteps() {
       return w;
     };
 
-    grid.appendChild(mkInput('בורר / טקסט אלמנט (Selector)', step.selector, meta.selectorHint, v => { step.selector = v; }));
-    grid.appendChild(mkInput('ערך / יעד / טקסט צפוי', step.value, meta.valueHint, v => { step.value = v; }));
-    grid.appendChild(mkInput('תיאור קצר בלוג', step.label, 'לדוגמה: אימות ניקוי לינק', v => { step.label = v; }, false));
+    grid.appendChild(mkInput('Selector / Element Text', step.selector, meta.selectorHint, v => { step.selector = v; }));
+    grid.appendChild(mkInput('Value / Target / Expected Text', step.value, meta.valueHint, v => { step.value = v; }));
+    grid.appendChild(mkInput('Short Log Label', step.label, 'e.g. Verify link cleaner output', v => { step.label = v; }, false));
 
     card.appendChild(grid);
     container.appendChild(card);
@@ -972,7 +972,7 @@ function renderPersonas() {
     const delBtn = document.createElement('button');
     delBtn.type = 'button';
     delBtn.className = 'small danger';
-    delBtn.textContent = 'מחק פרופיל';
+    delBtn.textContent = 'Delete Persona';
     delBtn.disabled = state.config.personas.length <= 1;
     delBtn.onclick = () => {
       state.config.personas.splice(idx, 1);
@@ -1006,15 +1006,15 @@ function renderPersonas() {
       return wrap;
     };
 
-    grid.appendChild(numField('עומק גלילה (0–1)', p.scrollDepth, 0.05, 0, 1, v => { p.scrollDepth = v; }));
-    grid.appendChild(numField('שיעור לחיצות (0–1)', p.clickRate, 0.05, 0, 1, v => { p.clickRate = v; }));
-    grid.appendChild(numField('קריאה מינ׳ (ms)', p.readTime[0], 100, 0, 120000, v => { p.readTime[0] = v; }));
-    grid.appendChild(numField('קריאה מקס׳ (ms)', p.readTime[1], 100, 0, 120000, v => { p.readTime[1] = v; }));
-    grid.appendChild(numField('מינ׳ עמודים', p.pageCount[0], 1, 1, 50, v => { p.pageCount[0] = v; }));
-    grid.appendChild(numField('מקס׳ עמודים', p.pageCount[1], 1, 1, 50, v => { p.pageCount[1] = v; }));
-    grid.appendChild(numField('השהיית Idle (0–1)', p.idleChance, 0.01, 0, 1, v => { p.idleChance = v; }));
-    grid.appendChild(numField('שינוי גודל חלון (0–1)', p.resizeChance, 0.01, 0, 1, v => { p.resizeChance = v; }));
-    grid.appendChild(numField('חזרה לאחור U-Turn (0–1)', p.uTurnChance, 0.01, 0, 1, v => { p.uTurnChance = v; }));
+    grid.appendChild(numField('Scroll Depth (0–1)', p.scrollDepth, 0.05, 0, 1, v => { p.scrollDepth = v; }));
+    grid.appendChild(numField('Click Rate (0–1)', p.clickRate, 0.05, 0, 1, v => { p.clickRate = v; }));
+    grid.appendChild(numField('Min Read (ms)', p.readTime[0], 100, 0, 120000, v => { p.readTime[0] = v; }));
+    grid.appendChild(numField('Max Read (ms)', p.readTime[1], 100, 0, 120000, v => { p.readTime[1] = v; }));
+    grid.appendChild(numField('Min Pages', p.pageCount[0], 1, 1, 50, v => { p.pageCount[0] = v; }));
+    grid.appendChild(numField('Max Pages', p.pageCount[1], 1, 1, 50, v => { p.pageCount[1] = v; }));
+    grid.appendChild(numField('Idle Chance (0–1)', p.idleChance, 0.01, 0, 1, v => { p.idleChance = v; }));
+    grid.appendChild(numField('Viewport Resize (0–1)', p.resizeChance, 0.01, 0, 1, v => { p.resizeChance = v; }));
+    grid.appendChild(numField('Backtrack U-Turn (0–1)', p.uTurnChance, 0.01, 0, 1, v => { p.uTurnChance = v; }));
 
     card.appendChild(grid);
     container.appendChild(card);
@@ -1029,14 +1029,14 @@ function updateSelectedProfileDesc() {
 
   const chosen = (state.siteProfiles || []).find(p => p.id === sel.value);
   if (!chosen) {
-    descEl.textContent = 'אין פרופיל נבחר.';
+    descEl.textContent = 'No profile selected.';
     if (delBtn) delBtn.disabled = true;
     return;
   }
 
-  const activeMark = chosen.id === state.activeProfileId ? ' [טעון כעת]' : ' — לחץ "טען פרופיל למערכת 📂" להחלה';
+  const activeMark = chosen.id === state.activeProfileId ? ' [Currently Loaded]' : ' — click "Load Profile 📂" to apply';
   const stepsCnt = chosen.config?.taskSteps?.length || 0;
-  descEl.textContent = `${chosen.description || 'פרופיל שמור'} | יעד: ${chosen.config?.targetUrl || '-'} | מצב: ${chosen.config?.taskMode || 'behavior'} (${stepsCnt} צעדים)${activeMark}`;
+  descEl.textContent = `${chosen.description || 'Saved profile'} | Target: ${chosen.config?.targetUrl || '-'} | Mode: ${chosen.config?.taskMode || 'behavior'} (${stepsCnt} steps)${activeMark}`;
   if (delBtn) delBtn.disabled = Boolean(chosen.isBuiltin);
 }
 
@@ -1071,13 +1071,13 @@ function renderConcurrencyAdvice() {
 
   if (watchMode && conc > 4) {
     box.className = 'advice-box warn';
-    box.textContent = `טיפ לצפייה חיה (Watch Mode): הרצת ${conc} דפדפנים גלויים במקביל עלולה להעמיס על המסך וה-RAM — בצפייה חיה מומלץ 1–4 מקביליות (להרצות עומס של ${conc}+ כבה "מצב צפייה חי").`;
+    box.textContent = `Watch Mode Tip: Running ${conc} visible browsers concurrently can strain display and RAM — 1–4 is recommended for visible mode (uncheck visible windows for ${conc}+ load runs).`;
   } else if (conc > maxStress) {
     box.className = 'advice-box warn';
-    box.textContent = `אזהרה: מקסימום מקביליות ${conc} גבוה מקיבולת המחשב (${sys.totalRamGb}GB RAM, ${sys.cpuCount} ליבות). Crawlee יבלום לפי צורך, אך מומלץ ${sweetSpot[0]}–${sweetSpot[1]}.`;
+    box.textContent = `Warning: Max concurrency ${conc} exceeds host capacity (${sys.totalRamGb}GB RAM, ${sys.cpuCount} cores). Crawlee will throttle automatically, but ${sweetSpot[0]}–${sweetSpot[1]} is recommended.`;
   } else {
     box.className = 'advice-box';
-    box.textContent = `המלצת חומרה (${sys.totalRamGb}GB RAM, ${sys.cpuCount} ליבות): Crawlee AutoscaledPool יווסת בין מינימום למקסימום (${recommended} מומלץ, תקרה בטוחה: ${maxStress}).`;
+    box.textContent = `Hardware Recommendation (${sys.totalRamGb}GB RAM, ${sys.cpuCount} cores): Crawlee AutoscaledPool scales between min and max (${recommended} recommended, safe cap: ${maxStress}).`;
   }
 }
 
@@ -1089,20 +1089,20 @@ function renderJsonPreview() {
 function renderSystemInfo() {
   const sys = state.system;
   if (!sys) return;
-  $('kpi-system').textContent = `RAM ${sys.memUsedPct}% | ${sys.cpuCount} ליבות`;
-  $('kpi-system-advice').textContent = `פנוי: ${sys.freeRamGb} / ${sys.totalRamGb} GB | מומלץ: ${sys.concurrencyAdvice.sweetSpot[0]}–${sys.concurrencyAdvice.sweetSpot[1]}`;
+  $('kpi-system').textContent = `RAM ${sys.memUsedPct}% | ${sys.cpuCount} cores`;
+  $('kpi-system-advice').textContent = `Free: ${sys.freeRamGb} / ${sys.totalRamGb} GB | Recommended: ${sys.concurrencyAdvice.sweetSpot[0]}–${sys.concurrencyAdvice.sweetSpot[1]}`;
   renderConcurrencyAdvice();
 }
 
 function renderProfiles(profiles) {
   state.profiles = profiles || [];
-  $('kpi-profiles-count').textContent = `פרופילי Persistent בדיסק: ${state.profiles.length}`;
+  $('kpi-profiles-count').textContent = `Persistent profiles on disk: ${state.profiles.length}`;
   const el = $('profiles-list');
   if (!state.profiles.length) {
-    el.textContent = 'אין כרגע פרופילי משתמש חוזר שמורים בדיסק.';
+    el.textContent = 'No persistent returning-visitor profiles saved on disk yet.';
     return;
   }
-  el.textContent = `שמורים בדיסק ${state.profiles.length} פרופילים: ` +
+  el.textContent = `${state.profiles.length} profiles saved on disk: ` +
     state.profiles.map(p => `${p.name} (${p.deviceKey}, ${p.cookiesCount} cookies)`).join(' • ');
 }
 
@@ -1113,7 +1113,7 @@ function renderRunStatus(st) {
   const badge = $('run-status-badge');
   badge.className = `badge ${st.status}`;
   badge.textContent = st.streamMode && st.status === 'running'
-    ? `🌊 נחל רציף פעיל (גל #${st.streamWave || 1})`
+    ? `🌊 Continuous Stream Active (Wave #${st.streamWave || 1})`
     : (STATUS_LABELS[st.status] || st.status);
 
   const isRunning = st.status === 'running' || st.status === 'waiting_schedule';
@@ -1131,17 +1131,17 @@ function renderRunStatus(st) {
   const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
 
   $('kpi-completed').textContent = `${done} / ${total}`;
-  $('kpi-breakdown').textContent = `הצלחה: ${st.succeeded || 0} | פג תוקף: ${st.timedOut || 0} | כשל: ${st.failed || 0}`;
+  $('kpi-breakdown').textContent = `Succeeded: ${st.succeeded || 0} | Timed Out: ${st.timedOut || 0} | Failed: ${st.failed || 0}`;
 
   $('kpi-concurrency').textContent = `${st.currentConcurrency || 0} / ${st.desiredConcurrency || 0}`;
-  $('kpi-concurrency-sub').textContent = `טווח מוגדר: ${st.minConcurrency || 1}–${st.maxConcurrency || 3}${st.isSystemOverloaded ? ' (עומס גבוה — מואט)' : ''}`;
-  $('crawlee-pool-badge').textContent = `Crawlee Pool: ${st.currentConcurrency || 0} פעילים (יעד: ${st.desiredConcurrency || 0})`;
+  $('kpi-concurrency-sub').textContent = `Configured range: ${st.minConcurrency || 1}–${st.maxConcurrency || 3}${st.isSystemOverloaded ? ' (high load — throttling)' : ''}`;
+  $('crawlee-pool-badge').textContent = `Crawlee Pool: ${st.currentConcurrency || 0} active (target: ${st.desiredConcurrency || 0})`;
 
   $('kpi-avg-load').textContent = st.avgLoadMs != null ? `${st.avgLoadMs} ms` : '—';
-  $('kpi-errors-sub').textContent = `שגיאות JS/קונסולה: ${st.errorsTotal || 0}`;
+  $('kpi-errors-sub').textContent = `JS / Console errors: ${st.errorsTotal || 0}`;
   $('kpi-sessions').textContent = `${st.returningSessions || 0} / ${st.newSessions || 0}`;
 
-  $('progress-label').textContent = `התקדמות הרצה: ${pct}%`;
+  $('progress-label').textContent = `Run Progress: ${pct}%`;
   $('progress-target').textContent = st.targetUrl ? st.targetUrl : '';
   $('progress-fill').style.width = `${pct}%`;
 }
@@ -1155,7 +1155,7 @@ function appendLogLine(entry) {
 
   const ts = document.createElement('span');
   ts.className = 'log-ts';
-  ts.textContent = new Date(entry.ts).toLocaleTimeString('he-IL', { hour12: false });
+  ts.textContent = new Date(entry.ts).toLocaleTimeString('en-GB', { hour12: false });
 
   const msg = document.createElement('span');
   msg.textContent = entry.message;
@@ -1210,13 +1210,13 @@ function renderLiveFrame(frame) {
     if (rrContainer) rrContainer.style.display = 'none';
     img.style.display = 'none';
     empty.style.display = 'flex';
-    lbl.textContent = 'מסך חי של הדפדפן (Live Preview)';
-    urlEl.textContent = 'ממתין להרצה...';
+    lbl.textContent = 'Live Browser Preview';
+    urlEl.textContent = 'Waiting for run...';
     return;
   }
 
   if (frame.type === 'live_meta') {
-    lbl.textContent = `ביקור #${(frame.visitIndex ?? 0) + 1}${frame.label ? ' — ' + frame.label : ''}`;
+    lbl.textContent = `Visit #${(frame.visitIndex ?? 0) + 1}${frame.label ? ' — ' + frame.label : ''}`;
     if (frame.url) urlEl.textContent = frame.url;
     return;
   }
@@ -1225,7 +1225,7 @@ function renderLiveFrame(frame) {
     img.style.display = 'none';
     empty.style.display = 'none';
     rrContainer.style.display = 'block';
-    lbl.textContent = `ביקור #${(frame.visitIndex ?? 0) + 1}${frame.label ? ' — ' + frame.label : ' (DOM חי)'}`;
+    lbl.textContent = `Visit #${(frame.visitIndex ?? 0) + 1}${frame.label ? ' — ' + frame.label : ' (Live DOM)'}`;
     if (frame.url) urlEl.textContent = frame.url;
 
     const hasFullSnapshot = frame.events.some(ev => ev && ev.type === 2);
@@ -1264,7 +1264,7 @@ function renderLiveFrame(frame) {
   img.src = frame.imageDataUrl;
   img.style.display = 'block';
   empty.style.display = 'none';
-  lbl.textContent = `ביקור #${(frame.visitIndex ?? 0) + 1}${frame.label ? ' — ' + frame.label : ''}`;
+  lbl.textContent = `Visit #${(frame.visitIndex ?? 0) + 1}${frame.label ? ' — ' + frame.label : ''}`;
   urlEl.textContent = frame.url || '';
 }
 
@@ -1277,7 +1277,7 @@ function renderVisitDetails() {
     const p = document.createElement('p');
     p.style.color = 'var(--muted)';
     p.style.padding = '12px';
-    p.textContent = 'עדיין אין דוחות ביקור מפורטים. לחץ "הפעל הרצה ▶".';
+    p.textContent = 'No visit reports yet. Click "Start Run ▶" to begin.';
     list.appendChild(p);
     return;
   }
@@ -1293,13 +1293,13 @@ function renderVisitDetails() {
     head.style.gap = '8px';
 
     const title = document.createElement('strong');
-    title.textContent = `ביקור #${v.visitNumber} • ${v.persona} • ${v.device}`;
+    title.textContent = `Visit #${v.visitNumber} • ${v.persona} • ${v.device}`;
 
     const badge = document.createElement('span');
     badge.className = hasErr ? 'pill-fail' : 'pill-ok';
     const extraGeo = v.country ? ` | 🌍 ${v.country}` : '';
-    const extraWave = v.waveSummary?.mutated ? ` | 🌊 גל #${v.waveSummary.waveNumber || 1}` : '';
-    badge.textContent = `HTTP ${v.status} | ${v.loadMs}ms | שגיאות: ${v.pageErrors || 0}${extraGeo}${extraWave}`;
+    const extraWave = v.waveSummary?.mutated ? ` | 🌊 Wave #${v.waveSummary.waveNumber || 1}` : '';
+    badge.textContent = `HTTP ${v.status} | ${v.loadMs}ms | Errors: ${v.pageErrors || 0}${extraGeo}${extraWave}`;
 
     head.appendChild(title);
     head.appendChild(badge);
@@ -1310,7 +1310,7 @@ function renderVisitDetails() {
       route.style.marginTop = '5px';
       const code = document.createElement('code');
       code.style.fontSize = '0.76rem';
-      code.textContent = 'מסלול: ' + v.visitedUrls.map(u => `${u.path} (${u.status})`).join(' -> ');
+      code.textContent = 'Trail: ' + v.visitedUrls.map(u => `${u.path} (${u.status})`).join(' -> ');
       route.appendChild(code);
       card.appendChild(route);
     }
@@ -1322,7 +1322,7 @@ function renderVisitDetails() {
       summary.style.color = '#34d399';
       summary.style.fontSize = '0.78rem';
       summary.style.cursor = 'pointer';
-      summary.textContent = `צעדי משימה (${v.stepResults.length}): ` + v.stepResults.map(s => `✓ ${s.label}`).join(' | ');
+      summary.textContent = `Scenario steps (${v.stepResults.length}): ` + v.stepResults.map(s => `✓ ${s.label}`).join(' | ');
       detailsEl.appendChild(summary);
 
       const ol = document.createElement('ol');
@@ -1360,7 +1360,7 @@ function renderDemoEvents() {
     const p = document.createElement('p');
     p.style.color = 'var(--muted)';
     p.style.padding = '12px';
-    p.textContent = 'עדיין לא נקלטו אירועים מאתר הניסיון המובנה.';
+    p.textContent = 'No events captured from the built-in demo site yet.';
     list.appendChild(p);
     return;
   }
@@ -1374,10 +1374,10 @@ function renderDemoEvents() {
     top.style.justifyContent = 'space-between';
     top.style.gap = '8px';
     const title = document.createElement('strong');
-    title.textContent = `${ev.eventType || 'event'} — ${ev.returning ? 'משתמש חוזר' : 'משתמש חדש'} (${ev.visitorId || '—'})`;
+    title.textContent = `${ev.eventType || 'event'} — ${ev.returning ? 'Returning Visitor' : 'New Visitor'} (${ev.visitorId || '—'})`;
     const time = document.createElement('span');
     time.style.color = 'var(--muted)';
-    time.textContent = new Date(ev.ts).toLocaleTimeString('he-IL', { hour12: false });
+    time.textContent = new Date(ev.ts).toLocaleTimeString('en-GB', { hour12: false });
     top.appendChild(title);
     top.appendChild(time);
 
@@ -1398,7 +1398,7 @@ function renderProxyTestResults(results) {
   const box = $('proxy-test-results');
   box.innerHTML = '';
   if (!results || !results.length) {
-    box.textContent = 'לא נמצאו שרתי Proxy לבדיקה.';
+    box.textContent = 'No proxy servers configured to test.';
     return;
   }
   results.forEach(r => {
@@ -1412,8 +1412,8 @@ function renderProxyTestResults(results) {
     const right = document.createElement('span');
     right.className = r.ok ? 'pill-ok' : 'pill-fail';
     right.textContent = r.ok
-      ? `תקין | ${r.latencyMs}ms | IP: ${r.exitIp || 'OK'} ${r.country ? '• ' + r.country : ''}`
-      : `נכשל: ${r.error || 'Error'}`;
+      ? `OK | ${r.latencyMs}ms | IP: ${r.exitIp || 'OK'} ${r.country ? '• ' + r.country : ''}`
+      : `Failed: ${r.error || 'Error'}`;
 
     row.appendChild(left);
     row.appendChild(right);
@@ -1449,7 +1449,7 @@ function renderCountriesSelector() {
     };
 
     const span = document.createElement('span');
-    span.textContent = c.nameHe || c.code;
+    span.textContent = c.nameEn || c.name || c.code;
     chip.appendChild(cb);
     chip.appendChild(span);
     if (c.tier === 1) {
@@ -1470,10 +1470,10 @@ function renderAiStatusBadge(info) {
   if (info.providers?.uncensoredllm?.configured) parts.push(`UncensoredLLM(${info.providers.uncensoredllm.source})`);
   if (info.configured) {
     badge.className = 'badge completed';
-    badge.textContent = parts.length ? `מחובר: ${parts.join(' + ')}` : `מחובר לענן (${info.source})`;
+    badge.textContent = parts.length ? `Connected: ${parts.join(' + ')}` : `Cloud Connected (${info.source})`;
   } else {
     badge.className = 'badge idle';
-    badge.textContent = 'ללא מפתח ענן (מצב בקר מקומי)';
+    badge.textContent = 'Offline (Local Advisor Mode)';
   }
 }
 
@@ -1490,7 +1490,7 @@ function renderAiChatFeed({ forceScroll = false } = {}) {
     const p = document.createElement('div');
     p.style.color = 'var(--muted)';
     p.style.fontSize = '0.86rem';
-    p.textContent = 'שוחח כאן עם מפקח צי ה-AI או תן פקודות בזמן אמת (שינוי גלים, מקביליות, השהיה ושליחת משימות לסוכנים).';
+    p.textContent = 'Chat with the AI Fleet Commander or issue real-time directives (adjust waves, concurrency, pause/resume, or assign field tasks).';
     feed.appendChild(p);
     if (scrollBtn) scrollBtn.classList.remove('has-unread');
     return;
@@ -1501,8 +1501,8 @@ function renderAiChatFeed({ forceScroll = false } = {}) {
     card.textContent = msg.content || '';
     const metaParts = [];
     if (msg.model) metaParts.push(msg.model);
-    if (Array.isArray(msg.applied) && msg.applied.length) metaParts.push(`יושם לצי: ${msg.applied.join(', ')}`);
-    if (msg.ts) metaParts.push(new Date(msg.ts).toLocaleTimeString('he-IL', { hour12: false }));
+    if (Array.isArray(msg.applied) && msg.applied.length) metaParts.push(`Applied: ${msg.applied.join(', ')}`);
+    if (msg.ts) metaParts.push(new Date(msg.ts).toLocaleTimeString('en-GB', { hour12: false }));
     if (metaParts.length) {
       const meta = document.createElement('div');
       meta.className = 'ai-msg-meta';
@@ -1516,13 +1516,13 @@ function renderAiChatFeed({ forceScroll = false } = {}) {
     feed.scrollTop = feed.scrollHeight;
     if (scrollBtn) {
       scrollBtn.classList.remove('has-unread');
-      scrollBtn.textContent = '⬇️ חזור לתחתית הצ׳אט';
+      scrollBtn.textContent = '⬇️ Scroll to Bottom';
     }
   } else {
     feed.scrollTop = prevScrollTop;
     if (scrollBtn) {
       scrollBtn.classList.add('has-unread');
-      scrollBtn.textContent = '⬇️ יש עדכונים חדשים למטה';
+      scrollBtn.textContent = '⬇️ New updates below';
     }
   }
 }
@@ -1530,9 +1530,9 @@ function renderAiChatFeed({ forceScroll = false } = {}) {
 // ─── Actions & SSE ────────────────────────────────────────────────────────────
 
 const RECORDER_CC_LABEL = {
-  US: 'ארה״ב', CA: 'קנדה', GB: 'בריטניה', AU: 'אוסטרליה', DE: 'גרמניה', AT: 'אוסטריה',
-  FR: 'צרפת', IT: 'איטליה', NL: 'הולנד', CZ: 'צ׳כיה', RO: 'רומניה', JP: 'יפן',
-  KR: 'קוריאה', SG: 'סינגפור',
+  US: 'United States', CA: 'Canada', GB: 'United Kingdom', AU: 'Australia', DE: 'Germany', AT: 'Austria',
+  FR: 'France', IT: 'Italy', NL: 'Netherlands', CZ: 'Czechia', RO: 'Romania', JP: 'Japan',
+  KR: 'South Korea', SG: 'Singapore',
 };
 
 function flagOf(cc) {
@@ -1543,20 +1543,20 @@ function flagOf(cc) {
 
 function countryLabel(cc) {
   const key = String(cc || '').toUpperCase();
-  if (!key) return 'לא ידוע';
+  if (!key) return 'Unknown';
   return `${flagOf(key)} ${RECORDER_CC_LABEL[key] || key}`;
 }
 
-// ממלא את רשימת הפרוקסים במסך ההקלטה (מדינה · עיר — host:port, כולל ✅/⛔ מול ההצעה).
+// Populate the proxy selector in the recorder panel (country · city — host:port, with ✅/⛔ offer status).
 async function loadRecorderProxyList() {
   const group = $('recorder-proxy-country-group');
   if (!group) return;
-  group.innerHTML = '<option value="" disabled>טוען רשימת פרוקסים…</option>';
+  group.innerHTML = '<option value="" disabled>Loading proxy list…</option>';
   try {
     const data = await api('/api/proxy/list');
     const list = Array.isArray(data?.proxies) ? data.proxies : [];
     if (!list.length) {
-      group.innerHTML = '<option value="" disabled>לא נמצאו פרוקסים בהגדרות</option>';
+      group.innerHTML = '<option value="" disabled>No proxies found in config</option>';
       return;
     }
     const order = Object.keys(RECORDER_CC_LABEL);
@@ -1570,11 +1570,11 @@ async function loadRecorderProxyList() {
       const city = p.city ? ` · ${p.city}` : '';
       const ms = p.ms ? ` · ${p.ms}ms` : '';
       // The metered gateway publishes one host:port for every sticky session, so it has no single country.
-      const label = p.cc ? countryLabel(p.cc) : (/webshare/i.test(p.hostPort) ? '🌍 רזידנציאלי (Webshare)' : 'לא ידוע');
+      const label = p.cc ? countryLabel(p.cc) : (/webshare/i.test(p.hostPort) ? '🌍 Residential (Webshare)' : 'Unknown');
       return `<option value="${p.hostPort}">${label}${city} — ${p.hostPort}${ms} ${offerMark}</option>`;
     }).join('');
   } catch {
-    group.innerHTML = '<option value="" disabled>טעינת רשימת הפרוקסים נכשלה</option>';
+    group.innerHTML = '<option value="" disabled>Failed to load proxy list</option>';
   }
 }
 
@@ -1613,34 +1613,34 @@ function wireActions() {
     });
     renderTaskSteps();
     renderJsonPreview();
-    showToast(`נוסף צעד: ${btn.dataset.qlbl || btn.dataset.qtype}`);
+    showToast(`Added step: ${btn.dataset.qlbl || btn.dataset.qtype}`);
   });
 
   $('btn-discover-pages').onclick = async () => {
     collectSimpleFieldsToConfig();
     const targetUrl = state.config.targetUrl;
     if (!targetUrl) {
-      showToast('הזן קודם כתובת אתר ב-targetUrl.', true);
+      showToast('Please enter a targetUrl first.', true);
       return;
     }
     const btn = $('btn-discover-pages');
     btn.disabled = true;
-    btn.textContent = 'סורק את האתר...';
+    btn.textContent = 'Scanning site...';
     try {
       const res = await api('/api/discover', { method: 'POST', body: JSON.stringify({ targetUrl }) });
       if (Array.isArray(res.pages) && res.pages.length) {
         state.config.pages = res.pages;
         renderPages();
         renderJsonPreview();
-        showToast(`נמצאו ${res.pages.length} עמודים אמיתיים באתר (HTTP ${res.rootStatus})! כעת לחץ "שמור הגדרות" או "הפעל הרצה".`);
+        showToast(`Discovered ${res.pages.length} pages (HTTP ${res.rootStatus})! Click "Save Settings" or "Start Run".`);
       } else {
-        showToast('לא נמצאו קישורים פנימיים נוספים מעבר ל-/.');
+        showToast('No additional internal links found beyond /.');
       }
     } catch (err) {
-      showToast('סריקת עמודים נכשלה: ' + err.message, true);
+      showToast('Page discovery failed: ' + err.message, true);
     } finally {
       btn.disabled = false;
-      btn.textContent = 'סרוק עמודים קיימים באתר 🔍';
+      btn.textContent = 'Discover Site Pages 🔍';
     }
   };
 
@@ -1661,11 +1661,11 @@ function wireActions() {
     const startBtn = $('btn-recorder-start');
     const urlInput = $('targetUrl').value.trim();
     if (!urlInput) {
-      showToast('יש להזין כתובת אתר יעד לפני תחילת ההקלטה.', true);
+      showToast('Please enter a target URL before starting recording.', true);
       return;
     }
     startBtn.disabled = true;
-    startBtn.textContent = '⏳ פותח דפדפן הקלטה...';
+    startBtn.textContent = '⏳ Launching recorder browser...';
     try {
       const modeRaw = $('recorder-proxy-mode')?.value || 'resi:';
       // `resi:<cc>` = metered residential pool pinned to one country (Webshare `-<cc>` suffix).
@@ -1679,19 +1679,19 @@ function wireActions() {
       renderRecorderState(data.recorder);
       const isDirect = !data.proxyHost || data.proxyHost === 'DIRECT';
       const geoLabel = isDirect
-        ? ' (חיבור ישיר — IP שלך)'
-        : ` (יוצא מהארץ: ${countryLabel(data.proxyCountry)} · ${data.proxyHost})`;
+        ? ' (Direct — your local IP)'
+        : ` (Exit: ${countryLabel(data.proxyCountry)} · ${data.proxyHost})`;
       const statusEl = $('recorder-proxy-status');
       if (statusEl) {
         statusEl.textContent = isDirect
-          ? '🌐 IP הקלטה: ישיר מהמחשב שלך (ישראל)'
-          : `📍 IP הקלטה: ${countryLabel(data.proxyCountry)} · ${data.proxyHost}`;
+          ? '🌐 Recorder IP: Direct from local machine'
+          : `📍 Recorder IP: ${countryLabel(data.proxyCountry)} · ${data.proxyHost}`;
       }
-      showToast(`נפתח חלון Chrome נפרד להקלטה${geoLabel}! בסיום לחצו "סיים הקלטה" או סגרו אותו.`);
+      showToast(`Opened recording browser${geoLabel}! Click "Stop Recording" or close it when done.`);
     } catch (err) {
       startBtn.disabled = false;
-      startBtn.textContent = '🔴 הקלט מסלול בדפדפן';
-      showToast(`פתיחת ההקלטה נכשלה: ${err.message}`, true);
+      startBtn.textContent = '🔴 Record Journey in Browser';
+      showToast(`Failed to start recorder: ${err.message}`, true);
     }
   };
 
@@ -1703,11 +1703,11 @@ function wireActions() {
       renderRecorderState(data.recorder);
       await importRecordedSteps(data.recorder, { force: true });
       if (!data.recorder?.steps?.length) {
-        showToast('ההקלטה נסגרה ללא צעדים מוקלטים.');
+        showToast('Recording closed with no recorded steps.');
       }
     } catch (err) {
       stopBtn.disabled = false;
-      showToast(`סיום ההקלטה נכשל: ${err.message}`, true);
+      showToast(`Failed to stop recording: ${err.message}`, true);
     }
   };
 
@@ -1717,12 +1717,12 @@ function wireActions() {
         const res = await api('/api/recorder/focus', { method: 'POST' });
         showToast(
           res.ok
-            ? (res.reason || 'חלון ההקלטה הוקפץ לחזית.')
-            : (res.reason || 'לא נמצא חלון הקלטה פתוח להקפצה.'),
+            ? (res.reason || 'Recorder window brought to front.')
+            : (res.reason || 'No open recorder window found.'),
           !res.ok
         );
       } catch (err) {
-        showToast(`שגיאה בהקפצת חלון ההקלטה: ${err.message}`, true);
+        showToast(`Error focusing recorder window: ${err.message}`, true);
       }
     };
   }
@@ -1733,7 +1733,7 @@ function wireActions() {
       refreshProxyBtn.disabled = true;
       await loadRecorderProxyList();
       refreshProxyBtn.disabled = false;
-      showToast('רשימת הפרוקסים רועננה — בחר מדינה ופתח הקלטה.');
+      showToast('Proxy list refreshed — choose a country and start recording.');
     };
   }
   loadRecorderProxyList();
@@ -1742,9 +1742,9 @@ function wireActions() {
     try {
       const rec = state.recorder?.steps?.length ? state.recorder : (await api('/api/recorder/status')).recorder;
       const ok = await importRecordedSteps(rec, { force: true });
-      if (!ok) showToast('אין צעדים מוקלטים זמינים לטעינה.', true);
+      if (!ok) showToast('No recorded steps available to load.', true);
     } catch (err) {
-      showToast(`טעינת הצעדים נכשלה: ${err.message}`, true);
+      showToast(`Failed to load recorded steps: ${err.message}`, true);
     }
   };
 
@@ -1753,12 +1753,12 @@ function wireActions() {
     const targetUrl = state.config.targetUrl;
     const pagePath = $('mapper-page-input').value.trim() || '/';
     if (!targetUrl && !/^https?:\/\//i.test(pagePath)) {
-      showToast('הזן קודם כתובת אתר ב-targetUrl או URL מלא למיפוי.', true);
+      showToast('Enter a targetUrl or full URL to inspect.', true);
       return;
     }
     const btn = $('btn-inspect-page');
     btn.disabled = true;
-    btn.textContent = 'ממפה חלקים בדפדפן...';
+    btn.textContent = 'Inspecting page in browser...';
     try {
       const res = await api('/api/inspect-page', {
         method: 'POST',
@@ -1769,12 +1769,12 @@ function wireActions() {
       if ($('mapper-filter-input')) $('mapper-filter-input').value = '';
       renderPageMapperResults();
       const s = res.mapped?.summary || {};
-      showToast(`מופה בהצלחה: ${s.buttons || 0} כפתורים, ${s.links || 0} קישורים, ${s.inputs || 0} שדות, ${s.sections || 0} אזורים, ${s.adSlots || 0} מודעות.`);
+      showToast(`Mapped: ${s.buttons || 0} buttons, ${s.links || 0} links, ${s.inputs || 0} inputs, ${s.sections || 0} sections, ${s.adSlots || 0} ad slots.`);
     } catch (err) {
-      showToast('מיפוי העמוד נכשל: ' + err.message, true);
+      showToast('Page inspection failed: ' + err.message, true);
     } finally {
       btn.disabled = false;
-      btn.textContent = '🔍 מפה את כל חלקי העמוד';
+      btn.textContent = '🔍 Inspect Page Elements';
     }
   };
 
@@ -1800,30 +1800,30 @@ function wireActions() {
     state.config.headless = true;
     state.config.keepBrowserOpenMs = 2000;
     state.config.taskSteps = [
-      { type: 'goto', selector: '', value: '/contact', label: 'פתיחת דף צור קשר' },
-      { type: 'fill', selector: 'input[name="name"]', value: 'Avi QA Tester', label: 'הזנת שם מלא' },
-      { type: 'fill', selector: 'input[name="email"]', value: 'qa@hirepulse.dev', label: 'הזנת אימייל' },
-      { type: 'select', selector: 'select[name="topic"]', value: 'demo', label: 'בחירת נושא' },
-      { type: 'fill', selector: 'textarea[name="message"]', value: 'Automated end-to-end task verification test', label: 'הזנת הודעה' },
-      { type: 'click', selector: 'button[type="submit"]', value: '', label: 'שליחת הטופס' },
-      { type: 'wait', selector: '', value: '400', label: 'המתנה לתשובה' },
-      { type: 'assert', selector: '#form-status', value: 'Form received by QA Sandbox!', assertKind: 'text_contains', label: 'אימות הודעת הצלחה' },
+      { type: 'goto', selector: '', value: '/contact', label: 'Open contact page' },
+      { type: 'fill', selector: 'input[name="name"]', value: 'Avi QA Tester', label: 'Enter full name' },
+      { type: 'fill', selector: 'input[name="email"]', value: 'qa@hirepulse.dev', label: 'Enter email' },
+      { type: 'select', selector: 'select[name="topic"]', value: 'demo', label: 'Select topic' },
+      { type: 'fill', selector: 'textarea[name="message"]', value: 'Automated end-to-end task verification test', label: 'Enter message' },
+      { type: 'click', selector: 'button[type="submit"]', value: '', label: 'Submit form' },
+      { type: 'wait', selector: '', value: '400', label: 'Wait for response' },
+      { type: 'assert', selector: '#form-status', value: 'Form received by QA Sandbox!', assertKind: 'text_contains', label: 'Verify success banner' },
     ];
     syncFormFromConfig();
-    showToast('נטענה משימת מילוי ואימות טופס באתר הדמו!');
+    showToast('Loaded demo site form fill & assertion scenario!');
   };
 
   $('btn-tpl-landing').onclick = () => {
     state.config.taskMode = 'scenario';
     state.config.taskSteps = [
-      { type: 'goto', selector: '', value: '/', label: 'טעינת דף הבית' },
-      { type: 'assert', selector: '', value: '', assertKind: 'status_ok', label: 'אימות HTTP 200' },
-      { type: 'scroll', selector: '', value: '60', label: 'גלילה ל-60%' },
-      { type: 'wait', selector: '', value: '1200', label: 'המתנת קריאה' },
-      { type: 'screenshot', selector: '', value: 'Landing Check', label: 'צילום דף הבית' },
+      { type: 'goto', selector: '', value: '/', label: 'Load home page' },
+      { type: 'assert', selector: '', value: '', assertKind: 'status_ok', label: 'Assert HTTP 200' },
+      { type: 'scroll', selector: '', value: '60', label: 'Scroll to 60%' },
+      { type: 'wait', selector: '', value: '1200', label: 'Reading dwell' },
+      { type: 'screenshot', selector: '', value: 'Landing Check', label: 'Capture home screenshot' },
     ];
     syncFormFromConfig();
-    showToast('נטענה משימת בדיקת דף הבית + גלילה + צילום.');
+    showToast('Loaded landing page + scroll + screenshot scenario.');
   };
 
   $('btn-add-page').onclick = () => {
@@ -1850,7 +1850,7 @@ function wireActions() {
     state.config.targetUrl = `${location.origin}/demo-site`;
     state.config.pages = ['/', '/about', '/pricing', '/contact'];
     syncFormFromConfig();
-    showToast('הוגדרה כתובת אתר הניסיון המובנה.');
+    showToast('Target URL set to built-in demo site.');
   };
 
   $('btn-demo-preset').onclick = () => {
@@ -1871,7 +1871,7 @@ function wireActions() {
     state.config.sessionPersistence = { enabled: true, returningUserRate: 50, profilePoolSize: 5 };
     state.config.snippet = `<script>\nconsole.log('[QA-Monitor] Synthetic snippet active on', location.pathname);\n</script>`;
     syncFormFromConfig();
-    showToast('נטענה בדיקת ניסיון גלויה (3 ביקורים). לחץ על "הפעל הרצה ▶" לצפייה בדפדפן חי!');
+    showToast('Loaded visible demo preset (3 visits). Click "Start Run ▶" to watch!');
   };
 
   $('btn-apply-recommended-conc').onclick = () => {
@@ -1879,7 +1879,7 @@ function wireActions() {
     state.config.minConcurrency = 1;
     state.config.concurrency = state.system.concurrencyAdvice.recommended;
     syncFormFromConfig();
-    showToast(`המקביליות הותאמה אוטומטית לטווח 1–${state.config.concurrency}.`);
+    showToast(`Concurrency automatically matched to 1–${state.config.concurrency}.`);
   };
 
   document.querySelectorAll('.preset-scale-btn').forEach((btn) => {
@@ -1906,8 +1906,8 @@ function wireActions() {
         mode: (visits >= 1000 || engine === 'http_fast') ? 'burst' : 'natural_peaks',
       };
       syncFormFromConfig();
-      const modeTag = engine === 'http_fast' ? 'HTTP Fast ללא דפדפן' : `Headless ברקע, מצב זיכרון: ${ramMode}`;
-      showToast(`הוגדרה ריצת סקאלה של ${visits.toLocaleString('he-IL')} סשנים (מקביליות ${minConc}–${maxConc}, השהיה ${state.config.interVisitDelayMs}ms, ${modeTag}).`);
+      const modeTag = engine === 'http_fast' ? 'HTTP Fast (Browserless)' : `Headless background, RAM mode: ${ramMode}`;
+      showToast(`Configured scale run of ${visits.toLocaleString('en-US')} sessions (concurrency ${minConc}–${maxConc}, delay ${state.config.interVisitDelayMs}ms, ${modeTag}).`);
     };
   });
 
@@ -1920,15 +1920,15 @@ function wireActions() {
       if (!badge) return;
       if (res.email?.configured) {
         badge.textContent = res.email.isFreeOwnerPilot
-          ? 'מחובר (Owner Pilot)'
-          : 'מחובר (מפתח API)';
+          ? 'Connected (Owner Pilot)'
+          : 'Connected (API Key)';
         $('btn-create-live-inbox').disabled = false;
         badge.style.color = '#4ade80';
         if (pilotBox) pilotBox.style.display = '';
       } else {
         // Optional feature: no key means no inbox — the box simply stays out of the way instead of
         // asking the operator to set an environment variable that traffic generation never needs.
-        badge.textContent = 'לא מוגדר — תיבת מייל זמנית כבויה';
+        badge.textContent = 'Unconfigured — live inbox disabled';
         badge.style.color = '#94a3b8';
         if (pilotBox) pilotBox.style.display = 'none';
       }
@@ -1965,7 +1965,7 @@ function wireActions() {
         await navigator.clipboard.writeText(addr);
         showToast('Inbox address copied.');
       } catch {
-        showToast('העתק ידנית מהשדה.', true);
+        showToast('Please copy manually from the field.', true);
       }
     };
   }
@@ -1975,31 +1975,31 @@ function wireActions() {
       if (!currentLiveInboxId) return;
       const btn = $('btn-check-live-otp');
       btn.disabled = true;
-      btn.textContent = 'בודק מייל...';
+      btn.textContent = 'Checking inbox...';
       try {
         const res = await api(`/api/email/code/${encodeURIComponent(currentLiveInboxId)}`);
         if (res.status === 'link_confirmed' && res.confirmationUrl) {
-          $('live-otp-result').textContent = '✅ המייל אומת אוטומטית! (נמצא ואושר לינק אימות מהמייל)';
+          $('live-otp-result').textContent = '✅ Email verified automatically! (confirmation link opened)';
           $('live-otp-result').style.color = '#4ade80';
-          showToast('התקבל מייל עם לינק אימות והוא אושר אוטומטית!');
+          showToast('Confirmation link received and verified automatically!');
         } else if (res.status === 'code' && res.code) {
-          $('live-otp-result').textContent = `🔑 קוד אימות: ${res.code}`;
+          $('live-otp-result').textContent = `🔑 Verification Code: ${res.code}`;
           $('live-otp-result').style.color = '#4ade80';
           try { await navigator.clipboard.writeText(String(res.code)); } catch {}
           showToast('Verification code received.');
         } else if (res.status === 'message_received') {
-          $('live-otp-result').textContent = `📩 התקבל מייל בתיבה: "${res.subject || 'הודעה חדשה'}"`;
+          $('live-otp-result').textContent = `📩 Email received: "${res.subject || 'New message'}"`;
           $('live-otp-result').style.color = '#4ade80';
-          showToast(`התקבל מייל בתיבה: ${res.subject || ''}`);
+          showToast(`Email received: ${res.subject || ''}`);
         } else {
-          $('live-otp-result').textContent = `⏳ עדיין ממתין למייל (${res.status})... נסה שוב בעוד 2 שניות`;
-          showToast('עדיין לא הגיע קוד אימות — המתן 2 שניות ונסה שוב.');
+          $('live-otp-result').textContent = `⏳ Still waiting for email (${res.status})... try again in 2s`;
+          showToast('No verification code received yet — wait 2 seconds and retry.');
         }
       } catch (err) {
         showToast(err.message, true);
       } finally {
         btn.disabled = false;
-        btn.textContent = '🔑 שלוף קוד אימות (OTP)';
+        btn.textContent = 'Check verification code';
       }
     };
   }
@@ -2042,7 +2042,7 @@ function wireActions() {
     state.config.personas = structuredClone(state.defaultConfig.personas);
     renderPersonas();
     renderJsonPreview();
-    showToast('הפרסונות אופסו לברירת המחדל.');
+    showToast('Personas reset to defaults.');
   };
 
   $('btn-sample-snippet').onclick = () => {
@@ -2059,22 +2059,22 @@ function wireActions() {
     collectSimpleFieldsToConfig();
     const servers = state.config.proxy?.servers || [];
     if (!servers.length) {
-      showToast('הזן לפחות שרת Proxy אחד בתיבה כדי לבדוק.', true);
+      showToast('Enter at least one proxy server to test.', true);
       return;
     }
     const btn = $('btn-test-proxies');
     btn.disabled = true;
-    btn.textContent = 'בודק שרתי Proxy...';
+    btn.textContent = 'Testing proxies...';
     try {
       const res = await api('/api/proxies/test', { method: 'POST', body: JSON.stringify({ servers }) });
       renderProxyTestResults(res.results);
       const okCount = (res.results || []).filter(r => r.ok).length;
-      showToast(`בדיקת Proxies הושלמה: ${okCount} מתוך ${res.results.length} תקינים.`);
+      showToast(`Proxy test complete: ${okCount} of ${res.results.length} passed.`);
     } catch (err) {
       showToast(err.message, true);
     } finally {
       btn.disabled = false;
-      btn.textContent = 'בדוק תקינות Proxies';
+      btn.textContent = 'Test Proxies';
     }
   };
 
@@ -2082,7 +2082,7 @@ function wireActions() {
     try {
       const res = await api('/api/profiles', { method: 'DELETE' });
       renderProfiles(res.profiles);
-      showToast('כל פרופילי ה-Persistent נמחקו.');
+      showToast('All persistent profiles cleared.');
     } catch (err) {
       showToast(err.message, true);
     }
@@ -2094,7 +2094,7 @@ function wireActions() {
       const res = await api('/api/config', { method: 'PUT', body: JSON.stringify(state.config) });
       state.config = res.config;
       syncFormFromConfig();
-      showToast('ההגדרות נשמרו ל-config.json ול-proxies.txt בהצלחה!');
+      showToast('Settings saved to config.json and proxies.txt!');
     } catch (err) {
       showToast(err.message, true);
     }
@@ -2112,7 +2112,7 @@ function wireActions() {
       state.activeProfileId = res.activeProfileId || id;
       syncFormFromConfig();
       renderSiteProfilesBar();
-      showToast(`הפרופיל "${res.profile.name}" נטען למערכת ומוכן — פשוט לחץ "הפעל הרצה ▶"!`);
+      showToast(`Profile "${res.profile.name}" loaded — click "Start Run ▶" to begin!`);
     } catch (err) {
       showToast(err.message, true);
     }
@@ -2131,7 +2131,7 @@ function wireActions() {
       state.siteProfiles = res.profiles || state.siteProfiles;
       state.activeProfileId = res.activeProfileId || id;
       renderSiteProfilesBar();
-      showToast(`השינויים נשמרו בפרופיל "${res.profile.name}"!`);
+      showToast(`Changes saved to profile "${res.profile.name}"!`);
     } catch (err) {
       showToast(err.message, true);
     }
@@ -2149,7 +2149,7 @@ function wireActions() {
     const name = $('new-profile-name').value.trim();
     const description = $('new-profile-desc').value.trim();
     if (!name) {
-      showToast('הזן שם לפרופיל החדש.', true);
+      showToast('Enter a name for the new profile.', true);
       return;
     }
     try {
@@ -2165,7 +2165,7 @@ function wireActions() {
       $('new-profile-desc').value = '';
       $('new-profile-drawer').classList.remove('open');
       renderSiteProfilesBar();
-      showToast(`נוצר פרופיל חדש: "${res.profile.name}"!`);
+      showToast(`Created new profile: "${res.profile.name}"!`);
     } catch (err) {
       showToast(err.message, true);
     }
@@ -2179,7 +2179,7 @@ function wireActions() {
       state.siteProfiles = res.profiles || [];
       state.activeProfileId = res.activeProfileId || null;
       renderSiteProfilesBar();
-      showToast('הפרופיל נמחק.');
+      showToast('Profile deleted.');
     } catch (err) {
       showToast(err.message, true);
     }
@@ -2190,7 +2190,7 @@ function wireActions() {
       collectSimpleFieldsToConfig();
       const res = await api('/api/run/start', { method: 'POST', body: JSON.stringify({ config: state.config, streamMode: false }) });
       renderRunStatus(res.status);
-      showToast('ההרצה הופעלה! עקוב אחר הלוגים והמקביליות בזמן אמת.');
+      showToast('Run started! Monitor live logs and concurrency.');
     } catch (err) {
       showToast(err.message, true);
     }
@@ -2202,7 +2202,7 @@ function wireActions() {
         collectSimpleFieldsToConfig();
         const res = await api('/api/run/start', { method: 'POST', body: JSON.stringify({ config: state.config, streamMode: true }) });
         renderRunStatus(res.status);
-        showToast('🌊 מצב נחלים רציפים הופעל! ראשי הצוות ב-AI ישגרו גלים אוטומטית עד שתלחץ עצור.');
+        showToast('🌊 Continuous stream mode started! Waves will run until you click Stop.');
       } catch (err) {
         showToast(err.message, true);
       }
@@ -2213,7 +2213,7 @@ function wireActions() {
     try {
       const res = await api('/api/run/pause', { method: 'POST' });
       renderRunStatus(res.status);
-      showToast('הרצה הושהתה.');
+      showToast('Run paused.');
     } catch (err) {
       showToast(err.message, true);
     }
@@ -2223,7 +2223,7 @@ function wireActions() {
     try {
       const res = await api('/api/run/resume', { method: 'POST' });
       renderRunStatus(res.status);
-      showToast('הרצה חודשה.');
+      showToast('Run resumed.');
     } catch (err) {
       showToast(err.message, true);
     }
@@ -2233,7 +2233,7 @@ function wireActions() {
     try {
       const res = await api('/api/run/stop', { method: 'POST' });
       renderRunStatus(res.status);
-      showToast('פקודת עצירה נשלחה.');
+      showToast('Stop signal sent.');
     } catch (err) {
       showToast(err.message, true);
     }
@@ -2244,7 +2244,7 @@ function wireActions() {
       const res = await api('/api/config/reset', { method: 'POST' });
       state.config = res.config;
       syncFormFromConfig();
-      showToast('קובץ config.json אופס לברירת המחדל.');
+      showToast('config.json reset to defaults.');
     } catch (err) {
       showToast(err.message, true);
     }
@@ -2253,9 +2253,9 @@ function wireActions() {
   $('btn-copy-json').onclick = async () => {
     try {
       await navigator.clipboard.writeText($('json-preview').textContent);
-      showToast('ה-JSON הועתק ללוח!');
+      showToast('JSON copied to clipboard!');
     } catch {
-      showToast('לא ניתן להעתיק ללוח בדפדפן זה.', true);
+      showToast('Clipboard copy unavailable in this browser.', true);
     }
   };
 
@@ -2272,7 +2272,7 @@ function wireActions() {
       state.config.proxy.preferredCountries = [...state.tier1Defaults];
       renderCountriesSelector();
       renderJsonPreview();
-      showToast('סומנו 5 מדינות Tier-1 האיכותיות כברירת מחדל.');
+      showToast('Selected 5 Tier-1 default countries.');
     };
   }
   if ($('btn-countries-all')) {
@@ -2298,7 +2298,7 @@ function wireActions() {
       const directive = $('ai-directive-input')?.value.trim() || '';
       try {
         const res = await api('/api/ai/directive', { method: 'POST', body: JSON.stringify({ directive }) });
-        showToast(res.liveDelivered ? 'ההנחיה שוגרה ישירות לצי הפעיל!' : 'ההנחיה נשמרה למשימה הבאה.');
+        showToast(res.liveDelivered ? 'Directive dispatched to active fleet!' : 'Directive saved for next run.');
       } catch (err) {
         showToast(err.message, true);
       }
@@ -2316,7 +2316,7 @@ function wireActions() {
     const btn = $('btn-ai-chat-send');
     if (btn) {
       btn.disabled = true;
-      btn.textContent = 'מפקד AI חושב...';
+      btn.textContent = 'AI Commander thinking...';
     }
     try {
       const res = await api('/api/ai/chat', {
@@ -2343,11 +2343,11 @@ function wireActions() {
       }
       renderAiChatFeed({ forceScroll: true });
     } catch (err) {
-      showToast('שגיאת מפקח AI: ' + err.message, true);
+      showToast('AI Commander error: ' + err.message, true);
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.textContent = 'שלח למפקד ↗';
+        btn.textContent = 'Send to Commander ↗';
       }
     }
   };
@@ -2369,7 +2369,7 @@ function wireActions() {
   if ($('btn-live-pause')) {
     $('btn-live-pause').onclick = () => {
       state.livePreviewPaused = !state.livePreviewPaused;
-      $('btn-live-pause').textContent = state.livePreviewPaused ? '▶️ המשך תצוגה' : '⏸️ השהה תצוגה';
+      $('btn-live-pause').textContent = state.livePreviewPaused ? '▶️ Resume Preview' : '⏸️ Pause Preview';
       api('/api/run/preview', { method: 'POST', body: JSON.stringify({ active: !state.livePreviewPaused && !state.livePreviewHidden }) }).catch(() => {});
     };
   }
@@ -2378,7 +2378,7 @@ function wireActions() {
       state.livePreviewHidden = !state.livePreviewHidden;
       const body = $('live-screen-body');
       if (body) body.style.display = state.livePreviewHidden ? 'none' : 'block';
-      $('btn-live-toggle').textContent = state.livePreviewHidden ? '👁️ הצג תצוגה' : '🙈 הסתר';
+      $('btn-live-toggle').textContent = state.livePreviewHidden ? '👁️ Show Preview' : '🙈 Hide';
       api('/api/run/preview', { method: 'POST', body: JSON.stringify({ active: !state.livePreviewPaused && !state.livePreviewHidden }) }).catch(() => {});
     };
   }
@@ -2388,7 +2388,7 @@ function wireActions() {
       if (feed) {
         feed.scrollTop = feed.scrollHeight;
         $('btn-ai-scroll-bottom').classList.remove('has-unread');
-        $('btn-ai-scroll-bottom').textContent = '⬇️ חזור לתחתית הצ׳אט';
+        $('btn-ai-scroll-bottom').textContent = '⬇️ Scroll to Bottom';
       }
     };
   }
@@ -2397,7 +2397,7 @@ function wireActions() {
       const feed = $('ai-chat-feed');
       if (!feed) return;
       const expanded = feed.classList.toggle('expanded');
-      $('btn-ai-expand').textContent = expanded ? '⛶ כווץ חלון צ׳אט' : '⛶ הרחב חלון צ׳אט';
+      $('btn-ai-expand').textContent = expanded ? '⛶ Collapse Chat' : '⛶ Expand Chat';
     };
   }
   if ($('ai-chat-feed')) {
@@ -2406,7 +2406,7 @@ function wireActions() {
       const btn = $('btn-ai-scroll-bottom');
       if (feed && btn && (feed.scrollHeight - feed.scrollTop - feed.clientHeight) <= 35) {
         btn.classList.remove('has-unread');
-        btn.textContent = '⬇️ חזור לתחתית הצ׳אט';
+        btn.textContent = '⬇️ Scroll to Bottom';
       }
     });
   }
@@ -2473,7 +2473,7 @@ function handleSseEvent(type, rawData) {
       if (data && data.config) {
         state.config = data.config;
         syncFormFromConfig();
-        showToast('⚙️ ההגדרות סונכרנו אוטומטית מהמפקח.');
+        showToast('⚙️ Configuration synced from AI Commander.');
       }
       break;
     case 'report_ready': {
@@ -2481,7 +2481,7 @@ function handleSseEvent(type, rawData) {
       if (btn && (data.pdfFile || data.htmlFile)) {
         btn.href = '/api/reports/' + (data.pdfFile || data.htmlFile);
       }
-      showToast('📄 דוח PDF מפורט ומסוכם ב-AI בעברית מוכן להורדה!');
+      showToast('📄 AI-summarized PDF report is ready for download!');
       break;
     }
     case 'ai_feed': {
@@ -2542,14 +2542,14 @@ async function init() {
     if (!d.ok) throw new Error(d.error || 'failed');
     const selectedTier = $('proxy-tier')?.value || state.config?.proxy?.tier || d.tier || 'auto';
     const tierLabel = selectedTier === 'datacenter'
-      ? '🏢 מצב פעיל: זול (דאטה־סנטר בלבד — 0MB רזידנציאלי)'
-      : (selectedTier === 'residential' ? '🌍 מצב פעיל: יקר (רזידנציאלי מדוד)' : '⚙️ מצב פעיל: אוטומטי (לפי הרשימה)');
+      ? '🏢 Active Mode: Datacenter Only (0MB residential)'
+      : (selectedTier === 'residential' ? '🌍 Active Mode: Residential (metered)' : '⚙️ Active Mode: Auto (follow list)');
     const tail = d.exhausted
-      ? ' · המכסה נוצלה — הריצה תעבור לדאטה־סנטר'
+      ? ' · Budget exhausted — falling back to datacenter'
       : '';
-    el.textContent = `${tierLabel} | דאטה־סנטר: ${d.datacenterCount ?? 0} שרתים | רזידנציאלי: ${d.poolSize ?? 0} סשנים · נוצלו ${d.usedMb}/${d.budgetMb}MB (נותרו ${d.remainingMb}MB · ${d.visits} ביקורים)${tail}`;
+    el.textContent = `${tierLabel} | Datacenter: ${d.datacenterCount ?? 0} servers | Residential: ${d.poolSize ?? 0} sessions · Used ${d.usedMb}/${d.budgetMb}MB (${d.remainingMb}MB remaining · ${d.visits} visits)${tail}`;
   } catch {
-    el.textContent = 'מאגר פרוקסים: לא ניתן לקרוא סטטוס מהשרת';
+    el.textContent = 'Proxy Pool: Unable to fetch status from server';
   }
 }
 $('proxy-tier')?.addEventListener('change', refreshResidentialStatus);
@@ -2586,7 +2586,7 @@ setInterval(refreshResidentialStatus, 20000);
     renderSiteProfilesBar();
     connectSSE();
   } catch (err) {
-    showToast('שגיאה בטעינת הדאשבורד: ' + err.message, true);
+    showToast('Dashboard load error: ' + err.message, true);
   }
 }
 

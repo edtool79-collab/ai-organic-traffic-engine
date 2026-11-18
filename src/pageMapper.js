@@ -9,7 +9,7 @@ function resolveInspectTargetUrl(rawTargetUrl, pagePath = '/') {
   }
   const base = new URL(baseStr);
   if (!['http:', 'https:'].includes(base.protocol)) {
-    throw new Error('כתובת היעד חייבת להתחיל ב-http:// או https://');
+    throw new Error('Target URL must start with http:// or https://');
   }
   const baseNormalized = base.pathname && base.pathname !== '/' ? base.pathname.replace(/\/$/, '') : '';
   const rel = pathStr.startsWith('/') ? pathStr : '/' + pathStr;
@@ -35,10 +35,10 @@ function isDisallowedPrivateHost(hostname) {
 async function inspectPageElements({ targetUrl, pagePath = '/' }) {
   const finalUrlObj = resolveInspectTargetUrl(targetUrl, pagePath);
   if (!['http:', 'https:'].includes(finalUrlObj.protocol)) {
-    throw new Error('ניתן למפות רק כתובות http:// או https://');
+    throw new Error('Only http:// or https:// URLs can be inspected');
   }
   if (isDisallowedPrivateHost(finalUrlObj.hostname)) {
-    throw new Error('מיפוי כתובות רשת פרטיות/פנימיות אינו מורשה.');
+    throw new Error('Inspecting private/internal network addresses is not permitted.');
   }
 
   const finalUrl = finalUrlObj.toString();
@@ -59,7 +59,7 @@ async function inspectPageElements({ targetUrl, pagePath = '/' }) {
       const resp = await page.goto(finalUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
       status = resp ? resp.status() : 0;
     } catch (err) {
-      throw new Error(`טעינת העמוד נכשלה (${err.message})`);
+      throw new Error(`Page load failed (${err.message})`);
     }
 
     await page.waitForTimeout(900);

@@ -225,13 +225,13 @@ function getCdpIntegrationsStatus() {
       installed: Boolean(browserlessVersion),
       version: browserlessVersion,
       proxyChainVersion,
-      description: 'Browserless CDP Pool + Proxy-Chain Anonymizer (חיבור CDP מהיר וניהול בריכת זיכרון)',
+      description: 'Browserless CDP Pool + Proxy-Chain Anonymizer (fast CDP connection & memory pool)',
     },
     lightpanda: {
       installed: Boolean(lightpandaVersion),
       version: lightpandaVersion,
       platformNote: process.platform === 'win32'
-        ? 'חבילת @lightpanda/browser מותקנת (על Windows פועלת במצב Lightpanda CDP Ultra-Lite ~25MB או דרך WSL/Docker בפורט 9222)'
+        ? '@lightpanda/browser package installed (runs in Lightpanda CDP Ultra-Lite ~25MB mode or via WSL/Docker on port 9222)'
         : 'Lightpanda Native CDP Binary Ready',
     },
     activeDaemons: cdpDaemons.size,

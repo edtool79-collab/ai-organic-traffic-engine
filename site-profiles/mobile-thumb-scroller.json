@@ -1,7 +1,7 @@
 {
   "id": "mobile-thumb-scroller",
-  "name": "חוויית מובייל אמיתית (iPhone 14 + Pixel 7): גלילה ולחיצה",
-  "description": "מריץ 100% מכשירי מובייל אמולטור, בודק גלילה באגודל, קריאה אנושית, התאמה רספונסיבית ולחיצת כפתור ניווט.",
+  "name": "Mobile UX Experience (iPhone 14 + Pixel 7): Scroll & Tap",
+  "description": "Runs 100% mobile device emulation, testing thumb scrolling, mobile article reading, responsive layout, and CTA tapping.",
   "category": "mobile_ux",
   "isBuiltin": true,
   "config": {
@@ -26,56 +26,56 @@
         "selector": "",
         "value": "/",
         "assertKind": "text_contains",
-        "label": "פתיחת האתר בתצוגת מובייל"
+        "label": "Open site in mobile viewport"
       },
       {
         "type": "wait",
         "selector": "",
         "value": "1200",
         "assertKind": "text_contains",
-        "label": "המתנה ליציבות תצוגה"
+        "label": "Wait for layout stability"
       },
       {
         "type": "scroll",
         "selector": "",
         "value": "45",
         "assertKind": "text_contains",
-        "label": "גלילת אמצע מסך מובייל (45%)"
+        "label": "Mid-page mobile thumb scroll (45%)"
       },
       {
         "type": "read_article",
         "selector": "",
         "value": "5500",
         "assertKind": "text_contains",
-        "label": "קריאה אנושית מותאמת מובייל"
+        "label": "Mobile-paced human reading"
       },
       {
         "type": "scroll_to",
         "selector": "button[data-action=\"cta_explore\"]",
         "value": "",
         "assertKind": "text_contains",
-        "label": "גלילה אל כפתור תחתון"
+        "label": "Scroll to bottom CTA button"
       },
       {
         "type": "click",
         "selector": "button[data-action=\"cta_explore\"]",
         "value": "",
         "assertKind": "text_contains",
-        "label": "לחיצה על כפתור במובייל"
+        "label": "Tap CTA button on mobile"
       },
       {
         "type": "human_browse",
         "selector": "",
         "value": "3000",
         "assertKind": "text_contains",
-        "label": "גלישה חופשית קצרה במובייל"
+        "label": "Brief free browsing on mobile"
       },
       {
         "type": "screenshot",
         "selector": "",
         "value": "Mobile Viewport Audit",
         "assertKind": "text_contains",
-        "label": "צילום מסך מובייל סופי"
+        "label": "Capture final mobile viewport screenshot"
       }
     ],
     "keepBrowserOpenMs": 2000,

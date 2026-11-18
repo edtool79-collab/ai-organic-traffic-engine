@@ -24,11 +24,11 @@ const { classify } = require(path.join(ROOT, 'src', 'targetPreflight'));
 const residentialPool = require(path.join(ROOT, 'src', 'residentialPool'));
 
 const VERDICT_HE = {
-  open: 'פתוח — אין גדר אימות',
-  cf_interstitial: 'חסימת Cloudflare ברמת הדומיין (מוניטין IP)',
-  site_tick: 'האתר דורש סימון וי ידני (Turnstile אינטראקטיבי)',
-  dead: 'שרשרת ההפניות נגמרה בכתובת שאינה פעילה',
-  unknown: 'לא זוהה — צריך להסתכל על התמונה',
+  open: 'Open — no verification gate detected',
+  cf_interstitial: 'Cloudflare domain-level interstitial (IP reputation)',
+  site_tick: 'Site requires interactive manual verification (Turnstile)',
+  dead: 'Redirect chain ended at an unreachable URL',
+  unknown: 'Unknown — inspect the captured screenshot',
 };
 
 function parseArgs(argv) {

@@ -1,7 +1,7 @@
 {
   "id": "landing-forms-qa",
-  "name": "אתר תדמית וטופסי לידים (QA דמו)",
-  "description": "בודק זמינות דפים, מילוי טופס יצירת קשר ואימות שהשרת מחזיר אישור שליחה תקין.",
+  "name": "Landing Page & Lead Forms (Demo QA)",
+  "description": "Verifies page availability, fills out the contact form, and asserts that the server returns a valid submission confirmation.",
   "category": "forms_qa",
   "isBuiltin": true,
   "config": {
@@ -27,56 +27,56 @@
         "selector": "",
         "value": "/contact",
         "assertKind": "text_contains",
-        "label": "פתיחת דף צור קשר"
+        "label": "Open contact page"
       },
       {
         "type": "fill",
         "selector": "input[name=\"name\"]",
         "value": "Avi QA Tester",
         "assertKind": "text_contains",
-        "label": "הזנת שם מלא"
+        "label": "Enter full name"
       },
       {
         "type": "fill",
         "selector": "input[name=\"email\"]",
         "value": "qa@hirepulse.dev",
         "assertKind": "text_contains",
-        "label": "הזנת אימייל"
+        "label": "Enter email address"
       },
       {
         "type": "select",
         "selector": "select[name=\"topic\"]",
         "value": "demo",
         "assertKind": "text_contains",
-        "label": "בחירת נושא"
+        "label": "Select inquiry topic"
       },
       {
         "type": "fill",
         "selector": "textarea[name=\"message\"]",
         "value": "Automated end-to-end form QA check",
         "assertKind": "text_contains",
-        "label": "הזנת הודעה"
+        "label": "Enter message body"
       },
       {
         "type": "click",
         "selector": "button[type=\"submit\"]",
         "value": "",
         "assertKind": "text_contains",
-        "label": "שליחת הטופס"
+        "label": "Submit contact form"
       },
       {
         "type": "wait",
         "selector": "",
         "value": "400",
         "assertKind": "text_contains",
-        "label": "המתנה לתשובה"
+        "label": "Wait for submission response"
       },
       {
         "type": "assert",
         "selector": "#form-status",
         "value": "Form received by QA Sandbox!",
         "assertKind": "text_contains",
-        "label": "אימות הודעת הצלחה"
+        "label": "Verify confirmation banner"
       }
     ],
     "keepBrowserOpenMs": 2000,

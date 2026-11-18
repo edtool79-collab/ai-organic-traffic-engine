@@ -1,107 +1,98 @@
-# הגרסה המקומית מול הגרסה הציבורית
+# Local Copy vs. Remote Repository
 
-שני עותקים של **אותו קוד**. ההבדל היחיד הוא מה שבתיקייה: קבצים פרטיים נשארים אצלך, הקוד עולה ל־GitHub.
+Two copies of the **same codebase**. The only difference is what stays on your machine: private files remain local, while application code is pushed to your private backup repository on GitHub.
 
 ```
-c:\Users\sales\Downloads\גדכגד\web-traffic-generation     ← העותק המקומי שלך (הכול)
+<local-workspace>/web-traffic-generation                  ← Your local working copy (everything)
         │
-        │  git push  (רק מה שלא ב-.gitignore)
+        │  git push private main  (only tracked files not in .gitignore)
         ▼
-github.com/Violet329/web-traffic-generation              ← הגרסה הציבורית (קוד בלבד)
+github.com/edtool79-collab/web-traffic-generation-private ← Your private GitHub backup (code only)
 ```
 
 ---
 
-## 1. מה עולה ומה נשאר
+## 1. What Gets Committed vs. What Stays Local
 
-| מה | איפה | עולה ל־GitHub? | למה |
+| Item | Location | Committed to Git? | Reason |
 |---|---|---|---|
-| `src/` — 24 מודולים | מקומי | ✅ **כן** | זה המוצר |
-| `dashboard/` — 46 routes + UI | מקומי | ✅ **כן** | זה המוצר |
-| `tests/`, `tools/` | מקומי | ✅ **כן** | |
-| `.env.example` | מקומי | ✅ **כן** | תבנית ריקה, מראה אילו משתנים קיימים |
-| `.env.local` | מקומי | ❌ **לא** | **המפתחות שלך** |
-| `config.json` | מקומי | ❌ לא | היעד, הפרוקסים, ה־personas שלך |
-| `data/` | מקומי | ❌ לא | מכסת בייטים, קוקיז, ניקוד פרוקסי |
-| `site-profiles/` (האישיים) | מקומי | ❌ לא | רק 9 תבניות כלליות עולות |
-| `session-profiles/`, `storage/` | מקומי | ❌ לא | פרופילים עם קוקיז אמיתיים |
-| `reports/`, `runs/` | מקומי | ❌ לא | נתוני הרצה |
-| `scratch/` | מקומי | ❌ לא | סקריפטים זמניים |
-| `sideOps/` | מקומי | ⚠️ **החלטה שלך** | כרגע ב־`.gitignore` |
-| `tools/google-workspace-account/` | מקומי | ⚠️ **החלטה שלך** | כרגע ב־`.gitignore` |
+| `src/` — 24 modules | Local | ✅ **Yes** | Core application |
+| `dashboard/` — routes + UI | Local | ✅ **Yes** | Core application |
+| `tests/`, `tools/` | Local | ✅ **Yes** | Verification & CLI utilities |
+| `.env.example` | Local | ✅ **Yes** | Empty template showing supported variables |
+| `.env.local` | Local | ❌ **No** | **Your private API keys & tokens** |
+| `config.json` | Local | ❌ No | Your active target URL, proxies, and personas |
+| `data/` | Local | ❌ No | Residential byte ledger, proxy geo metadata, scoreboards |
+| `site-profiles/` (custom) | Local | ❌ No | Only the 9 clean built-in starter templates are tracked |
+| `session-profiles/`, `storage/` | Local | ❌ No | Persistent browser profiles with live cookies |
+| `reports/`, `runs/` | Local | ❌ No | Local run telemetry and generated reports |
+| `scratch/` | Local | ❌ No | Temporary scratch scripts |
+| `sideOps/` | Local | ❌ No | Excluded via `.gitignore` |
+| `tools/google-workspace-account/` | Local | ❌ No | Excluded via `.gitignore` |
 
-**כלל הברזל:** אם זה קובץ `.js` — הוא עולה. אם זה סוד, קונפיג אישי או נתוני הרצה — הוא נשאר.
+**Core Rule:** Source code (`.js`, `.html`, `.css`) and clean templates are tracked. Secrets, personal configuration, proxy lists, and runtime state stay strictly local.
 
 ---
 
-## 2. המפתחות — מה זה כל אחד
+## 2. Environment Variables & Keys (`.env.local`)
 
-| משתנה | מה זה | מאיפה משיגים | חובה? |
+| Variable | Purpose | Source | Required? |
 |---|---|---|---|
-| `HIREPULSE_OWNER_PILOT_TOKEN` | טוקן הבעלים החינמי של שער המייל שלך | הסוד `API_KEYS['owner-pilot']` ב־Worker `hirepulse-gateway` שלך | לא |
-| `HIREPULSE_EMAIL_API_KEY` | מפתח בתשלום לאותה מערכת | `https://gethirepulse.xyz/credits` | לא |
-| `HIREPULSE_OWNER_PILOT_FILE` | נתיב לקובץ JSON מקומי שמחזיק את הטוקן | אתה יוצר | לא |
-| `WTG_API_TOKEN` | סיסמה ל־API העתידי (`/v1/jobs`, `/mcp`) | **אתה ממציא אותה** — `openssl rand -hex 32` | רק כשיש API |
+| `HIREPULSE_OWNER_PILOT_TOKEN` | Owner-pilot bearer token for your live inbox gateway | `API_KEYS['owner-pilot']` on your `hirepulse-gateway` Worker | No |
+| `HIREPULSE_EMAIL_API_KEY` | Commercial API key for the same inbox service | `https://gethirepulse.xyz/credits` | No |
+| `HIREPULSE_OWNER_PILOT_FILE` | Path to a local JSON file containing the owner-pilot token | Local file | No |
+| `OLLAMA_API_KEY` | Ollama Cloud API key for AI Fleet Commander & worker steps | Ollama Cloud | No |
+| `ULLM_API_KEY` | UncensoredLLM API key for direct or failover AI routing | UncensoredLLM | No |
+| `WTG_API_TOKEN` | Reserved bearer token for future HTTP/MCP endpoints | Operator-generated (`openssl rand -hex 32`) | Optional |
 
-**אף אחד מהם לא "מוציאים" מספק חיצוני.** שלושת הראשונים שייכים למערכת **שלך** (`gethirepulse.xyz`), והרביעי אתה מייצר בעצמך.
+### How Live Inboxes Work
 
-### למה פתיחת תיבות המייל לא עובדת
-
-התיבות לא נוצרות מקומית. `src/emailInboxClient.js` קורא ל־`https://gethirepulse.xyz/v1/email/inboxes` עם `Authorization: Bearer <token>`. בלי טוקן — אין קריאה. הסטטוס בפועל, נמדד:
+Live inboxes are not created locally. `src/emailInboxClient.js` calls `https://gethirepulse.xyz/v1/email/inboxes` with `Authorization: Bearer <token>`. Without a configured token, the inbox client reports:
 
 ```json
 { "configured": false, "mode": "unconfigured" }
 ```
 
-זו כל הסיבה. `emailsCreated` נשאר 0, ולכן גם טופסי ההרשמה לא נשלחים.
+### How to Enable Live Inboxes
 
-### איך מפעילים (בלי לשרוף כסף)
-
-1. העתק את התבנית:
+1. Copy the template:
+   ```powershell
+   Copy-Item .env.example .env.local
    ```
-   copy .env.example .env.local
-   ```
-2. פתח את `.env.local` ומלא **אחד** מהשניים: `HIREPULSE_OWNER_PILOT_TOKEN` (חינם, שלך) או `HIREPULSE_EMAIL_API_KEY` (בתשלום).
-3. הפעל מחדש את הדשבורד. `dashboard/server.js` טוען את `.env.local` לבד בשורה הראשונה.
-4. בדוק:
-   ```
+2. Open `.env.local` and fill in **one** of `HIREPULSE_OWNER_PILOT_TOKEN` or `HIREPULSE_EMAIL_API_KEY`.
+3. Restart the dashboard (`dashboard/server.js` automatically loads `.env.local` on startup).
+4. Verify status (zero spend):
+   ```powershell
    node -e "console.log(require('./src/emailInboxClient').getEmailClientStatus())"
    ```
-   צריך להראות `configured: true`.
+   It should report `configured: true`.
 
-⚠️ יצירת תיבה **צורכת קרדיט** בשירות שלך. לא מריצים אותה לבדיקה בלי אישור.
-
----
-
-## 3. מה Codex בונה ל־GitHub
-
-Codex עובד על אותו ריפו, אבל פרומפט השחרור שלו מגדיר מה מותר לו לגעת בו. הכלל שהוטל עליו:
-**אף מודול לא מוסר.** רק סודות, קונפיג אישי ונתוני הרצה יורדים.
-
-הוא לא נוגע ב־`.env.local`, לא ב־`config.json`, ולא ב־`data/`. אם הוא מנסה — זו טעות, לא החלטה.
+⚠️ Creating a live inbox consumes service quota/credits. Do not trigger live inbox creation in automated tests without operator approval.
 
 ---
 
-## 4. איך מוודאים שההפרדה לא נשברה
+## 3. Verifying the Boundary Before Pushing
 
-```bat
-:: 1. כלום סודי לא מקומט
-git ls-files | findstr /i "\.env config.json proxies secret native-pilot"
+```powershell
+# 1. Verify no sensitive files are tracked
+git ls-files | Select-String "\.env|config\.json|proxies|secret|license\.key"
 
-:: 2. אין סיסמה בתוך קובץ מקומט
-git grep -n -I -E "://[^/@ ]+:[^/@ ]+@" --cached
+# 2. Verify no credentials exist in staged/tracked files
+git grep -n -I -E "(socks5|http)://[^ \x22@]*:[^ \x22@]*@" --cached
 
-:: 3. כל המודולים כן מקומטים
-git ls-files src | findstr /c:".js"
+# 3. Verify all 24 core modules are tracked
+(git ls-files src | Measure-Object -Line).Lines
 ```
 
-הראשונות חייבות להחזיר **ריק**. השלישית חייבת להחזיר **24** מודולים.
+* Check #1 must only return `.env.example` and `config.example.json`.
+* Check #2 must only return documented placeholders/test fixtures (`user:pass`, `user1:pass`, `${...}`).
+* Check #3 must return **24**.
 
 ---
 
-## 5. כללים
+## 4. Hygiene Rules
 
-- `.env.local` לא נכנס ל־commit, גם לא "לזמן קצר".
-- מפתח שנופל ל־commit — מחליפים אותו. מחיקת השורה לא מוחקת אותו מההיסטוריה.
-- `config.example.json` הוא התבנית הציבורית; `config.json` הוא שלך.
-- כל קובץ חדש עם סוד — שמו נכנס ל־`.gitignore` **לפני** שהוא נוצר, לא אחרי.
+- `.env.local` and `config.json` are never committed, even temporarily.
+- If a real credential ever enters a commit, rotate/revoke it immediately.
+- `config.example.json` is the tracked public template; `config.json` is your local working configuration.
+- Any new file holding credentials or runtime state must be added to `.gitignore` **before** it is created.

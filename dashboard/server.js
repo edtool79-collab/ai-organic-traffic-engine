@@ -268,19 +268,19 @@ function normalizeTargets(rawTargets, fallbackPages) {
 
 function validateAndNormalizeConfig(input) {
   if (!input || typeof input !== 'object') {
-    throw new Error('גוף הבקשה חייב להיות אובייקט JSON תקין.');
+    throw new Error('Request body must be a valid JSON object.');
   }
 
   let targetUrl = typeof input.targetUrl === 'string' ? input.targetUrl.trim() : '';
-  if (!targetUrl) throw new Error('חובה להזין כתובת יעד (targetUrl).');
+  if (!targetUrl) throw new Error('Target URL (targetUrl) is required.');
   let parsedUrl;
   try {
     parsedUrl = new URL(targetUrl);
   } catch {
-    throw new Error('כתובת היעד (targetUrl) אינה כתובת URL תקינה.');
+    throw new Error('Target URL (targetUrl) is not a valid URL.');
   }
   if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
-    throw new Error('כתובת היעד חייבת להתחיל ב-http:// או https://.');
+    throw new Error('Target URL must start with http:// or https://.');
   }
   targetUrl = targetUrl.replace(/\/+$/, '');
 
@@ -293,7 +293,7 @@ function validateAndNormalizeConfig(input) {
     totalDeviceWeight += w;
   }
   if (totalDeviceWeight <= 0) {
-    throw new Error('לפחות פרופיל מכשיר אחד חייב להיות בעל משקל גדול מ-0.');
+    throw new Error('At least one device profile must have a weight greater than 0.');
   }
 
   const rawPersonas = Array.isArray(input.personas) && input.personas.length
@@ -1065,7 +1065,7 @@ app.post('/api/proxies/test', async (req, res) => {
     const rawList = Array.isArray(req.body?.servers) ? req.body.servers : readProxiesTxt();
     const cleaned = rawList.map(s => String(s || '').trim()).filter(s => s && !s.startsWith('#'));
     if (!cleaned.length) {
-      return res.json({ results: [], message: 'לא הוזנו שרתי Proxy לבדיקה.' });
+      return res.json({ results: [], message: 'No proxy servers provided to test.' });
     }
     const results = await checkProxiesBatch(cleaned.slice(0, 50), 5);
     res.json({ results });
@@ -1120,7 +1120,7 @@ app.put('/api/site-profiles/:id', (req, res) => {
 app.post('/api/site-profiles/:id/load', (req, res) => {
   try {
     const profile = getSiteProfile(req.params.id, validateAndNormalizeConfig, PORT);
-    if (!profile) return res.status(404).json({ error: 'פרופיל האתר לא נמצא.' });
+    if (!profile) return res.status(404).json({ error: 'Site profile not found.' });
     const currentCfg = readConfigFromDisk();
     const includeInfra = Boolean(req.body?.includeInfra);
 
@@ -1195,7 +1195,7 @@ app.post('/api/discover', async (req, res) => {
     const rawUrl = typeof req.body?.targetUrl === 'string' ? req.body.targetUrl.trim() : '';
     const parsed = new URL(rawUrl);
     if (!['http:', 'https:'].includes(parsed.protocol)) {
-      return res.status(400).json({ error: 'כתובת היעד חייבת להתחיל ב-http:// או https://' });
+      return res.status(400).json({ error: 'Target URL must start with http:// or https://' });
     }
     const baseOrigin = parsed.origin;
     const basePath = parsed.pathname && parsed.pathname !== '/' ? parsed.pathname.replace(/\/$/, '') : '';
@@ -1254,7 +1254,7 @@ app.post('/api/discover', async (req, res) => {
     const pages = [...discovered].slice(0, 25);
     res.json({ ok: true, rootStatus, pages });
   } catch (err) {
-    res.status(400).json({ error: err.message || 'סריקת האתר נכשלה.' });
+    res.status(400).json({ error: err.message || 'Site discovery failed.' });
   }
 });
 
@@ -1263,12 +1263,12 @@ app.post('/api/inspect-page', async (req, res) => {
     const targetUrl = typeof req.body?.targetUrl === 'string' ? req.body.targetUrl.trim() : '';
     const pagePath = typeof req.body?.pagePath === 'string' ? req.body.pagePath.trim() : '/';
     if (!targetUrl && !/^https?:\/\//i.test(pagePath)) {
-      return res.status(400).json({ error: 'יש להזין כתובת אתר ראשית (targetUrl) או כתובת URL מלאה.' });
+      return res.status(400).json({ error: 'Please provide a targetUrl or full URL.' });
     }
     const mapped = await inspectPageElements({ targetUrl, pagePath });
     res.json({ ok: true, mapped });
   } catch (err) {
-    res.status(400).json({ error: err.message || 'מיפוי חלקי העמוד נכשל.' });
+    res.status(400).json({ error: err.message || 'Page element inspection failed.' });
   }
 });
 
@@ -1311,7 +1311,7 @@ app.get('/api/email/code/:inboxId', async (req, res) => {
     const inboxId = String(req.params.inboxId || '').trim();
     const stored = activeDashboardInboxes.get(inboxId);
     if (!stored || !stored.capability) {
-      return res.status(404).json({ error: 'תיבת המייל לא נמצאה בזיכרון השרת הנוכחי.' });
+      return res.status(404).json({ error: 'Inbox not found in current server memory.' });
     }
     const [result, msgsPayload] = await Promise.all([
       getEmailCode({
@@ -1360,7 +1360,7 @@ app.get('/api/email/code/:inboxId', async (req, res) => {
         address: stored.address,
         status: 'message_received',
         code: null,
-        subject: msgList[0]?.subject || 'הודעה חדשה',
+        subject: msgList[0]?.subject || 'New message',
       });
     }
 
@@ -1371,7 +1371,7 @@ app.get('/api/email/code/:inboxId', async (req, res) => {
       code: null,
     });
   } catch (err) {
-    res.status(400).json({ error: err.message || 'בדיקת קוד האימות נכשלה.' });
+    res.status(400).json({ error: err.message || 'Verification code check failed.' });
   }
 });
 
@@ -1382,10 +1382,10 @@ app.get('/api/reports', (_req, res) => {
 app.get('/api/reports/latest/pdf', (_req, res) => {
   const reports = listSavedReports();
   const latest = reports.find(r => r.pdfFile || r.htmlFile);
-  if (!latest) return res.status(404).send('טרם נוצרו דוחות הרצה.');
+  if (!latest) return res.status(404).send('No run reports generated yet.');
   const targetFile = latest.pdfFile || latest.htmlFile;
   const fullPath = path.join(REPORTS_DIR, path.basename(targetFile));
-  if (!fs.existsSync(fullPath)) return res.status(404).send('קובץ הדוח לא נמצא.');
+  if (!fs.existsSync(fullPath)) return res.status(404).send('Report file not found.');
   if (targetFile.endsWith('.pdf')) {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${path.basename(targetFile)}"`);
@@ -1396,10 +1396,10 @@ app.get('/api/reports/latest/pdf', (_req, res) => {
 app.get('/api/reports/:filename', (req, res) => {
   const safeName = path.basename(String(req.params.filename || ''));
   if (!safeName.startsWith('run-report-') || !/\.(pdf|html|json)$/i.test(safeName)) {
-    return res.status(400).send('שם קובץ לא תקין.');
+    return res.status(400).send('Invalid file name.');
   }
   const fullPath = path.join(REPORTS_DIR, safeName);
-  if (!fs.existsSync(fullPath)) return res.status(404).send('קובץ הדוח לא נמצא.');
+  if (!fs.existsSync(fullPath)) return res.status(404).send('Report file not found.');
   if (safeName.endsWith('.pdf')) {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
@@ -1407,12 +1407,12 @@ app.get('/api/reports/:filename', (req, res) => {
   res.sendFile(fullPath);
 });
 
-// רוטציית IP להקלטות: זכירת הפרוקסי האחרון שנבחר כדי שההקלטה הבאה תיפתח עם IP אחר (ללא חזרה עצמית)
+// Recorder IP rotation: remember the last selected proxy so the next recording opens with a different IP.
 let lastRecorderProxyUrl = '';
 
-// ---- בחירת פרוקסי להקלטה -------------------------------------------------
-// data/proxy-geo.json נבנה ע"י tools/build-proxy-geo.js (ip-api.com חינמי + בדיקת ההצעה).
-// מחזיר מיפוי "host:port" -> { cc, city, ms, offerOk }. לעולם לא נשמרים כאן פרטי התחברות.
+// ---- Recorder proxy selection ---------------------------------------------
+// data/proxy-geo.json is built by tools/build-proxy-geo.js.
+// Returns a map of "host:port" -> { cc, city, ms, offerOk }. Credentials are never stored here.
 function readProxyGeoMap() {
   try {
     const raw = fs.readFileSync(path.join(__dirname, '..', 'data', 'proxy-geo.json'), 'utf8');
@@ -1454,8 +1454,8 @@ const RECORDER_LOCALE_BY_CC = {
   SG: ['en-SG', 'Asia/Singapore'],
 };
 
-// רשימת הפרוקסים הזמינים לבחירה במסך ההקלטה (ללא סיסמאות).
-// יתרת המכסה הרזידנציאלית (1GB) — נספרת מהבייטים שירדו בפועל בכל ביקור, לא מהערכה.
+// List of available proxies for the recorder selector (without passwords).
+// Remaining residential byte budget (1GB) — metered from actual downloaded bytes per visit.
 app.get('/api/proxy/residential', (_req, res) => {
   try {
     const cfg = readConfigFromDisk();
@@ -1502,13 +1502,13 @@ app.get('/api/proxy/list', (_req, res) => {
       }
     })() });
   } catch (err) {
-    res.status(500).json({ error: err.message || 'קריאת רשימת הפרוקסים נכשלה.' });
+    res.status(500).json({ error: err.message || 'Failed to read proxy list.' });
   }
 });
 
 app.post('/api/recorder/start', async (req, res) => {
   if (activeProcess) {
-    return res.status(409).json({ error: 'כבר פועלת הרצת סשנים כעת. עצור קודם את ההרצה לפני פתיחת ההקלטה.' });
+    return res.status(409).json({ error: 'A run is currently active. Stop it before starting a recording.' });
   }
   try {
     const cfg = readConfigFromDisk();
@@ -1532,7 +1532,7 @@ app.post('/api/recorder/start', async (req, res) => {
         ].filter(p => p && !residentialPool.isResidentialUrl(p))));
         if (!dcPool.length) {
           return res.status(400).json({
-            error: 'לא נמצאו פרוקסי דאטה־סנטר זמינים. הוסף פרוקסים סטטיים או בחר רזידנציאלי / חיבור ישיר.',
+            error: 'No datacenter proxies available. Add static proxies or choose Residential / Direct.',
           });
         }
         const offerOkPool = dcPool.filter(p => (geoMap[hostPortOf(p)] || {}).offerOk === true);
@@ -1542,7 +1542,7 @@ app.post('/api/recorder/start', async (req, res) => {
       } else {
       if (!candidates.length) {
         return res.status(400).json({
-          error: 'לא נמצאו פרוקסים בהגדרות (proxy.servers / proxies.txt). הוסף פרוקסים או בחר "ישיר מהמחשב (ישראל)".',
+          error: 'No proxies configured (proxy.servers / proxies.txt). Add proxies or choose Direct Connection.',
         });
       }
       // Residential first — Cloudflare/Turnstile and link-shortener WAFs reject datacenter ASNs
@@ -1559,14 +1559,14 @@ app.post('/api/recorder/start', async (req, res) => {
         proxyUrl = rotatedResi[Math.floor(Math.random() * rotatedResi.length)] || resiCandidates[0];
       } else if (wantedCountry && (proxyMode === 'us' || proxyMode === 'auto')) {
         return res.status(400).json({
-          error: `אין פרוקסי רזידנציאלי למדינה ${wantedCountry.toUpperCase()} — נסה מדינה אחרת או "אקראי — כל המדינות".`,
+          error: `No residential proxy available for ${wantedCountry.toUpperCase()} — try another country or Random.`,
         });
       } else if (proxyMode === 'us' || proxyMode === 'auto') {
         const pool = proxyMode === 'us'
           ? candidates.filter(p => (geoMap[hostPortOf(p)] || {}).cc === 'US')
           : candidates;
         const basePool = pool.length ? pool : candidates;
-        // מעדיפים פרוקסים שידוע שמקבלים את דף ההצעה (offerOk=true), ואז מסובבים
+        // Prefer proxies known to pass target checks (offerOk=true), then rotate
         const offerOkPool = basePool.filter(p => (geoMap[hostPortOf(p)] || {}).offerOk === true);
         const usable = offerOkPool.length ? offerOkPool : basePool;
         const rotated = usable.filter(p => !lastRecorderProxyUrl || p !== lastRecorderProxyUrl || usable.length <= 1);
@@ -1574,16 +1574,16 @@ app.post('/api/recorder/start', async (req, res) => {
         if (!proxyUrl) {
           return res.status(400).json({
             error: proxyMode === 'us'
-              ? 'לא נמצא פרוקסי מארה״ב (US) ברשימה. בחר מדינה אחרת מהרשימה או "ישיר מהמחשב (ישראל)".'
-              : 'לא נמצא פרוקסי זמין ברשימה. בחר "ישיר מהמחשב (ישראל)".',
+              ? 'No US proxy found in the list. Select another country or Direct Connection.'
+              : 'No available proxy found in the list. Select Direct Connection.',
           });
         }
       } else {
-        // בחירה ידנית: proxyMode מכיל "host:port"
+        // Manual selection: proxyMode contains "host:port"
         const match = candidates.find(p => hostPortOf(p).toLowerCase() === proxyMode);
         if (!match) {
           return res.status(400).json({
-            error: `הפרוקסי ${rawMode} לא נמצא ברשימה הנוכחית. רענן את הרשימה במסך ההקלטה ונסה שוב.`,
+            error: `Proxy ${rawMode} was not found in the current list. Refresh the proxy list and try again.`,
           });
         }
         proxyUrl = match;
@@ -1613,7 +1613,7 @@ app.post('/api/recorder/start', async (req, res) => {
       // The recorder is deliberately independent of the runner-wide stealthMode: heavy injection
       // there produced a browser whose fingerprint contradicted itself. Opt in explicitly if needed.
       stealthMode: process.env.WTG_RECORDER_STEALTH === 'maximum' ? 'maximum' : 'standard',
-      // מצב מוק: לפתוח דפדפן אמיתי עם הפרוקסי (IP אמריקאי) בלי להקליט צעדים בפועל
+      // Mock mode: launch a real browser with the proxy (US IP) without recording steps
       mock: Boolean(req.body?.mock),
       onUpdate: st => broadcastEvent('recorder_update', st),
     });
@@ -1623,7 +1623,7 @@ app.post('/api/recorder/start', async (req, res) => {
   } catch (err) {
     const status = err?.code === 'NON_INTERACTIVE_DESKTOP' ? 409 : 400;
     const desktop = await getDesktopSessionInfo().catch(() => null);
-    res.status(status).json({ error: err.message || 'פתיחת ההקלטה נכשלה.', code: err?.code || null, desktop });
+    res.status(status).json({ error: err.message || 'Failed to launch recorder.', code: err?.code || null, desktop });
   }
 });
 
@@ -1633,7 +1633,7 @@ app.post('/api/recorder/stop', async (_req, res) => {
     broadcastEvent('recorder_update', recorder);
     res.json({ ok: true, recorder });
   } catch (err) {
-    res.status(500).json({ error: err.message || 'סיום ההקלטה נכשל.' });
+    res.status(500).json({ error: err.message || 'Failed to stop recorder.' });
   }
 });
 
@@ -1642,7 +1642,7 @@ app.post('/api/recorder/focus', async (_req, res) => {
     const focusRes = await focusRecorderWindow();
     res.json(focusRes);
   } catch (err) {
-    res.status(500).json({ error: err.message || 'הבאת חלון ההקלטה לחזית נכשלה.' });
+    res.status(500).json({ error: err.message || 'Failed to bring recorder window to front.' });
   }
 });
 
@@ -1824,7 +1824,7 @@ function applyFleetDirectives(directives = []) {
             assertKind: 'text_contains',
             label: typeof d.step.label === 'string' && d.step.label.trim()
               ? d.step.label.trim().slice(0, 90)
-              : `צעד AI (${rawType}) בטאב #${targetTab}`,
+              : `AI Step (${rawType}) in Tab #${targetTab}`,
             tab: targetTab,
             optional: true,
           };
@@ -1942,7 +1942,7 @@ function applyFleetDirectives(directives = []) {
           }
         }
         if (blocked.length) {
-          appendLog('warn', `[AI Commander Guard] נחסמו שדות בבעלות המפעיל מפני שכתובת AI: ${blocked.join(', ')}`);
+          appendLog('warn', `[AI Commander Guard] Blocked AI override of operator-owned fields: ${blocked.join(', ')}`);
         }
         if (Object.keys(patch).length) {
           const updated = updateSavedConfig(cur => deepMergeConfigPatch(cur, patch));
@@ -1990,7 +1990,7 @@ function applyFleetDirectives(directives = []) {
     broadcastEvent('config_updated', { config: latestConfig });
   }
   if (applied.length) {
-    appendLog('info', `[AI Commander] יושמו פקודות צי: ${applied.join(', ')}`);
+    appendLog('info', `[AI Commander] Applied fleet directives: ${applied.join(', ')}`);
   }
   return applied;
 }
@@ -2020,15 +2020,15 @@ app.post('/api/ai/directive', (req, res) => {
       activeProcess.send({ type: 'ai_directive', directive });
     } catch {}
   }
-  appendLog('info', `[AI Commander] עודכנה הנחיית סוכנים ידנית: ${directive || '(נוקה)'}`);
-  broadcastEvent('ai_feed', { role: 'system', content: `הנחיית סוכנים עודכנה: ${directive || '(ללא)'}`, ts: new Date().toISOString() });
+  appendLog('info', `[AI Commander] Updated manual agent directive: ${directive || '(cleared)'}`);
+  broadcastEvent('ai_feed', { role: 'system', content: `Agent directive updated: ${directive || '(none)'}`, ts: new Date().toISOString() });
   res.json({ ok: true, activeDirective: directive, liveDelivered: Boolean(activeProcess) });
 });
 
 app.post('/api/ai/chat', async (req, res) => {
   try {
     const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
-    if (!message) return res.status(400).json({ error: 'הזן הודעה או פקודה למפקח ה-AI.' });
+    if (!message) return res.status(400).json({ error: 'Enter a message or directive for the AI Commander.' });
     const cfg = readConfigFromDisk();
     const model = typeof req.body?.model === 'string' && req.body.model.trim()
       ? req.body.model.trim()
@@ -2136,11 +2136,11 @@ function launchRunnerWave(cfg, { isContinuationWave = false, isAutoResume = fals
   runState.pid = child.pid;
   runState.streamMode = streamState.active;
   runState.streamWave = streamState.waveNumber;
-  const streamTag = streamState.active ? `🌊 [נחל רציף — גל #${streamState.waveNumber}] ` : '';
-  const resumeTag = isAutoResume ? '🔄 [המשך אוטומטי] ' : '';
+  const streamTag = streamState.active ? `🌊 [Continuous Stream — Wave #${streamState.waveNumber}] ` : '';
+  const resumeTag = isAutoResume ? '🔄 [Auto-Resume] ' : '';
   appendLog(
     'info',
-    `${resumeTag}${streamTag}מפעיל הרצה (${cfg.engineMode}): ${effectiveVisitCount} ביקורים | מקביליות: ${cfg.minConcurrency}-${cfg.concurrency} | דפדפן ${cfg.headless ? 'מוסתר (Headless)' : 'גלוי (Watch Mode)'} | יעד: ${cfg.targetUrl}`
+    `${resumeTag}${streamTag}Starting run (${cfg.engineMode}): ${effectiveVisitCount} visits | concurrency: ${cfg.minConcurrency}-${cfg.concurrency} | ${cfg.headless ? 'Headless' : 'Visible (Watch Mode)'} | target: ${cfg.targetUrl}`
   );
 
   child.on('message', msg => {
@@ -2229,7 +2229,7 @@ function launchRunnerWave(cfg, { isContinuationWave = false, isAutoResume = fals
       broadcastEvent('status', runState);
       appendLog(
         'info',
-        `🔄 [Auto-Recovery #${streamState.autoRecoveryAttempts}/5] מזהה עצירה לא מתוכננת (קוד: ${code ?? signal ?? 'unknown'}, הושלמו ${runState.completed}/${runState.totalPlanned}) — ממשיך אוטומטית את ${remainingVisits} הביקורים שנותרו בעוד 5 שניות...`
+        `🔄 [Auto-Recovery #${streamState.autoRecoveryAttempts}/5] Unexpected stop detected (code: ${code ?? signal ?? 'unknown'}, completed ${runState.completed}/${runState.totalPlanned}) — resuming ${remainingVisits} remaining visits in 5 seconds...`
       );
       streamState.autoRecoveryTimer = setTimeout(() => {
         streamState.autoRecoveryTimer = null;
@@ -2240,7 +2240,7 @@ function launchRunnerWave(cfg, { isContinuationWave = false, isAutoResume = fals
         } catch (err) {
           runState.status = 'error';
           broadcastEvent('status', runState);
-          appendLog('stderr', `שגיאה ב-Auto-Recovery: ${err.message}`);
+          appendLog('stderr', `Auto-Recovery error: ${err.message}`);
         }
       }, 5000);
       return;
@@ -2252,11 +2252,11 @@ function launchRunnerWave(cfg, { isContinuationWave = false, isAutoResume = fals
       runState.status = 'running';
       broadcastEvent('status', runState);
       const waveEngineLabel = (cfg.engineMode === 'http_fast')
-        ? 'מנוע HTTP Fast (ללא דפדפן ו-AI)'
-        : 'ראשי הצוות (GLM-5.3-Flash + DeepSeek + Beam + Clef)';
+        ? 'HTTP Fast Engine (Browserless, no AI)'
+        : 'AI Squad Leaders (GLM-5.3-Flash + DeepSeek + Beam + Clef)';
       appendLog(
         'info',
-        `🌊 [נחל אוטונומי רציף — גל #${finishedWave} הושלם בהצלחה!] ${waveEngineLabel} משגרים את גל #${streamState.waveNumber} בעוד 10 שניות...`
+        `🌊 [Continuous Stream — Wave #${finishedWave} Completed!] ${waveEngineLabel} launching Wave #${streamState.waveNumber} in 10 seconds...`
       );
       streamState.nextWaveTimer = setTimeout(() => {
         streamState.nextWaveTimer = null;
@@ -2268,7 +2268,7 @@ function launchRunnerWave(cfg, { isContinuationWave = false, isAutoResume = fals
           streamState.active = false;
           runState.status = 'error';
           broadcastEvent('status', runState);
-          appendLog('stderr', `שגיאה בשיגור גל הבא בנחל: ${err.message}`);
+          appendLog('stderr', `Error launching next stream wave: ${err.message}`);
         }
       }, 10000);
       return;
@@ -2282,8 +2282,8 @@ function launchRunnerWave(cfg, { isContinuationWave = false, isAutoResume = fals
     appendLog(
       runState.status === 'error' ? 'stderr' : 'info',
       wasStopping
-        ? 'ההרצה והנחל נעצרו ידנית על ידי המשתמש.'
-        : `ההרצה הסתיימה (קוד יציאה: ${code ?? signal ?? 'unknown'}). מייצר דוח PDF מפורט ומסוכם ב-AI בעברית...`
+        ? 'Run and stream stopped manually by operator.'
+        : `Run finished (exit code: ${code ?? signal ?? 'unknown'}). Generating detailed AI-summarized PDF report...`
     );
 
     const runLogsSnapshot = logHistory.filter(l => (Number(l?.id) || 0) > currentRunStartLogSeq);
@@ -2300,12 +2300,12 @@ function launchRunnerWave(cfg, { isContinuationWave = false, isAutoResume = fals
         const dlTarget = reportMeta.pdfFile || reportMeta.htmlFile;
         appendLog(
           'info',
-          `📄 [דוח PDF אוטומטי מוכן] נשמר דוח הרצה מלא + סיכום AI בעברית: /api/reports/${dlTarget} (לחץ על "📄 הורד דוח PDF אחרון" למעלה!)`
+          `📄 [PDF Report Ready] Saved full run report + AI summary: /api/reports/${dlTarget} (click "Download Summary PDF Report" above!)`
         );
         const summaryEntry = {
           role: 'assistant',
           auto: true,
-          content: `📄 **דוח סיכום הרצה אוטומטי (${reportMeta.id}):**\n\n${reportMeta.aiSummaryHe}`,
+          content: `📄 **Automated Run Summary Report (${reportMeta.id}):**\n\n${reportMeta.aiSummaryHe}`,
           directives: [],
           applied: [],
           provider: 'report-ai',
@@ -2320,7 +2320,7 @@ function launchRunnerWave(cfg, { isContinuationWave = false, isAutoResume = fals
         scheduleSaveSessionState();
       })
       .catch(err => {
-        appendLog('stderr', `שגיאה ביצירת דוח ה-PDF האוטומטי: ${err.message}`);
+        appendLog('stderr', `Error generating PDF report: ${err.message}`);
       });
   });
 
@@ -2360,7 +2360,7 @@ function launchRunnerWave(cfg, { isContinuationWave = false, isAutoResume = fals
 
       try {
         const resReview = await askFleetCommander({
-          message: 'סקור טלמטריה רחבה של הריצה: שגיאות JS/דפים, צעדים מדולגים או סלקטורים שבורים, מהירות טעינה, חיסכון פרוקסי ו-AI Cache, ועומס זיכרון. דווח תובנות קצרות בעברית וקבל החלטת איזון אם נדרש.',
+          message: 'Review live run telemetry: JS/page errors, skipped steps or broken selectors, load latency, proxy/AI cache savings, and memory pressure. Report concise insights in English and rebalance concurrency if needed.',
           runState,
           config: readConfigFromDisk(),
           recentLogs: logHistory.slice(-24),
@@ -2392,16 +2392,16 @@ function launchRunnerWave(cfg, { isContinuationWave = false, isAutoResume = fals
     runState.pid = null;
     runState.finishedAt = new Date().toISOString();
     runState.status = 'error';
-    appendLog('stderr', `שגיאת הפעלה: ${err.message}`);
+    appendLog('stderr', `Launch error: ${err.message}`);
   });
 }
 
 app.post('/api/run/start', (req, res) => {
   if (activeProcess || streamState.nextWaveTimer) {
-    return res.status(409).json({ error: 'כבר קיימת הרצה פעילה כרגע. השהה או עצור אותה לפני הפעלה חדשה.' });
+    return res.status(409).json({ error: 'A run is already active. Pause or stop it before starting a new one.' });
   }
   if (getRecorderState().active) {
-    return res.status(409).json({ error: 'הקלטת מסלול פעילה כרגע. סיים את ההקלטה לפני הפעלת סשנים.' });
+    return res.status(409).json({ error: 'A journey recording is currently active. Stop recording before starting a run.' });
   }
 
   let cfg;
@@ -2436,7 +2436,7 @@ app.post('/api/run/preview', (req, res) => {
 });
 
 app.post('/api/run/pause', (_req, res) => {
-  if (!activeProcess) return res.status(409).json({ error: 'אין הרצה פעילה להשהיה.' });
+  if (!activeProcess) return res.status(409).json({ error: 'No active run to pause.' });
   try {
     activeProcess.send({ type: 'pause' });
     runState.status = 'paused';
@@ -2448,7 +2448,7 @@ app.post('/api/run/pause', (_req, res) => {
 });
 
 app.post('/api/run/resume', (_req, res) => {
-  if (!activeProcess) return res.status(409).json({ error: 'אין הרצה פעילה לחידוש.' });
+  if (!activeProcess) return res.status(409).json({ error: 'No active run to resume.' });
   try {
     activeProcess.send({ type: 'resume' });
     runState.status = 'running';
@@ -2477,7 +2477,7 @@ app.post('/api/run/stop', (_req, res) => {
   }
   const procToStop = activeProcess;
   runState.status = 'stopping';
-  appendLog('info', 'שולח פקודת עצירה ל-Crawlee ולדפדפנים הפתוחים...');
+  appendLog('info', 'Sending stop signal to Crawlee and open browser workers...');
   broadcastEvent('status', runState);
 
   try { procToStop.send({ type: 'stop' }); } catch {}
@@ -2539,7 +2539,7 @@ const server = app.listen(PORT, HOST, () => {
     const remainingVisits = Math.max(1, persistedPlanned - persistedCompleted);
     appendLog(
       'info',
-      `🔄 [Auto-Recovery] זוהה סבב פעיל שנקטע (${persistedCompleted}/${persistedPlanned}) — ממשיך אוטומטית את ${remainingVisits} הביקורים שנותרו בעוד 3 שניות...`
+      `🔄 [Auto-Recovery] Detected interrupted run (${persistedCompleted}/${persistedPlanned}) — resuming ${remainingVisits} remaining visits in 3 seconds...`
     );
     streamState.autoRecoveryTimer = setTimeout(() => {
       streamState.autoRecoveryTimer = null;
@@ -2550,7 +2550,7 @@ const server = app.listen(PORT, HOST, () => {
       } catch (err) {
         runState.status = 'error';
         broadcastEvent('status', runState);
-        appendLog('stderr', `שגיאה בחידוש אוטומטי של הסבב: ${err.message}`);
+        appendLog('stderr', `Error auto-resuming run: ${err.message}`);
       }
     }, 3000);
   }

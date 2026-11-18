@@ -1,7 +1,7 @@
 {
   "id": "multi-page-funnel-template",
-  "name": "משפך רב-עמודי: בית ← מחירון ← צור קשר (תבנית לחיצות)",
-  "description": "דוגמה חיה למעבר בין דפים בלחיצות כפתור אמיתיות, בדיקת URL, קריאה וצילום מסך. החלף targetUrl והסלקטורים לאתר שלך.",
+  "name": "Multi-Page Funnel: Home -> Pricing -> Contact (Click Template)",
+  "description": "Live example of multi-page navigation via real button clicks, URL assertions, reading scrolls, and screenshot capture.",
   "category": "funnel_ux",
   "isBuiltin": true,
   "config": {
@@ -26,70 +26,70 @@
         "selector": "",
         "value": "/",
         "assertKind": "text_contains",
-        "label": "1. כניסה לדף הנחיתה הראשי"
+        "label": "1. Open main landing page"
       },
       {
         "type": "human_browse",
         "selector": "",
         "value": "3000",
         "assertKind": "text_contains",
-        "label": "2. גלילה וריחוף אנושי בדף הבית"
+        "label": "2. Human scroll and hover on home page"
       },
       {
         "type": "hover",
         "selector": "#hero-cta",
         "value": "600",
         "assertKind": "text_contains",
-        "label": "3. ריחוף על כפתור פעולה ראשי"
+        "label": "3. Hover over primary CTA button"
       },
       {
         "type": "click",
         "selector": "#hero-cta",
         "value": "",
         "assertKind": "text_contains",
-        "label": "4. לחיצה על כפתור הפעולה בדף הבית"
+        "label": "4. Click primary CTA button on home page"
       },
       {
         "type": "click",
         "selector": "a.btn[href=\"/demo-site/pricing\"]",
         "value": "",
         "assertKind": "text_contains",
-        "label": "5. מעבר בלחיצה לעמוד המחירון"
+        "label": "5. Click through to Pricing page"
       },
       {
         "type": "assert",
         "selector": "",
         "value": "/pricing",
         "assertKind": "url_contains",
-        "label": "6. אימות שהגענו ל-/pricing"
+        "label": "6. Verify navigation to /pricing"
       },
       {
         "type": "scroll",
         "selector": "",
         "value": "60",
         "assertKind": "text_contains",
-        "label": "7. גלילה לסקירת תוכן המחירון"
+        "label": "7. Scroll to review pricing tiers"
       },
       {
         "type": "click",
         "selector": "a.btn[href=\"/demo-site/contact\"]",
         "value": "",
         "assertKind": "text_contains",
-        "label": "8. לחיצה על \"Start Trial\" למעבר לטופס"
+        "label": "8. Click \"Start Trial\" to open contact form"
       },
       {
         "type": "assert",
         "selector": "",
         "value": "/contact",
         "assertKind": "url_contains",
-        "label": "9. אימות שהגענו לדף צור קשר"
+        "label": "9. Verify arrival on /contact page"
       },
       {
         "type": "screenshot",
         "selector": "",
         "value": "Multi-Page Funnel Done",
         "assertKind": "text_contains",
-        "label": "10. צילום הגעה לסוף המשפך"
+        "label": "10. Capture funnel completion screenshot"
       }
     ],
     "keepBrowserOpenMs": 2000,

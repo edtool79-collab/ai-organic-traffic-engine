@@ -72,9 +72,9 @@ function getPatchrightChromium() {
   try {
     const pr = require('patchright');
     patchrightChromiumInstance = pr.chromium;
-    console.log('[Browser] מנוע patchright פעיל (Chromium מוטמע, ללא playwright-extra).');
+    console.log('[Browser] patchright engine active (patched Chromium, zero playwright-extra).');
   } catch (err) {
-    console.log(`[Browser] patchright לא זמין (${String(err && err.message || err).split('\n')[0]}) — חוזר ל-Playwright הרגיל.`);
+    console.log(`[Browser] patchright unavailable (${String(err && err.message || err).split('\n')[0]}) — falling back to standard Playwright.`);
     patchrightChromiumInstance = getStealthChromium();
   }
   return patchrightChromiumInstance;
@@ -1084,7 +1084,7 @@ async function getSharedBrowser(engine, headless, proxy, { stealthMode = 'standa
       return await launcher.launch(opts);
     } catch (err) {
       if (opts.channel) {
-        console.log('[Browser] ערוץ Chrome המותקן לא זמין — חוזר אוטומטית ל-Chromium המצורף.');
+        console.log('[Browser] Installed Chrome channel unavailable — falling back to bundled Chromium.');
         const { channel, ...rest } = opts;
         return launcher.launch(rest);
       }

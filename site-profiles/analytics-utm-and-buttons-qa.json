@@ -1,7 +1,7 @@
 {
   "id": "analytics-utm-and-buttons-qa",
-  "name": "אימות UTM, מדידות ולחיצות כפתורים (Analytics QA)",
-  "description": "נכנס עם פרמטרי קמפיין (UTM), לוחץ על מספר כפתורים באתר ומציג הוכחות מדויקות בלוג ובטאב האנליטיקס.",
+  "name": "UTM Attribution, Telemetry & Button Clicks (Analytics QA)",
+  "description": "Enters with campaign UTM parameters, clicks multiple tracked buttons, and records verification proof in the logs and analytics tab.",
   "category": "analytics_qa",
   "isBuiltin": true,
   "config": {
@@ -25,56 +25,56 @@
         "selector": "",
         "value": "/?utm_source=self_learn&utm_medium=qa&utm_campaign=clicks_proof",
         "assertKind": "text_contains",
-        "label": "כניסה עם פרמטרי UTM לבדיקת מדידה"
+        "label": "Enter with UTM parameters for attribution QA"
       },
       {
         "type": "wait",
         "selector": "",
         "value": "1500",
         "assertKind": "text_contains",
-        "label": "המתנה לשליחת Pageview ראשוני"
+        "label": "Wait for initial pageview beacon"
       },
       {
         "type": "hover",
         "selector": "#hero-cta",
         "value": "600",
         "assertKind": "text_contains",
-        "label": "ריחוף לפני קליק 1"
+        "label": "Hover before Click #1"
       },
       {
         "type": "click",
         "selector": "#hero-cta",
         "value": "",
         "assertKind": "text_contains",
-        "label": "קליק מדוד #1: כפתור ראשי"
+        "label": "Tracked Click #1: Hero CTA"
       },
       {
         "type": "scroll_to",
         "selector": "button[data-action=\"cta_explore\"]",
         "value": "",
         "assertKind": "text_contains",
-        "label": "גלילה לכפתור מדידות"
+        "label": "Scroll to Explore Metrics button"
       },
       {
         "type": "click",
         "selector": "button[data-action=\"cta_explore\"]",
         "value": "",
         "assertKind": "text_contains",
-        "label": "קליק מדוד #2: Explore Metrics"
+        "label": "Tracked Click #2: Explore Metrics"
       },
       {
         "type": "click",
         "selector": "button[data-action=\"cta_docs\"]",
         "value": "",
         "assertKind": "text_contains",
-        "label": "קליק מדוד #3: Read Docs"
+        "label": "Tracked Click #3: Read Docs"
       },
       {
         "type": "screenshot",
         "selector": "",
         "value": "Analytics UTM Click Proof",
         "assertKind": "text_contains",
-        "label": "צילום הוכחת קליקים ומדידות"
+        "label": "Capture click & attribution proof screenshot"
       }
     ],
     "keepBrowserOpenMs": 2500,

@@ -226,7 +226,7 @@ function isWithinActiveHours(schedule, now = new Date()) {
 
 function loadConfig(configPath) {
   if (!fs.existsSync(configPath)) {
-    throw new Error(`קובץ config.json לא נמצא בנתיב: ${configPath}`);
+    throw new Error(`config.json not found at: ${configPath}`);
   }
   const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   if (!cfg.targetUrl) {
@@ -241,7 +241,7 @@ function resolveProxies(cfg) {
     ? cfg.targets.filter(t => t && t.url).map(t => String(t.url))
     : [cfg.targetUrl];
   if (effectiveTargetUrls.every(isLoopbackUrl)) {
-    console.log(`[Proxy] יעד מקומי (${cfg.targetUrl}) אינו עובר דרך Proxy מרוחק — מדלג על רוטציית פרוקסי לריצה זו.`);
+    console.log(`[Proxy] Local target (${cfg.targetUrl}) bypasses remote proxies — skipping proxy rotation for this run.`);
     return [];
   }
 
@@ -280,7 +280,7 @@ function resolveProxies(cfg) {
         : (nonResi(normalizeList(cfg.proxy?.fallbackServers)).length
           ? nonResi(normalizeList(cfg.proxy?.fallbackServers))
           : nonResi(normalizeList(readFallbackProxiesTxt()))));
-    console.log(`[Proxy Tier] מצב זול (Datacenter בלבד): ${dcList.length} שרתים — 0MB ממכסת הרזידנציאל.`);
+    console.log(`[Proxy Tier] Datacenter only: ${dcList.length} servers — 0MB residential usage.`);
     return dcList;
   }
 
@@ -291,10 +291,10 @@ function resolveProxies(cfg) {
     if (budget.exhausted) {
       const fallback = readFallbackPool();
       console.log(
-        `[Proxy Tier] מצב יקר (Residential) — המכסה נוצלה (${budget.usedMb}/${budget.budgetMb}MB) — עובר למאגר החלופי (${fallback.length} פרוקסים).`
+        `[Proxy Tier] Residential budget exhausted (${budget.usedMb}/${budget.budgetMb}MB) — falling back to static pool (${fallback.length} proxies).`
       );
       if (fallback.length) return fallback;
-      console.log('[Residential] אין מאגר חלופי מוגדר — הריצה תעצור כדי לא לשרוף מכסה בתשלום.');
+      console.log('[Residential] No fallback pool configured — stopping run to prevent overspending.');
       return [];
     }
     const cc = String(activeResiCfg.country || '').toLowerCase().replace(/[^a-z]/g, '').slice(0, 2);
@@ -302,7 +302,7 @@ function resolveProxies(cfg) {
     if (!metered.length) metered = configured.filter(u => residentialPool.isResidentialUrl(u));
     if (!metered.length && cc) metered = normalizeList(residentialPool.getServers(activeResiCfg));
     console.log(
-      `[Proxy Tier] מצב יקר (Residential${cc ? '/' + cc.toUpperCase() : ''}): ${metered.length} סשנים, נותרו ${budget.remainingMb}MB מתוך ${budget.budgetMb}MB (${budget.usedPct}% נוצל).`
+      `[Proxy Tier] Residential${cc ? '/' + cc.toUpperCase() : ''}: ${metered.length} sessions, ${budget.remainingMb}MB remaining of ${budget.budgetMb}MB (${budget.usedPct}% used).`
     );
     return metered;
   }
@@ -315,14 +315,14 @@ function resolveProxies(cfg) {
   if (budget.exhausted) {
     const fallback = readFallbackPool();
     console.log(
-      `[Residential] המכסה נוצלה (${budget.usedMb}/${budget.budgetMb}MB) — עובר למאגר החלופי (${fallback.length} פרוקסים).`
+      `[Residential] Budget exhausted (${budget.usedMb}/${budget.budgetMb}MB) — falling back to static pool (${fallback.length} proxies).`
     );
     if (fallback.length) return fallback;
-    console.log('[Residential] אין מאגר חלופי מוגדר — הריצה תעצור כדי לא לשרוף מכסה בתשלום.');
+    console.log('[Residential] No fallback pool configured — stopping run to prevent overspending.');
     return [];
   }
   console.log(
-    `[Residential] פעיל מתוך הרשימה בדאשבורד: ${metered.length} סשנים, נותרו ${budget.remainingMb}MB מתוך ${budget.budgetMb}MB (${budget.usedPct}% נוצל).`
+    `[Residential] Active from configured list: ${metered.length} sessions, ${budget.remainingMb}MB remaining of ${budget.budgetMb}MB (${budget.usedPct}% used).`
   );
   return metered;
 }
@@ -404,15 +404,15 @@ async function executeVisitWorkload({
     combined.waveSummary = waveSummary;
     if (wavesCfg?.enabled && waveSummary) {
       const extras = [
-        waveSummary.scanProductsAdded ? '+סריקת מוצרים' : '',
-        waveSummary.extraPage ? `+עמוד(${waveSummary.extraPage})` : '',
-        waveSummary.formMutatedCount ? `+טפסים(${waveSummary.formMutatedCount})` : '',
-        waveSummary.aiAdded ? `+מוח AI(${waveSummary.squadWorkerModel || 'auto'})` : '',
+        waveSummary.scanProductsAdded ? '+scan_products' : '',
+        waveSummary.extraPage ? `+page(${waveSummary.extraPage})` : '',
+        waveSummary.formMutatedCount ? `+forms(${waveSummary.formMutatedCount})` : '',
+        waveSummary.aiAdded ? `+AI(${waveSummary.squadWorkerModel || 'auto'})` : '',
       ].filter(Boolean).join(' ');
       const squadLabel = waveSummary.squadName ? ` | ${waveSummary.squadName}` : '';
-      const fullTag = waveSummary.recordingAnalysis?.hasEmailFlow ? ' 🎯[מסלול המרה+רישום מייל]' : ' 🎯[מסלול מוקלט מלא]';
-      const convTag = waveSummary.isConverter === true ? fullTag : (waveSummary.isConverter === false ? ' 🌿[גלישה אורגנית באתר]' : '');
-      console.log(`[Wave #${waveSummary.waveNumber}${squadLabel} | ילד #${visitIndex + 1}] נוצר מסלול דינמי (${effectiveSteps.length} צעדים) ${extras}${convTag}`);
+      const fullTag = waveSummary.recordingAnalysis?.hasEmailFlow ? ' 🎯[Conversion+Email Flow]' : ' 🎯[Full Recorded Flow]';
+      const convTag = waveSummary.isConverter === true ? fullTag : (waveSummary.isConverter === false ? ' 🌿[Organic Site Browsing]' : '');
+      console.log(`[Wave #${waveSummary.waveNumber}${squadLabel} | Child #${visitIndex + 1}] Built dynamic route (${effectiveSteps.length} steps) ${extras}${convTag}`);
     }
 
     const scenRes = await executeTaskSteps({
@@ -479,7 +479,7 @@ async function executeVisitWorkload({
         combined.stepResults.push({
           index: combined.stepResults.length + 1,
           type: 'scan_products',
-          label: `ילד-גל #${visitIndex + 1}: סריקת מוצרים`,
+          label: `Wave-child #${visitIndex + 1}: Scan products`,
           ok: true,
           durationMs: 0,
           detail: msg,
@@ -498,7 +498,7 @@ async function executeVisitWorkload({
         combined.stepResults.push({
           index: combined.stepResults.length + 1,
           type: 'ai_explore',
-          label: 'סוכן AI אוטונומי',
+          label: 'Autonomous AI Agent',
           ok: true,
           durationMs: 0,
           detail: aiMsg,
@@ -521,10 +521,10 @@ function logVisitOutcome(i, persona, deviceLabel, engineLabel, result, sessionTa
   );
   if (Array.isArray(result.visitedUrls) && result.visitedUrls.length) {
     const trail = result.visitedUrls.map(v => `${v.path} (${v.status})`).join(' -> ');
-    console.log(`  ↳ מסלול: ${trail}`);
+    console.log(`  ↳ Trail: ${trail}`);
   }
   if (Array.isArray(result.errorDetails) && result.errorDetails.length) {
-    console.log(`  ↳ פירוט שגיאות (${result.errorDetails.length}): ${result.errorDetails.slice(0, 4).join(' | ')}`);
+    console.log(`  ↳ Errors (${result.errorDetails.length}): ${result.errorDetails.slice(0, 4).join(' | ')}`);
   }
   sendIpc({
     type: 'visit_detail',
@@ -683,7 +683,7 @@ async function run() {
       cfg.resourceMode = resourceMode;
       fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2), 'utf8');
     } catch {}
-    console.log('[RAM & Background Mode] מצב חיסכון זיכרון פעיל — הדפדפנים רצים ברקע (Headless) ללא חלונות פיזיים, והתצוגה החיה משודרת למסך הדאשבורד!');
+    console.log('[RAM & Background Mode] Running headless in background with live preview frames streamed to the dashboard.');
   }
   const personas = normalizePersonas(cfg.personas);
   const deviceWeights = cfg.devices || {};
@@ -786,7 +786,7 @@ async function run() {
   // filtering either block it outright (the Hebrew "Partner 5G" page) or silently void the lead.
   if (cfg.proxy?.enabled && !rawProxyUrls.length) {
     throw new Error(
-      'פרוקסי מופעל בהגדרות אבל אין אף כתובת פרוקסי ברשימה. ההרצה נעצרה כדי לא לשלוח תנועה מהכתובת המקומית (ישראל). הוסף פרוקסים או בטל את מתג הפרוקסי במפורש.'
+      'Proxy rotation is enabled in config, but the proxy server list is empty. Run stopped to avoid sending traffic from your local IP. Add proxies or disable proxy rotation explicitly.'
     );
   }
   let proxyUrls = rawProxyUrls;
@@ -815,14 +815,14 @@ async function run() {
     proxyCountryByUrl = countrySel.countryByUrl || {};
     const prefList = Array.isArray(cfg.proxy?.preferredCountries) ? cfg.proxy.preferredCountries.join(',') : 'Tier-1';
     if (countrySel.fallbackUsed) {
-      console.log(`[Proxy Geo] לא נמצאו פרוקסי תואמים למדינות (${prefList}) — משתמש בגיבוי בכל ${proxyUrls.length} השרתים הזמינים.`);
+      console.log(`[Proxy Geo] No proxies matched preferred countries (${prefList}) — falling back to all ${proxyUrls.length} available servers.`);
     } else if (cfg.proxy?.countryFilterEnabled !== false) {
-      console.log(`[Proxy Geo] סוננו ${proxyUrls.length}/${countrySel.totalCount} פרוקסי למדינות מועדפות (${prefList}).`);
+      console.log(`[Proxy Geo] Filtered ${proxyUrls.length}/${countrySel.totalCount} proxies for preferred countries (${prefList}).`);
     }
     if (proxyUrls.length) {
       const doFullPrefilter = cfg.proxy?.prefilter !== false && proxyUrls.length > 1;
       const probeTargets = doFullPrefilter ? proxyUrls : proxyUrls.slice(0, 1);
-      console.log(`[Proxy Prefilter] בודק ${probeTargets.length} פרוקסים (עד 16 במקביל, תמלית 5.5 שניות) לפני ההרצה...`);
+      console.log(`[Proxy Prefilter] Probing ${probeTargets.length} proxies (up to 16 concurrent, 5.5s timeout) before run...`);
       const probeResults = [];
       let probeCursor = 0;
       const probeWorkers = Array.from({ length: Math.min(16, probeTargets.length) }, async () => {
@@ -853,16 +853,16 @@ async function run() {
           proxyUrls = healthy;
           prefilterKeptAlive = true;
           const detail = Object.entries(rejectedSummary).map(([reason, count]) => `${reason}×${count}`).slice(0, 6).join(', ').slice(0, 180);
-          console.log(`[Proxy Prefilter] נשמרו ${healthy.length}/${beforeCount} פרוקסים פעילים (נופו: ${detail}).`);
+          console.log(`[Proxy Prefilter] Kept ${healthy.length}/${beforeCount} healthy proxies (dropped: ${detail}).`);
         } else {
-          console.log(`[Proxy Prefilter] אף פרוקסי לא עבר סינון — נשארת עם הכל (${beforeCount}) והלוגיקה של מכסה/כשל תיכנס בהמשך.`);
+          console.log(`[Proxy Prefilter] No proxy passed prefilter — keeping all (${beforeCount}); runtime failover will handle errors.`);
         }
       }
       const anyAlive = (doFullPrefilter && prefilterKeptAlive) || probeResults.some(r => r && r.ok);
       let aliveNow = anyAlive;
       if (!aliveNow) {
         // One bad moment (proxy restart, ISP hiccup) must not turn the whole run into Israeli traffic.
-        console.log('[Proxy Prefilter] אף פרוקסי לא ענה בניסיון הראשון — בודק שוב אחרי 3 שניות...');
+        console.log('[Proxy Prefilter] No proxy responded on first attempt — retrying in 3s...');
         await sleep(3000);
         for (const p of proxyUrls) {
           const r = await checkSingleProxy(p, 7000).catch(() => null);
@@ -878,7 +878,7 @@ async function run() {
             proxyUrls = fbList;
             startedOnFallback = true;
             console.log(
-              `🔁 [Proxy Failover] הפרוקסי הראשי אינו זמין (${errReasons}) — עובר אוטומטית לגיבוי Static (${fbList.length} כתובות).`
+              `🔁 [Proxy Failover] Primary proxy unavailable (${errReasons}) — switching to static fallback (${fbList.length} proxies).`
             );
           }
         }
@@ -886,13 +886,13 @@ async function run() {
           if (cfg.proxy?.allowDirectFallback === true) {
             console.log(
               errReasons.includes('402')
-                ? `⚠️ [Proxy Alert — HTTP 402] מכסת הנתונים הסתיימה (${errReasons}). חיבור ישיר הותר במפורש (allowDirectFallback=true) — התנועה תצא מהכתובת המקומית.`
-                : `⚠️ [Proxy Alert] שרתי הפרוקסי אינם מגיבים (${errReasons}). חיבור ישיר הותר במפורש (allowDirectFallback=true) — התנועה תצא מהכתובת המקומית.`
+                ? `⚠️ [Proxy Alert — HTTP 402] Bandwidth quota exhausted (${errReasons}). Direct fallback explicitly allowed (allowDirectFallback=true) — traffic will use local IP.`
+                : `⚠️ [Proxy Alert] Proxy servers unresponsive (${errReasons}). Direct fallback explicitly allowed (allowDirectFallback=true) — traffic will use local IP.`
             );
             proxyUrls = [];
           } else {
             throw new Error(
-              `כל ${proxyUrls.length} שרתי הפרוקסי אינם זמינים כרגע (${errReasons}). ההרצה נעצרה בכוונה: בלי פרוקסי התנועה יוצאת מהכתובת המקומית בישראל, אתרים חוסמים אותה (עמוד "הגלישה לאתר לא בטוחה") וההמרות לא נספרות. בדוק את רשימת הפרוקסים ונסה שוב.`
+              `All ${proxyUrls.length} proxy servers are currently unreachable (${errReasons}). Run stopped to avoid falling back to your local IP. Check your proxy list and try again.`
             );
           }
         }
@@ -907,8 +907,8 @@ async function run() {
     const ranked = proxyScore.rankProxies(proxyUrls, offerDomain);
     proxyUrls = ranked.ordered;
     console.log(
-      `[Proxy Score] הצעה ${offerDomain}: ${ranked.stats.ready}/${ranked.stats.total} פרוקסים מוכנים, ` +
-      `${ranked.stats.cooling} בהסגר זמני (ניקוד מוביל ${ranked.stats.bestScore}) — הסדר נקבע לפי הצלחות קודמות מול אותה הצעה.`
+      `[Proxy Score] Target ${offerDomain}: ${ranked.stats.ready}/${ranked.stats.total} proxies ready, ` +
+      `${ranked.stats.cooling} cooling down (top score ${ranked.stats.bestScore}) — ordered by prior target success.`
     );
   }
   const proxyPool = createFailoverProxyPool(proxyUrls, startedOnFallback ? [] : fallbackProxyUrls, {
@@ -916,7 +916,7 @@ async function run() {
     onSwitch: (list, reason) => {
       proxyUrls = list;
       console.log(
-        `🔁 [Proxy Failover] הפרוקסי הראשי נכשל באימות/מכסה (${reason}) — עברנו אוטומטית לגיבוי Static (${list.length} כתובות). ההרצה ממשיכה בלי עצירה.`
+        `🔁 [Proxy Failover] Primary proxy failed auth/quota (${reason}) — switched to static fallback (${list.length} proxies). Run continues seamlessly.`
       );
     },
   });
@@ -931,7 +931,7 @@ async function run() {
     const cdpSt = getCdpIntegrationsStatus();
     if (cdpSt.browserless.installed || cdpSt.lightpanda.installed) {
       console.log(
-        `[GitHub Engines] מחוברים: Browserless CDP Pool (${cdpSt.browserless.version || 'active'}) + Lightpanda Ultra-Light (${cdpSt.lightpanda.version || 'active'})`
+        `[CDP Engines] Connected: Browserless CDP Pool (${cdpSt.browserless.version || 'active'}) + Lightpanda Ultra-Light (${cdpSt.lightpanda.version || 'active'})`
       );
     }
   } catch {}
@@ -985,15 +985,15 @@ async function run() {
     if (!msg || typeof msg !== 'object') return;
     if (msg.type === 'pause') {
       userPaused = true;
-      console.log('[Control] ההרצה הושהתה (Paused) — מסיים סשנים פעילים ומקפיא תור...');
+      console.log('[Control] Run paused — finishing active sessions and freezing queue...');
       await syncPauseState();
     } else if (msg.type === 'resume') {
       userPaused = false;
-      console.log('[Control] ההרצה חודשה (Resumed).');
+      console.log('[Control] Run resumed.');
       await syncPauseState();
     } else if (msg.type === 'stop') {
       aborted = true;
-      console.log('[Control] מתבצעת עצירה מבוקרת של Crawlee Pool...');
+      console.log('[Control] Performing controlled stop of Crawlee Pool...');
       if (activePoolRef) await activePoolRef.abort().catch(() => {});
     } else if (msg.type === 'set_concurrency') {
       const nextMax = Math.max(1, Math.min(32, Number(msg.max) || maxConcurrency));
@@ -1005,47 +1005,47 @@ async function run() {
         activePoolRef.maxConcurrency = nextMax;
         activePoolRef.desiredConcurrency = Math.min(nextMax, Math.max(nextMin, activePoolRef.desiredConcurrency || nextMin));
       }
-      console.log(`[AI Commander] עודכן טווח מקביליות חי ל-${nextMin}–${nextMax}.`);
+      console.log(`[AI Commander] Live concurrency updated to ${nextMin}–${nextMax}.`);
     } else if (msg.type === 'set_wave_mode' && typeof msg.mode === 'string') {
       wavesCfg.enabled = msg.mode !== 'off';
       wavesCfg.mode = msg.mode;
-      console.log(`[AI Commander] עודכן מצב גלים חי ל-${msg.mode}.`);
+      console.log(`[AI Commander] Live wave mode updated to ${msg.mode}.`);
     } else if (msg.type === 'ai_directive') {
       runtimeState.aiDirective = String(msg.directive || '').trim();
       aiConfig.enabled = true;
-      console.log(`[AI Commander] הועברה הנחיית משימה חיה לסוכנים: ${runtimeState.aiDirective || '(ריענון)'}`);
+      console.log(`[AI Commander] Dispatched live directive to agents: ${runtimeState.aiDirective || '(refresh)'}`);
     } else if (msg.type === 'set_worker_pct' && msg.pct != null) {
       const pct = Math.max(0, Math.min(100, Math.round(Number(msg.pct) || 0)));
       aiConfig.enabled = pct > 0;
       aiConfig.workerPct = pct;
       runtimeState.workerPct = pct;
-      console.log(`[AI Commander] עודכן שיעור מעורבות מוח AI לסוכנים ל-${pct}%.`);
+      console.log(`[AI Commander] Live AI worker share updated to ${pct}%.`);
     } else if (msg.type === 'set_resource_mode' && typeof msg.mode === 'string') {
       if (['full', 'lite', 'ultra_lite'].includes(msg.mode)) {
         runtimeState.resourceMode = msg.mode;
-        console.log(`[AI Commander] עודכן מצב משאבים ופרוקסי חי ל-${msg.mode}.`);
+        console.log(`[AI Commander] Live resource mode updated to ${msg.mode}.`);
       }
     } else if (msg.type === 'set_conversion_rate' && msg.rate != null) {
       const rate = Math.max(0, Math.min(100, Math.round(Number(msg.rate) || 0)));
       wavesCfg.conversionRate = rate;
-      console.log(`[AI Commander] עודכן יחס המרות חי ל-${rate}%.`);
+      console.log(`[AI Commander] Live conversion rate updated to ${rate}%.`);
     } else if (msg.type === 'set_exploration') {
       if (msg.extraPageChance != null) wavesCfg.extraPageChance = Math.max(0, Math.min(100, Math.round(Number(msg.extraPageChance) || 0)));
       if (msg.scanProductsChance != null) wavesCfg.scanProductsChance = Math.max(0, Math.min(100, Math.round(Number(msg.scanProductsChance) || 0)));
       if (msg.maxProducts != null) wavesCfg.maxProductsPerVisit = Math.max(1, Math.min(4, Math.round(Number(msg.maxProducts) || 2)));
-      console.log(`[AI Commander] עודכנו פרמטרי חקירה: דפים=${wavesCfg.extraPageChance}%, סריקה=${wavesCfg.scanProductsChance}%, פריטים=${wavesCfg.maxProductsPerVisit}.`);
+      console.log(`[AI Commander] Updated exploration params: extraPages=${wavesCfg.extraPageChance}%, scan=${wavesCfg.scanProductsChance}%, items=${wavesCfg.maxProductsPerVisit}.`);
     } else if (msg.type === 'set_delays' && msg.interVisitDelayMs != null) {
       runtimeState.interVisitDelayMs = Math.max(0, Math.min(60000, Math.round(Number(msg.interVisitDelayMs) || 0)));
-      console.log(`[AI Commander] עודכנה השהייה בין ביקורים ל-${runtimeState.interVisitDelayMs}ms.`);
+      console.log(`[AI Commander] Inter-visit delay updated to ${runtimeState.interVisitDelayMs}ms.`);
     } else if (msg.type === 'update_task_steps' && Array.isArray(msg.taskSteps)) {
       taskSteps.splice(0, taskSteps.length, ...msg.taskSteps);
       cfgVars.taskSteps = taskSteps;
-      console.log(`[AI Commander] עודכנו ${taskSteps.length} צעדי תרחיש בשידור חי עבור הביקורים הבאים.`);
+      console.log(`[AI Commander] Updated ${taskSteps.length} live scenario steps for upcoming visits.`);
     } else if (msg.type === 'set_preview_active') {
       runtimeState.previewActive = msg.active !== false;
     } else if (msg.type === 'set_task_mode' && ['scenario', 'hybrid', 'behavior'].includes(msg.mode)) {
       cfgVars.taskMode = msg.mode;
-      console.log(`[AI Commander] מצב המשימה עודכן חי ל-${msg.mode}.`);
+      console.log(`[AI Commander] Live task mode updated to ${msg.mode}.`);
     } else if (msg.type === 'update_runtime_config' && msg.config && typeof msg.config === 'object') {
       const nc = msg.config;
       if (Array.isArray(nc.taskSteps)) {
@@ -1067,7 +1067,7 @@ async function run() {
       }
       if (nc.adSafety && typeof nc.adSafety === 'object') Object.assign(adSafety, nc.adSafety);
       if (nc.devices && typeof nc.devices === 'object') Object.assign(deviceWeights, nc.devices);
-      console.log('[AI Commander] כל הגדרות הקונפיגורציה סונכרנו בשידור חי לצי.');
+      console.log('[AI Commander] All configuration settings synced live to fleet.');
     } else if (msg.type === 'assign_squad_model' && typeof msg.model === 'string') {
       const targetSquad = ['alpha', 'bravo', 'charlie', 'delta', 'all'].includes(msg.squadId) ? msg.squadId : 'all';
       const cleanModel = msg.model.trim().slice(0, 80);
@@ -1077,7 +1077,7 @@ async function run() {
         } else {
           runtimeState.squadModels[targetSquad] = cleanModel;
         }
-        console.log(`[AI Commander] מודל מחלקת ${targetSquad} עודכן בשידור חי ל-${cleanModel}.`);
+        console.log(`[AI Commander] Squad ${targetSquad} model updated live to ${cleanModel}.`);
       }
     }
   });
@@ -1122,7 +1122,7 @@ async function run() {
   };
 
   if (schedulePaused) {
-    console.log(`[Schedule] השעה הנוכחית מחוץ לחלון הפעילות (${schedule.startHour}-${schedule.endHour}). ממתין לפתיחת החלון...`);
+    console.log(`[Schedule] Current time is outside active window (${schedule.startHour}-${schedule.endHour}). Waiting for window...`);
   }
 
   // ── Mode C: HTTP Fast Flood (No Browser — 1,000+ visits/min via Node HTTP/S + Proxies + Referer/UTM) ──
@@ -1132,7 +1132,7 @@ async function run() {
       bumpTargetStat(stats, t.url, 'planned');
     });
     if (isMultiTarget) {
-      targets.forEach(t => console.log(`[Targets] ${t.url} — ${t.visitCount} בקשות | עמודים: ${t.pages.join(', ')}`));
+      targets.forEach(t => console.log(`[Targets] ${t.url} — ${t.visitCount} requests | pages: ${t.pages.join(', ')}`));
     }
     const workerCount = Math.min(visitCount, Math.max(1, maxConcurrency));
     stats.desiredConcurrency = workerCount;
@@ -1158,10 +1158,10 @@ async function run() {
       const within = isWithinActiveHours(schedule);
       if (schedule.enabled && !within && !schedulePaused) {
         schedulePaused = true;
-        console.log(`[Schedule] יצאנו מחלון הפעילות (${schedule.startHour}-${schedule.endHour}) — משהה.`);
+        console.log(`[Schedule] Exited active window (${schedule.startHour}-${schedule.endHour}) — pausing.`);
       } else if (schedule.enabled && within && schedulePaused) {
         schedulePaused = false;
-        console.log(`[Schedule] נכנסנו לחלון הפעילות (${schedule.startHour}-${schedule.endHour}) — ממשיך.`);
+        console.log(`[Schedule] Entered active window (${schedule.startHour}-${schedule.endHour}) — resuming.`);
       }
       stats.currentConcurrency = inFlight;
       stats.desiredConcurrency = workerCount;
@@ -1329,7 +1329,7 @@ async function run() {
       bumpTargetStat(stats, t.url, 'planned');
     });
     if (isMultiTarget) {
-      targets.forEach(t => console.log(`[Targets] ${t.url} — ${t.visitCount} ביקורים | עמודים: ${t.pages.join(', ')}`));
+      targets.forEach(t => console.log(`[Targets] ${t.url} — ${t.visitCount} visits | pages: ${t.pages.join(', ')}`));
     }
     let nextVisitIndex = 0;
     let inFlight = 0;
@@ -1539,7 +1539,7 @@ async function run() {
             const budgetMb = residentialPool.budgetMbOf(cfg.proxy?.residential || {});
             const usedMb = usage.bytes / (1024 * 1024);
             if (usedMb >= budgetMb) {
-              console.log(`[Residential] המכסה נוצלה (${usedMb.toFixed(2)}/${budgetMb}MB) — הביקורים הבאים יעברו לדאטה־סנטר.`);
+              console.log(`[Residential] Budget exhausted (${usedMb.toFixed(2)}/${budgetMb}MB) — subsequent visits will use datacenter fallback.`);
             }
           }
           if (sessionSlot) {
@@ -1573,8 +1573,8 @@ async function run() {
               note: 'search engine challenge',
             });
             console.log(
-              `[${i + 1}] ⚠️ [Engine Challenge] ${result.engineChallenged} חסם את הפרוקסי הזה — ` +
-              `הביקורים הבאים עליו יעברו אוטומטית למנוע חיפוש אחר (רק מול ${result.engineChallenged}).`
+              `[${i + 1}] ⚠️ [Engine Challenge] ${result.engineChallenged} challenged this proxy — ` +
+              `subsequent visits on it will switch to another search engine.`
             );
           }
           } catch (err) {
@@ -1585,7 +1585,7 @@ async function run() {
             if (!retried && !aborted && !schedulePaused && !userPaused && retryBudget < retryCap && isTransient) {
               retried = true;
               stats.retriedVisitsCount = retryBudget + 1;
-              console.log(`[${i + 1}] ↻ [Retry Fix] כשל זמני — ניסיון חוזר אחד עם פרוקסי חדש (${errMsg.slice(0, 90)})`);
+              console.log(`[${i + 1}] ↻ [Retry Fix] Transient error — retrying once with a fresh proxy (${errMsg.slice(0, 90)})`);
               inFlight++;
               continue;
             }
@@ -1621,11 +1621,11 @@ async function run() {
       const within = isWithinActiveHours(schedule);
       if (schedule.enabled && !within && !schedulePaused) {
         schedulePaused = true;
-        console.log(`[Schedule] יצאנו מחלון הפעילות (${schedule.startHour}-${schedule.endHour}) — משהה עד לפתיחה מחדש.`);
+        console.log(`[Schedule] Exited active window (${schedule.startHour}-${schedule.endHour}) — pausing until reopen.`);
         await syncPauseState();
       } else if (schedule.enabled && within && schedulePaused) {
         schedulePaused = false;
-        console.log(`[Schedule] נכנסנו לחלון הפעילות (${schedule.startHour}-${schedule.endHour}) — ממשיך הרצה.`);
+        console.log(`[Schedule] Entered active window (${schedule.startHour}-${schedule.endHour}) — resuming run.`);
         await syncPauseState();
       }
 
@@ -1643,7 +1643,7 @@ async function run() {
         activePoolRef.desiredConcurrency = 1;
         runtimeState.resourceMode = 'ultra_lite';
         lastRamScaleAt = nowMs;
-        console.log(`[RAM Governor] עומס זיכרון קריטי (${usedMemPct}%, פנוי ${freeMemMb}MB) — בלם חירום: מקביליות 1 ומצב ultra_lite.`);
+        console.log(`[RAM Governor] Critical memory pressure (${usedMemPct}%, ${freeMemMb}MB free) — emergency brake: concurrency 1 & ultra_lite.`);
       } else if (nowMs - lastRamScaleAt >= 30000 && activePoolRef) {
         if ((freeMemMb < 750 || usedMemPct >= 95) && stats.maxConcurrency > 1) {
           const nextMax = Math.max(1, stats.maxConcurrency - 1);
@@ -1653,14 +1653,14 @@ async function run() {
           activePoolRef.maxConcurrency = nextMax;
           activePoolRef.desiredConcurrency = Math.min(nextMax, activePoolRef.desiredConcurrency);
           lastRamScaleAt = nowMs;
-          console.log(`[RAM Governor] לחץ זיכרון (${usedMemPct}%, פנוי ${freeMemMb}MB) — הפחתת מקביליות הדרגתית ל-${nextMax}.`);
+          console.log(`[RAM Governor] Memory pressure (${usedMemPct}%, ${freeMemMb}MB free) — stepping concurrency down to ${nextMax}.`);
         } else if (freeMemMb >= 1000 && usedMemPct < 92 && stats.maxConcurrency < configuredMaxCap) {
           const nextMax = Math.min(configuredMaxCap, stats.maxConcurrency + 1);
           stats.maxConcurrency = nextMax;
           activePoolRef.maxConcurrency = nextMax;
           activePoolRef.desiredConcurrency = Math.min(nextMax, Math.max(stats.minConcurrency, activePoolRef.desiredConcurrency + 1));
           lastRamScaleAt = nowMs;
-          console.log(`[RAM Governor] זיכרון פנוי (${usedMemPct}%, פנוי ${freeMemMb}MB) — העלאה הדרגתית של מקביליות ל-${nextMax}.`);
+          console.log(`[RAM Governor] Memory healthy (${usedMemPct}%, ${freeMemMb}MB free) — stepping concurrency up to ${nextMax}.`);
         }
       }
 
@@ -1675,13 +1675,13 @@ async function run() {
       const totalMb = (totalTransferBytes / (1024 * 1024)).toFixed(2);
       if (ps.savedBytes > 0 || ps.blockedRequests > 0 || ps.cacheHits > 0 || totalTransferBytes > 0) {
         console.log(
-          `🛡️ [Proxy Saver] תעבורה בפועל: ${totalMb}MB | נחסכו ~${ps.savedMb}MB תעבורת פרוקסי (${ps.cacheHits} קבצי JS/CSS מ-Cache [${ps.cachedFiles} קבצים, ${ps.cacheRamMb}MB RAM] + ${ps.blockedRequests} טראקרים/תמונות/מדיה שנחסמו).`
+          `🛡️ [Proxy Saver] Actual bandwidth: ${totalMb}MB | Saved ~${ps.savedMb}MB (${ps.cacheHits} JS/CSS cache hits [${ps.cachedFiles} files, ${ps.cacheRamMb}MB RAM] + ${ps.blockedRequests} trackers/media blocked).`
         );
       }
       const aiStats = getAiTokenSaverStats();
       if (aiStats.apiCalls > 0 || aiStats.cacheHits > 0) {
         console.log(
-          `🧠 [AI Brain] קריאות API: ${aiStats.apiCalls} (מתוכן התאוששות: ${aiStats.recoveryCalls}) | Cache Hits: ${aiStats.cacheHits} (${aiStats.cachedPlaybooks} תבניות שמורות) | נחסכו ~${aiStats.estimatedTokensSaved} טוקנים.`
+          `🧠 [AI Brain] API calls: ${aiStats.apiCalls} (recovery: ${aiStats.recoveryCalls}) | Cache Hits: ${aiStats.cacheHits} (${aiStats.cachedPlaybooks} playbooks) | Saved ~${aiStats.estimatedTokensSaved} tokens.`
         );
       }
       console.log('All visits complete.');
@@ -1691,10 +1691,10 @@ async function run() {
           passDelayMs: Number(cfg.emailSweepDelayMs ?? 30000),
         });
         if (emailSweepSummary && emailSweepSummary.total > 0) {
-          console.log(`📧 [Email Sweep] הושלם: ${emailSweepSummary.confirmed}/${emailSweepSummary.total} תיבות קיבלו לחיצת אישור (מיילים בלי קישור: ${emailSweepSummary.withoutLink}).`);
+          console.log(`📧 [Email Sweep] Completed: ${emailSweepSummary.confirmed}/${emailSweepSummary.total} inboxes confirmed (without link: ${emailSweepSummary.withoutLink}).`);
         }
       } catch (sweepErr) {
-        console.log(`[Email Sweep] דילוג: ${String(sweepErr?.message || sweepErr).slice(0, 120)}`);
+        console.log(`[Email Sweep] Skipped: ${String(sweepErr?.message || sweepErr).slice(0, 120)}`);
       }
     } finally {
       clearInterval(monitorTimer);
@@ -1734,7 +1734,7 @@ async function run() {
 
   requests.forEach(r => bumpTargetStat(stats, r.userData.targetUrl, 'planned'));
   if (isMultiTarget) {
-    targets.forEach(t => console.log(`[Targets] ${t.url} — ${t.visitCount} ביקורים | עמודים: ${t.pages.join(', ')}`));
+    targets.forEach(t => console.log(`[Targets] ${t.url} — ${t.visitCount} visits | pages: ${t.pages.join(', ')}`));
   }
 
   const crawler = new PlaywrightCrawler({
@@ -1889,11 +1889,11 @@ async function run() {
     const within = isWithinActiveHours(schedule);
     if (schedule.enabled && !within && !schedulePaused) {
       schedulePaused = true;
-      console.log(`[Schedule] יצאנו מחלון הפעילות (${schedule.startHour}-${schedule.endHour}) — משהה עד לפתיחה מחדש.`);
+      console.log(`[Schedule] Exited active window (${schedule.startHour}-${schedule.endHour}) — pausing until reopen.`);
       await syncPauseState();
     } else if (schedule.enabled && within && schedulePaused) {
       schedulePaused = false;
-      console.log(`[Schedule] נכנסנו לחלון הפעילות (${schedule.startHour}-${schedule.endHour}) — ממשיך הרצה.`);
+      console.log(`[Schedule] Entered active window (${schedule.startHour}-${schedule.endHour}) — resuming run.`);
       await syncPauseState();
     }
     emitTelemetry(crawler.autoscaledPool?.systemStatus?.getCurrentStatus?.());

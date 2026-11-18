@@ -3,35 +3,35 @@ const { getEmailClientStatus } = require('./emailInboxClient');
 const { redactText, safeStepLabel } = require('./redaction');
 
 const WAVE_MODE_META = {
-  off: { label: 'רגיל (ללא גלים)' },
-  steady: { label: 'גלים מאוזנים (Steady)' },
-  ramp_up: { label: 'התגברות הדרגתית (Ramp Up)' },
-  natural_peaks: { label: 'גאות ושפל טבעיים (Natural Peaks)' },
-  burst: { label: 'פרצי תנועה חכמים (Smart Bursts)' },
+  off: { label: 'Standard (No Waves)' },
+  steady: { label: 'Steady Pacing' },
+  ramp_up: { label: 'Gradual Ramp Up' },
+  natural_peaks: { label: 'Natural Peaks & Troughs' },
+  burst: { label: 'Smart Bursts' },
 };
 
 const SQUAD_LEADERS = [
   {
     id: 'alpha',
-    nameHe: 'מפקד אלפא (בודקי כלים ופונקציונליות)',
+    nameHe: 'Squad Alpha (Tools & Feature QA)',
     workerModel: 'deepseek-v4.1-flash',
     tacticalFocus: 'Focus on interactive site tools (/tools/*), testing inputs, and verifying tool outputs.',
   },
   {
     id: 'bravo',
-    nameHe: 'מפקד בראבו (צוות זרימות עומק וטפסים)',
+    nameHe: 'Squad Bravo (Deep Flows & Forms)',
     workerModel: 'beam',
     tacticalFocus: 'Execute complete recorded multi-step workflow, inspect form validation, and confirm responses.',
   },
   {
     id: 'charlie',
-    nameHe: 'מפקד צ׳ארלי (קוראי מדריכים ותוכן עמוק)',
+    nameHe: 'Squad Charlie (Guides & Deep Content)',
     workerModel: 'minimax-m3.1-flash',
     tacticalFocus: 'Deep human reading across guides (/guides/*), scrolling, and navigating between guides and tools.',
   },
   {
     id: 'delta',
-    nameHe: 'מפקד דלתא (סיור אורגני וקבלת החלטות)',
+    nameHe: 'Squad Delta (Organic Exploration & Decisions)',
     workerModel: 'gpt-oss:20b',
     tacticalFocus: 'Structured page evaluation and organic multi-page navigation across homepage, about, guides, and tool cards.',
   },
@@ -364,15 +364,15 @@ function analyzeRecordedJourney(baseSteps = [], targetUrl = '') {
   const externalTabs = Array.from(externalTabSet).sort((a, b) => a - b);
   const primaryExternalTab = externalTabs.length ? externalTabs[0] : null;
 
-  let flowLabelHe = 'מסלול גלישה ותוכן באתר (ללא רישום מייל)';
+  let flowLabelHe = 'Organic site browsing & content flow (no email signup)';
   if (hasEmailFlow) {
-    flowLabelHe = 'מסלול המרה + הרשמת מייל חיה';
+    flowLabelHe = 'Conversion + live email verification flow';
   } else if (hasMultiTabFlow && hasToolOrFormFlow) {
-    flowLabelHe = 'מסלול כלים אינטראקטיביים וטאבים חיצוניים (ללא רישום מייל)';
+    flowLabelHe = 'Interactive tools & multi-tab flow (no email signup)';
   } else if (hasMultiTabFlow) {
-    flowLabelHe = 'מסלול גלישה ורב-כרטיסיות / פרטנרים (ללא רישום מייל)';
+    flowLabelHe = 'Multi-tab / partner browsing flow (no email signup)';
   } else if (hasToolOrFormFlow) {
-    flowLabelHe = 'בדיקת כלים אינטראקטיביים וטפסים באתר (ללא רישום מייל)';
+    flowLabelHe = 'Interactive tools & form QA flow (no email signup)';
   }
 
   const keyRoutes = Array.from(routeSet).slice(0, 6);
@@ -510,7 +510,7 @@ function buildChildJourney({
         }
         return true;
       });
-  const workingSteps = effectiveCloned.length > 0 ? effectiveCloned : [{ type: 'goto', selector: '', value: '/', label: 'פתיחת דף הבית', tab: 0 }];
+  const workingSteps = effectiveCloned.length > 0 ? effectiveCloned : [{ type: 'goto', selector: '', value: '/', label: 'Open home page', tab: 0 }];
 
   // Protect any fill value that an assertion later verifies verbatim, so QA assertions never flake.
   const protectedValues = new Set(
@@ -627,8 +627,8 @@ function buildChildJourney({
       value: String(clampInt(wavesCfg.maxProductsPerVisit ?? 2, 1, 4, 2)),
       assertKind: 'text_contains',
       label: externalTabId !== null
-        ? `ילד-גל #${visitIndex + 1}: סריקת מוצרים/קישורים בכרטיסייה #${targetTab}`
-        : `ילד-גל #${visitIndex + 1}: סריקת מוצרים וקישורים באתר`,
+        ? `Wave-child #${visitIndex + 1}: Scan products/links in Tab #${targetTab}`
+        : `Wave-child #${visitIndex + 1}: Scan site products & links`,
       sameOriginOnly: !isConverter && targetTab === 0,
       tab: targetTab,
       optional: true,
@@ -658,7 +658,7 @@ function buildChildJourney({
         selector: '',
         value: chosenPage,
         assertKind: 'text_contains',
-        label: `ילד-גל #${visitIndex + 1}: מעבר אורגני לעמוד ${chosenPage}`,
+        label: `Wave-child #${visitIndex + 1}: Organic navigation to ${chosenPage}`,
         tab: 0,
         optional: true,
       },
@@ -667,7 +667,7 @@ function buildChildJourney({
         selector: '',
         value: String(jitterNumber(browseMs, 0.25, 1200, 15000)),
         assertKind: 'text_contains',
-        label: `גלישה טבעית בעמוד ${chosenPage}`,
+        label: `Natural browsing on ${chosenPage}`,
         tab: 0,
         optional: true,
       },
@@ -681,7 +681,7 @@ function buildChildJourney({
     ? SQUAD_LEADERS[1]
     : {
         ...SQUAD_LEADERS[1],
-        nameHe: 'מפקד בראבו (מבצעי ההקלטה המלאה וטאבים)',
+        nameHe: 'Squad Bravo (Full Recording & Tabs)',
         tacticalFocus: 'Execute complete recorded multi-step navigation, tools, and tab interactions smoothly; no email signup step.',
       };
   const organicSquads = [SQUAD_LEADERS[0], SQUAD_LEADERS[2], SQUAD_LEADERS[3]];
@@ -729,7 +729,7 @@ function buildChildJourney({
             tab: 0,
             sameOriginOnly: !isConverter,
             value: '2',
-            label: `[${assignedSquad.nameHe} | חקירת המשך באתר] ${assignedSquad.tacticalFocus}`,
+            label: `[${assignedSquad.nameHe} | Continue site exploration] ${assignedSquad.tacticalFocus}`,
           });
         }
       } else {
@@ -750,7 +750,7 @@ function buildChildJourney({
           childSteps.push({
             ...aiStep,
             value: '1',
-            label: `[${assignedSquad.nameHe} | בדיקה משנית] ${assignedSquad.tacticalFocus}`,
+            label: `[${assignedSquad.nameHe} | Secondary check] ${assignedSquad.tacticalFocus}`,
           });
         }
       }
@@ -773,7 +773,7 @@ function buildChildJourney({
         selector: '',
         value: '',
         query: '',
-        label: 'כניסה אורגנית מתוצאות חיפוש (מקור תנועה אמיתי בדוח)',
+        label: 'Organic search entry (authentic referrer attribution)',
         optional: true,
         tab: 0,
       });
@@ -802,7 +802,7 @@ function buildChildJourney({
         type: 'ai_route_repair',
         selector: '',
         value: `Continue the signup flow toward the offer form for ${recordingAnalysis.offerGoal || 'the current offer'}`,
-        label: `[${assignedSquad.nameHe} | תיקון מסלול] מאתר את ההמשך הנכון אחרי הנחיתה`,
+        label: `[${assignedSquad.nameHe} | Route Repair] Locating next flow step after landing`,
         workerModel: aiWorkerModel,
         tab: 0,
         optional: true,
@@ -825,7 +825,7 @@ function buildChildJourney({
         type: 'ai_form_guard',
         selector: '',
         value: '1',
-        label: 'שמירה על שלמות הטופס לפני שליחה — משלים שדות חסרים מהזהות של הביקור',
+        label: 'AI Form Guard — filling missing fields from session identity before submit',
         workerModel: aiWorkerModel,
         identity: { ...identity },
         tab: childSteps[k].tab || 0,
@@ -845,7 +845,7 @@ function buildChildJourney({
         selector: '',
         value: '2',
         assertKind: 'text_contains',
-        label: `[${assignedSquad.nameHe} | אימות שליחה והמשך] ודא שהטופס נשלח והמשך את ההצעה`,
+        label: `[${assignedSquad.nameHe} | Verify submission & continue]`,
         squadId: assignedSquad.id,
         squadFocus: 'Verify the submit succeeded and advance the offer flow.',
         workerModel: aiWorkerModel,
@@ -971,7 +971,7 @@ async function runScanProductsStep(page, step = {}, ctx = {}) {
       window.scrollBy({ top: 380, behavior: 'smooth' });
     }).catch(() => {});
     await page.waitForTimeout(900).catch(() => {});
-    return 'נסרק העמוד (לא זוהו כרטיסי מוצרים/קישורים נוספים זמינים — בוצעה גלילה אנושית)';
+    return 'Page scanned (no additional product/link cards found — performed human scroll)';
   }
 
   // Pick from top ranked pool with randomness so every child picks different items
@@ -1050,8 +1050,8 @@ async function runScanProductsStep(page, step = {}, ctx = {}) {
   }
 
   return visitedLabels.length
-    ? `סריקת מוצרים/קישורים הושלמה (${visitedLabels.length}): ${visitedLabels.join(' | ')}`
-    : 'בוצעה סריקת עמוד וגלילה אנושית';
+    ? `Product/link scan complete (${visitedLabels.length}): ${visitedLabels.join(' | ')}`
+    : 'Page scan and human scroll completed';
 }
 
 module.exports = {

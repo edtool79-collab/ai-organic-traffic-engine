@@ -80,7 +80,7 @@ async function launch(opts = {}) {
     os: 'windows',
     canvas_noise: false,
   });
-  console.log(`[Browser] מנוע camoufox פעיל (Firefox ${st.version}${headless ? ', headless' : ''}).`);
+  console.log(`[Browser] camoufox engine active (Firefox ${st.version}${headless ? ', headless' : ''}).`);
   return browser;
 }
 

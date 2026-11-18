@@ -1,7 +1,7 @@
 {
   "id": "qa-fingerprint-audit",
-  "name": "בדיקת עקביות טביעת אצבע ובוט-סיגנל (Fingerprint QA)",
-  "description": "בודק בדף האבחון המקומי תאימות OS/WebGL, HTTP Referer, הסתרת webdriver, אזור זמן ואירועי קלט אנושיים.",
+  "name": "Fingerprint Consistency & Bot-Signal Audit (Fingerprint QA)",
+  "description": "Verifies OS/WebGL consistency, HTTP Referer, webdriver masking, timezone alignment, and human input events on the local diagnostic page.",
   "category": "demo",
   "isBuiltin": true,
   "config": {
@@ -27,49 +27,49 @@
         "selector": "",
         "value": "/fingerprint-check",
         "assertKind": "text_contains",
-        "label": "פתיחת דף בדיקת טביעת האצבע"
+        "label": "Open fingerprint diagnostic page"
       },
       {
         "type": "wait",
         "selector": "",
         "value": "700",
         "assertKind": "text_contains",
-        "label": "המתנה לאיסוף מדדים"
+        "label": "Wait for probe collection"
       },
       {
         "type": "human_browse",
         "selector": "",
         "value": "2800",
         "assertKind": "text_contains",
-        "label": "יצירת אירועי גלילה ועכבר אנושיים"
+        "label": "Generate human scroll and mouse input events"
       },
       {
         "type": "click",
         "selector": "#fp-interact-btn",
         "value": "",
         "assertKind": "text_contains",
-        "label": "לחיצה על כפתור בדיקת קלט"
+        "label": "Click interactive input verification button"
       },
       {
         "type": "assert",
         "selector": "#fp-status",
         "value": "CLEAN_CONSISTENT",
         "assertKind": "text_contains",
-        "label": "אימות ציון עקביות מושלם (0 סתירות)"
+        "label": "Assert zero fingerprint contradictions (CLEAN_CONSISTENT)"
       },
       {
         "type": "assert",
         "selector": "#fp-status",
         "value": "Score: 100/100",
         "assertKind": "text_contains",
-        "label": "אימות ציון 100/100"
+        "label": "Assert consistency score 100/100"
       },
       {
         "type": "screenshot",
         "selector": "",
         "value": "Fingerprint QA Clean",
         "assertKind": "text_contains",
-        "label": "צילום דוח עקביות"
+        "label": "Capture consistency audit report"
       }
     ],
     "keepBrowserOpenMs": 500,
