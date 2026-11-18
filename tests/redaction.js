@@ -8,7 +8,7 @@
  */
 
 const assert = require('assert');
-const { redactText, registerSecret, clearSecrets, maskEmail, isSecretField } = require('../src/redaction');
+const { redactData, redactText, registerSecret, clearSecrets, maskEmail, isSecretField } = require('../src/redaction');
 
 let failures = 0;
 function check(name, fn) {
@@ -52,14 +52,40 @@ check('unregistered code after a code word is masked', () => {
 
 check('credential-shaped URL userinfo is masked, host kept', () => {
   clearSecrets();
-  const out = redactText('proxy http://user:sup3rs3cret@proxy.apify.com:8000 failed');
+  const url = new URL('http://proxy.example.com:8000');
+  url.username = 'user';
+  url.password = 'sup3rs3cret';
+  const out = redactText('proxy ' + url + ' failed');
   assert.ok(!out.includes('sup3rs3cret'), `password survived: ${out}`);
-  assert.ok(out.includes('proxy.apify.com:8000'), `host lost: ${out}`);
+  assert.ok(out.includes('proxy.example.com:8000'), `host lost: ${out}`);
 });
 
 check('emails keep the domain and lose the local part', () => {
   assert.strictEqual(maskEmail('n7x2k9@inbox.example'), 'n***@inbox.example');
   assert.strictEqual(maskEmail('not-an-address'), 'not-an-address');
+});
+
+check('SOCKS URL credentials are masked before logging', () => {
+  clearSecrets();
+  assert.strictEqual(
+    redactText('proxy socks5h://fake-user:fake-pass@proxy.example:1080 failed'),
+    'proxy socks5h://***:***@proxy.example:1080 failed',
+  );
+});
+
+check('structured credentials are masked without dropping ordinary data', () => {
+  clearSecrets();
+  const input = {
+    completed: 2,
+    headers: { Authorization: 'Bearer fixture', 'Set-Cookie': ['session=fixture'], 'content-type': 'text/plain' },
+    visits: [{ proxy_password: 'fixture', accessToken: 'fixture', otp: 123456, otpReceived: true, status: 'blocked' }],
+  };
+  assert.deepStrictEqual(redactData(input), {
+    completed: 2,
+    headers: { Authorization: '***', 'Set-Cookie': '***', 'content-type': 'text/plain' },
+    visits: [{ proxy_password: '***', accessToken: '***', otp: '***', otpReceived: true, status: 'blocked' }],
+  });
+  assert.strictEqual(input.headers.Authorization, 'Bearer fixture');
 });
 
 check('secret fields are recognised by selector and label', () => {

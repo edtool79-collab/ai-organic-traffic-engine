@@ -154,6 +154,14 @@
               </select>
             </div>
             <div class="field">
+              <label for="browserEngine">מנוע דפדפן (<code>browserEngine</code>)</label>
+              <select id="browserEngine">
+                <option value="chromium">Chromium + Chrome מותקן (ברירת מחדל)</option>
+                <option value="patchright">patchright (Chromium מוטמע, ללא דליפת CDP)</option>
+                <option value="camoufox">Camoufox (Firefox 158 ממוזג)</option>
+              </select>
+            </div>
+            <div class="field">
               <label for="visitCount">כמות סשנים כוללת (<code>visitCount</code>)</label>
               <input id="visitCount" type="number" min="1" max="100000" />
             </div>
@@ -230,7 +238,7 @@
           <div class="field">
             <label>תבניות משימה מוכנות בלחיצת כפתור:</label>
             <div class="inline-row" style="flex-wrap:wrap;">
-              <button type="button" class="small" id="btn-tpl-cleantab">תבנית: בדיקת CleanTab Ad-Safe + ניקוי לינקים</button>
+
               <button type="button" class="small" id="btn-tpl-demosite">תבנית: מילוי טופס באתר הדמו (/demo-site)</button>
               <button type="button" class="small" id="btn-tpl-landing">תבנית: בדיקת דף בית + גלילה + צילום</button>
               <button type="button" class="small danger" id="btn-clear-steps">נקה צעדים</button>
@@ -311,6 +319,7 @@
               <span class="muted" id="recorder-status-meta">מוכן להקלטה על כתובת היעד</span>
             </div>
             <div id="recorder-desktop-warning" style="display:none; background:#3b1419; border:1px solid #f87171; color:#fecaca; padding:10px 12px; border-radius:8px; margin-bottom:10px; font-size:0.86rem; line-height:1.5;"></div>
+            <div id="recorder-challenge-warning" style="display:none; background:#3a2a10; border:1px solid #fbbf24; color:#fde68a; padding:10px 12px; border-radius:8px; margin-bottom:10px; font-size:0.86rem; line-height:1.5;"></div>
             <p class="hint" style="margin-bottom:10px;">
               לחץ על <strong>"🔴 הקלט מסלול בדפדפן"</strong> ← ייפתח חלון כרום גלוי על האתר שלך. תגלוש כרגיל (קישורים, כפתורים, טפסים, גלילה, חזרה אחורה), ובסיום הצעדים ייטענו אוטומטית לרשימה למטה ותוכל לשמור כפרופיל בלחיצה על <strong>"+ שמור כפרופיל חדש"</strong>.
             </p>
@@ -320,9 +329,19 @@
               <button type="button" class="small" id="btn-recorder-focus" disabled title="שלוף את חלון ההקלטה לקדמת המסך">🪟 הקפץ חלון לחזית</button>
               <button type="button" class="small" id="btn-recorder-load-last" disabled>📥 טען הקלטה אחרונה לצעדים</button>
               <select id="recorder-proxy-mode" title="בחירת רשת ומיקום גיאוגרפי לפתיחת חלון ההקלטה">
-                <option value="us">🌐 רשת הקלטה: פרוקסי ארה״ב (US)</option>
                 <option value="direct">🇮🇱 רשת הקלטה: ישיר מהמחשב (ישראל)</option>
+                <option value="resi:us">🇺🇸 רשת הקלטה: ארה״ב (רזידנציאלי)</option>
+                <option value="resi:gb">🇬🇧 רשת הקלטה: בריטניה (רזידנציאלי)</option>
+                <option value="resi:ca">🇨🇦 רשת הקלטה: קנדה (רזידנציאלי)</option>
+                <option value="resi:au">🇦🇺 רשת הקלטה: אוסטרליה (רזידנציאלי)</option>
+                <option value="resi:de">🇩🇪 רשת הקלטה: גרמניה (רזידנציאלי)</option>
+                <option value="resi:fr">🇫🇷 רשת הקלטה: צרפת (רזידנציאלי)</option>
+                <option value="resi:nl">🇳🇱 רשת הקלטה: הולנד (רזידנציאלי)</option>
+                <option value="resi:">🌍 רשת הקלטה: אקראי — כל המדינות (רזידנציאלי)</option>
+                <option value="auto">🏢 רשת הקלטה: דאטה־סנטר (גיבוי, לא מומלץ מול Cloudflare)</option>
+                <optgroup label="בחירה ידנית לפי מדינה" id="recorder-proxy-country-group"></optgroup>
               </select>
+              <button type="button" class="small" id="btn-recorder-proxy-refresh" title="רענן את רשימת הפרוקסים והמדינות">🔄 רענן רשימת פרוקסים</button>
               <select id="recorder-mode" title="כיצד לטעון צעדים מוקלטים">
                 <option value="replace">טעינה: החלף צעדים קיימים</option>
                 <option value="append">טעינה: הוסף לסוף הרשימה</option>
@@ -332,6 +351,7 @@
                 <option value="hybrid">בסיום: התחל כמשולב (Hybrid — משימה + גלישה חופשית)</option>
               </select>
             </div>
+            <div class="muted" id="recorder-proxy-status" style="font-size:0.85rem; margin-bottom:8px;">📍 IP הקלטה: עדיין לא נבחר — בחר מדינה ולחץ "הקלט מסלול"</div>
             <div class="recorder-preview-list" id="recorder-live-preview">
               <div class="muted" style="font-size:0.84rem;">הצעדים שתבצע בדפדפן ההקלטה יופיעו כאן בזמן אמת...</div>
             </div>
@@ -339,20 +359,16 @@
 
           <div class="recorder-box" id="agent-email-pilot-box" style="margin-top:12px;">
             <div class="section-title" style="margin-bottom:8px;">
-              <span>📧 כלי מיילים וקודי אימות (OTP) לסוכנים (HirePulse Owner Pilot)</span>
-              <span class="badge" id="email-pilot-status-badge" style="font-size:0.76rem;color:#4ade80;">בודק חיבור Owner Pilot...</span>
+              <span>Live inboxes and verification codes</span>
+              <span class="badge" id="email-pilot-status-badge">Checking inbox service…</span>
             </div>
-            <p class="hint" style="margin-bottom:8px;">
-              <strong>איך משתמשים בזה תאכלס?</strong><br/>
-              1️⃣ <strong>אוטומטי לכל סוכן בנחיל:</strong> לחץ למעלה על <strong>"📧 + הזן אימייל סוכן חי"</strong> (או כתוב <code>{{AGENT_EMAIL}}</code> בשדה הערך של צעד <code>fill</code>) ועל <strong>"🔑 + המתן והזן קוד אימות (OTP)"</strong> (או <code>{{OTP_CODE}}</code>). כל סוכן ייצור לעצמו תיבת מייל חדשה וייחודית ב-Node.js וישלוף את ה-OTP לבד!<br/>
-              2️⃣ <strong>בזמן הקלטה חיה / בדיקה ידנית:</strong> לחץ למטה על <strong>"📧 צור תיבת מייל חיה עכשיו"</strong>, העתק את הכתובת לטופס ההרשמה באתר, וכשנשלח מייל אימות לחץ <strong>"🔑 שלוף קוד אימות (OTP)"</strong>.
-            </p>
+            <p class="hint">Create an inbox for a manual test, or add <code>fill_email</code> and <code>fill_otp</code> to a journey on a site you are authorized to test. Creating a live inbox can use service credits.</p>
             <div class="inline-row" style="gap:8px; flex-wrap:wrap; align-items:center;">
-              <button type="button" class="small primary" id="btn-create-live-inbox">📧 צור תיבת מייל חיה עכשיו ($0.00 Pilot)</button>
-              <input id="live-inbox-address" class="ltr" type="text" readonly placeholder="כתובת התיבה תופיע כאן..." style="min-width:250px; flex:1;" />
-              <button type="button" class="small" id="btn-copy-live-inbox" disabled>📋 העתק כתובת</button>
-              <button type="button" class="small" id="btn-check-live-otp" disabled>🔑 שלוף קוד אימות (OTP)</button>
-              <span id="live-otp-result" class="badge" style="font-size:0.84rem;">ממתין ליצירת תיבה</span>
+              <button type="button" class="small primary" id="btn-create-live-inbox" disabled>Create live inbox</button>
+              <input id="live-inbox-address" class="ltr" type="text" readonly placeholder="Inbox address" style="min-width:250px; flex:1;" />
+              <button type="button" class="small" id="btn-copy-live-inbox" disabled>Copy address</button>
+              <button type="button" class="small" id="btn-check-live-otp" disabled>Check verification code</button>
+              <span id="live-otp-result" class="badge" style="font-size:0.84rem;">No active inbox</span>
             </div>
           </div>
 
@@ -430,6 +446,16 @@
               <div class="field" style="display:flex;align-items:center;gap:8px;padding-top:18px;">
                 <input id="waves-mutate-forms" type="checkbox" style="width:18px;height:18px;" />
                 <label for="waves-mutate-forms" style="margin:0;cursor:pointer;">גוון אוטומטית שדות טפסים וחיפושים בכל ביקור</label>
+              </div>
+              <div class="field">
+                <label for="referrer-mode">מקור התנועה שיופיע בדוח (<code>referrerMode</code>)</label>
+                <select id="referrer-mode">
+                  <option value="mixed">מעורב — חיפוש בעיקר + רשתות חברתיות + מעט ישיר (מומלץ)</option>
+                  <option value="search_engines">מנועי חיפוש בלבד (בלי ישיר בכלל)</option>
+                  <option value="google_organic">גוגל אורגני בלבד</option>
+                  <option value="social">רשתות חברתיות בלבד (YouTube, Reddit, X...)</option>
+                  <option value="direct">ישיר (ללא מפנה — לא מומלץ)</option>
+                </select>
               </div>
             </div>
             <div class="field" style="margin-top:8px;">
@@ -524,6 +550,7 @@
             <label for="proxy-servers">רשימת שרתי Proxy (מסונכרן אוטומטית עם <code>proxies.txt</code>)</label>
             <textarea id="proxy-servers" class="ltr" rows="4" placeholder="http://host:port&#10;socks5://5.6.7.8:1080&#10;1.2.3.4:8080"></textarea>
             <div id="proxy-test-results" class="proxy-results"></div>
+            <div id="residential-status" class="advice-box">מאגר רזידנציאלי: טוען נתונים...</div>
           </div>
 
           <hr style="border:0;border-top:1px solid var(--border);margin:18px 0;" />
@@ -728,6 +755,18 @@
                 <label for="ai-worker-model">מודל סוכני שטח (Workers)</label>
                 <input id="ai-worker-model" type="text" class="ltr" list="ai-cheap-models" placeholder="deepseek-v4.1-flash" />
               </div>
+              <div class="field">
+                <label for="ai-all-squads-model">מודל אחד לכל ארבעת הצוותים (<code>allSquadsModel</code> — ריק = מודל נפרד לכל צוות)</label>
+                <input id="ai-all-squads-model" type="text" class="ltr" list="ai-cheap-models" placeholder="deepseek-v4.1-flash" />
+              </div>
+              <label class="switch-row" style="margin:0;padding:8px 10px;">
+                <span style="font-size:0.84rem;"><strong>מילוי חכם של שדות חסרים לפני כל שליחה</strong></span>
+                <input id="ai-form-assist" type="checkbox" />
+              </label>
+              <label class="switch-row" style="margin:0;padding:8px 10px;">
+                <span style="font-size:0.84rem;"><strong>תיקון מסלול אוטומטי כשנוחתים בעמוד הלא נכון</strong></span>
+                <input id="ai-route-repair" type="checkbox" />
+              </label>
               <datalist id="ai-cheap-models">
                 <option value="deepseek-v4.1-flash">Ollama Cloud — DeepSeek v4.1 Flash (0.8s, מהיר, חסכוני ומדויק לסוכנים)</option>
                 <option value="beam">Ollama Cloud — Beam (יעיל במיוחד בחיסכון טוקנים וכלים)</option>

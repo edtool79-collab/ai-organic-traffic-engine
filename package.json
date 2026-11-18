@@ -12,17 +12,22 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@lightpanda/browser": "^1.2.0",
     "@medv/finder": "^4.0.2",
     "browserless": "^14.1.10",
+    "camoufox": "^0.5.9",
     "crawlee": "^3.18.2",
     "fingerprint-generator": "^2.1.90",
     "fingerprint-injector": "^2.1.90",
     "https-proxy-agent": "^9.1.0",
+    "patchright": "^1.64.3",
     "playwright": "^1.58.2",
+    "playwright-core": "^1.62.1",
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "rrweb": "^2.2.2",
     "socks-proxy-agent": "^10.1.0"
+  },
+  "optionalDependencies": {
+    "@lightpanda/browser": "^1.2.0"
   }
 }

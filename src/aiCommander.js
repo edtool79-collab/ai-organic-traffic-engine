@@ -3,6 +3,7 @@ const os = require('os');
 const path = require('path');
 const { AD_SAFE_EXCLUSION_SELECTOR, registerScenarioPage } = require('./adSafetyHelper');
 const { runScanProductsStep, analyzeRecordedJourney } = require('./wavePlanner');
+const { redactData, registerStepSecrets } = require('./redaction');
 
 const DEFAULT_OLLAMA_HOST = 'https://ollama.com';
 const DEFAULT_ULLM_HOST = 'https://api.uncensoredllm.ai';
@@ -18,6 +19,59 @@ const OLLAMA_CHEAP_WORKER_POOL = [
   'nemotron-3-super',
 ];
 const unsupportedChatModels = new Set(['inkling-2-small', 'clef:27b']);
+// A model that answers on one Ollama transport but not the other is learned at runtime and cached
+// in data/ai-models.json. The set above is only a startup hint now, not a ban list.
+const AI_MODELS_FILE = path.join(__dirname, '..', 'data', 'ai-models.json');
+const OLLAMA_TRANSPORTS = ['chat', 'generate'];
+// Thinking costs output tokens, so it is enabled per role instead of globally.
+const THINK_BY_ROLE = { commander: true, recovery: true, worker: false };
+
+let modelMemoryCache = null;
+
+function loadModelMemory() {
+  if (modelMemoryCache) return modelMemoryCache;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(AI_MODELS_FILE, 'utf8'));
+    modelMemoryCache = (parsed && typeof parsed === 'object') ? parsed : {};
+  } catch {
+    modelMemoryCache = {};
+  }
+  return modelMemoryCache;
+}
+
+function saveModelMemory() {
+  try {
+    fs.mkdirSync(path.dirname(AI_MODELS_FILE), { recursive: true });
+    fs.writeFileSync(AI_MODELS_FILE, JSON.stringify(modelMemoryCache || {}, null, 2));
+  } catch {}
+}
+
+/** Remembers the transport a model actually answered on, so the next call skips discovery. */
+function rememberModelTransport(model, transport, note = '') {
+  const key = String(model || '').trim().toLowerCase();
+  if (!key) return;
+  const mem = loadModelMemory();
+  const prev = mem[key];
+  mem[key] = {
+    transport,
+    note: note || (prev && prev.note) || '',
+    checkedAt: new Date().toISOString(),
+  };
+  saveModelMemory();
+}
+
+function preferredTransport(model) {
+  const key = String(model || '').trim().toLowerCase();
+  const known = loadModelMemory()[key];
+  if (known && OLLAMA_TRANSPORTS.includes(known.transport)) return known.transport;
+  if (unsupportedChatModels.has(key)) return 'generate';
+  return 'chat';
+}
+
+function getModelMemory() {
+  return { ...loadModelMemory() };
+}
+
 const DEFAULT_ULLM_CHEAP_COMMANDER = 'glm-5.3-flash-uncensored';
 const DEFAULT_ULLM_CHEAP_WORKER = 'glm-5.3-flash-uncensored';
 const OLLAMA_KEY_FILE = path.join(os.homedir(), '.gemini', 'tools', '.ollama_key');
@@ -123,9 +177,11 @@ function mapModelForProvider(requestedModel, provider, role = 'worker') {
     }
     return raw;
   }
-  if (!raw || unsupportedChatModels.has(raw.toLowerCase())) {
+  if (!raw) {
     return role === 'commander' ? DEFAULT_COMMANDER_MODEL : DEFAULT_WORKER_MODEL;
   }
+  // No silent swap any more: a model that fails on /api/chat is retried on /api/generate by the
+  // transport layer, so the caller keeps the model it asked for.
   return raw;
 }
 
@@ -149,6 +205,124 @@ function extractJsonObject(text) {
   return null;
 }
 
+function flattenMessages(messages) {
+  return (Array.isArray(messages) ? messages : [])
+    .map(m => `${m?.role || 'user'}: ${String(m?.content || '')}`)
+    .join('\n\n')
+    .trim();
+}
+
+/**
+ * One round-trip to one Ollama transport. /api/chat and /api/generate differ in the request shape
+ * and in where the answer sits in the response; nothing else.
+ */
+async function postOllama({ cred, model, messages, temperature, tokenCap, json, think, transport, timeoutMs }) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(new Error('ollama_cloud timeout')), timeoutMs);
+  try {
+    const base = {
+      model,
+      stream: false,
+      think: Boolean(think),
+      options: { temperature, num_predict: tokenCap },
+      ...(json ? { format: 'json' } : {}),
+    };
+    const payload = transport === 'generate'
+      ? { ...base, prompt: flattenMessages(messages) }
+      : { ...base, messages };
+
+    const resp = await fetch(`${cred.host}/api/${transport}`, {
+      method: 'POST',
+      signal: ctrl.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${cred.apiKey}`,
+        'User-Agent': 'WebTrafficGen-AICommander/1.0',
+      },
+      body: JSON.stringify(redactData(payload)),
+    });
+
+    if (!resp.ok) {
+      const bodyText = await resp.text().catch(() => '');
+      const err = new Error(`ollama_cloud ${transport} HTTP ${resp.status}: ${bodyText.slice(0, 180)}`);
+      err.httpStatus = resp.status;
+      err.transport = transport;
+      throw err;
+    }
+
+    const data = await resp.json();
+    const rawAnswer = transport === 'generate'
+      ? String(data?.response || '')
+      : String(data?.message?.content || '');
+    return {
+      transport,
+      content: rawAnswer.replace(/<think[\s\S]*?<\/think>/gi, '').trim(),
+      usage: data?.usage || null,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const OLLAMA_DECISION_PATH = '/v1/systemone';
+// clef:27b is a decision model: it refuses /api/chat and /api/generate with
+// "clef:27b is a decision model and only supports /v1/systemone". It answers typed
+// questions (choice / noul / score) over a state object instead of writing prose.
+const DECISION_MODELS = new Set(['clef:27b']);
+const DECISION_QUESTION_TYPES = ['choice', 'noul', 'score'];
+
+function isDecisionModel(model) {
+  return DECISION_MODELS.has(String(model || '').trim().toLowerCase());
+}
+
+/**
+ * One round-trip to the Ollama decision transport. `state` is any non-empty string/object/array,
+ * `questions` maps ids to { type, instructions, criteria }. Answers come back typed and scored.
+ */
+async function callDecisionModel({ cred, model, state, questions, timeoutMs = 20000 }) {
+  const stateEmpty = !state || (typeof state === 'object' && !Object.keys(state).length);
+  if (stateEmpty) throw new Error('ollama decision: state must be a nonempty string, object, or array');
+  const ids = questions && typeof questions === 'object' ? Object.keys(questions) : [];
+  if (!ids.length || ids.length > 64) throw new Error('ollama decision: questions must contain 1-64 fields');
+  for (const id of ids) {
+    const type = String(questions[id]?.type || '').toLowerCase();
+    if (!DECISION_QUESTION_TYPES.includes(type)) {
+      throw new Error(`ollama decision: question "${id}" type must be choice, noul, or score`);
+    }
+  }
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(new Error('ollama decision timeout')), timeoutMs);
+  try {
+    const resp = await fetch(`${cred.host}${OLLAMA_DECISION_PATH}`, {
+      method: 'POST',
+      signal: ctrl.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${cred.apiKey}`,
+        'User-Agent': 'WebTrafficGen-AICommander/1.0',
+      },
+      body: JSON.stringify(redactData({ model, state, questions })),
+    });
+    if (!resp.ok) {
+      const bodyText = await resp.text().catch(() => '');
+      const err = new Error(`ollama_cloud systemone HTTP ${resp.status}: ${bodyText.slice(0, 180)}`);
+      err.httpStatus = resp.status;
+      err.transport = 'systemone';
+      throw err;
+    }
+    const data = await resp.json();
+    return {
+      transport: 'systemone',
+      content: JSON.stringify(data?.answers || {}),
+      answers: data?.answers || {},
+      usage: data?.usage || null,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function callSingleProviderChat({
   provider,
   cred,
@@ -158,71 +332,79 @@ async function callSingleProviderChat({
   temperature,
   maxTokens,
   timeoutMs,
+  json = false,
+  think = null,
 }) {
-  const isOllamaNative = provider === 'ollama_cloud';
-  const endpoint = isOllamaNative ? `${cred.host}/api/chat` : `${cred.host}/v1/chat/completions`;
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(new Error(`${provider} timeout`)), timeoutMs);
-  const tokenCap = role === 'commander'
+  const tokenCap = (role === 'commander' || role === 'recovery')
     ? Math.max(maxTokens || 500, 900)
     : Math.max(80, Math.min(420, maxTokens || 200));
+  const useThink = think === null ? Boolean(THINK_BY_ROLE[role]) : Boolean(think);
 
-  try {
-    const payload = isOllamaNative
-      ? {
-          model,
-          messages,
-          stream: false,
-          think: false,
-          options: {
-            temperature,
-            num_predict: tokenCap,
-          },
-        }
-      : {
+  if (isDecisionModel(model)) {
+    const err = new Error(`${model} is a decision model: use callDecisionModel (/v1/systemone), not chat`);
+    err.code = 'MODEL_NEEDS_DECISION_API';
+    throw err;
+  }
+
+  if (provider !== 'ollama_cloud') {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(new Error(`${provider} timeout`)), timeoutMs);
+    try {
+      const resp = await fetch(`${cred.host}/v1/chat/completions`, {
+        method: 'POST',
+        signal: ctrl.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${cred.apiKey}`,
+          'User-Agent': 'WebTrafficGen-AICommander/1.0',
+        },
+        body: JSON.stringify(redactData({
           model,
           messages,
           temperature,
           max_tokens: tokenCap,
           stream: false,
-        };
-
-    const resp = await fetch(endpoint, {
-      method: 'POST',
-      signal: ctrl.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${cred.apiKey}`,
-        'User-Agent': 'WebTrafficGen-AICommander/1.0',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!resp.ok) {
-      const bodyText = await resp.text().catch(() => '');
-      const err = new Error(`${provider} HTTP ${resp.status}: ${bodyText.slice(0, 180)}`);
-      err.httpStatus = resp.status;
-      throw err;
-    }
-
-    const data = await resp.json();
-    let content = '';
-    if (isOllamaNative) {
-      content = String(data?.message?.content || '').trim();
-    } else {
+        })),
+      });
+      if (!resp.ok) {
+        const bodyText = await resp.text().catch(() => '');
+        const err = new Error(`${provider} HTTP ${resp.status}: ${bodyText.slice(0, 180)}`);
+        err.httpStatus = resp.status;
+        throw err;
+      }
+      const data = await resp.json();
       const choice = data?.choices?.[0]?.message || {};
-      content = String(choice.content || '').trim();
+      return {
+        provider,
+        model,
+        transport: 'openai',
+        content: String(choice.content || '').trim().replace(/<think[\s\S]*?<\/think>/gi, '').trim(),
+        usage: data?.usage || null,
+      };
+    } finally {
+      clearTimeout(timer);
     }
-    content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-    return {
-      provider,
-      model,
-      content,
-      usage: data?.usage || null,
-    };
-  } finally {
-    clearTimeout(timer);
   }
+
+  // Ollama: try the transport this model is known to answer on, then the other one. A 400/404/422
+  // means "wrong door for this model", not "broken model" — that is why clef:27b was written off.
+  const first = preferredTransport(model);
+  const order = [first, ...OLLAMA_TRANSPORTS.filter(t => t !== first)];
+  let lastErr = null;
+  for (const transport of order) {
+    try {
+      const out = await postOllama({
+        cred, model, messages, temperature, tokenCap, json, think: useThink, transport, timeoutMs,
+      });
+      if (first !== transport) rememberModelTransport(model, transport, `fell back from ${first}`);
+      return { provider, model, ...out };
+    } catch (err) {
+      lastErr = err;
+      const wrongDoor = err?.httpStatus === 400 || err?.httpStatus === 404 || err?.httpStatus === 422;
+      if (!wrongDoor) throw err;
+    }
+  }
+  throw (lastErr || new Error('ollama_cloud: neither transport answered'));
 }
 
 /**
@@ -237,6 +419,8 @@ async function callAiChat({
   temperature = 0.25,
   maxTokens = 450,
   timeoutMs = 15000,
+  json = false,
+  think = null,
 } = {}) {
   const pref = normalizeAiProvider(provider);
   const candidates = [];
@@ -267,6 +451,8 @@ async function callAiChat({
         temperature,
         maxTokens,
         timeoutMs,
+        json,
+        think,
       });
     } catch (err) {
       lastErr = err;
@@ -285,6 +471,8 @@ async function callAiChat({
               temperature,
               maxTokens,
               timeoutMs,
+              json,
+              think,
             });
           } catch (retryErr) {
             lastErr = retryErr;
@@ -313,9 +501,12 @@ const aiTokenSaverStats = {
   apiCalls: 0,
   cacheHits: 0,
   recoveryCalls: 0,
+  decisionCalls: 0,
+  lastPageState: null,
   estimatedTokensSaved: 0,
   promptTokensUsed: 0,
   completionTokensUsed: 0,
+  byModel: {},
 };
 
 function sanitizeWorkerGoal(rawGoal, squadFocus = '') {
@@ -370,16 +561,25 @@ function setCachedPlaybook(cacheKey, entry) {
   aiPagePlaybookCache.set(cacheKey, { ...entry, ts: Date.now() });
 }
 
-function recordTokenUsage(usage) {
+function recordTokenUsage(usage, model = '') {
   aiTokenSaverStats.apiCalls += 1;
+  const modelKey = String(model || 'unknown').toLowerCase();
+  const perModel = aiTokenSaverStats.byModel[modelKey]
+    || (aiTokenSaverStats.byModel[modelKey] = { calls: 0, promptTokens: 0, completionTokens: 0 });
+  perModel.calls += 1;
   if (!usage || typeof usage !== 'object') return;
-  aiTokenSaverStats.promptTokensUsed += Number(usage.prompt_tokens || usage.input_tokens || 0) || 0;
-  aiTokenSaverStats.completionTokensUsed += Number(usage.completion_tokens || usage.output_tokens || 0) || 0;
+  const pTok = Number(usage.prompt_tokens || usage.input_tokens || 0) || 0;
+  const cTok = Number(usage.completion_tokens || usage.output_tokens || 0) || 0;
+  aiTokenSaverStats.promptTokensUsed += pTok;
+  aiTokenSaverStats.completionTokensUsed += cTok;
+  perModel.promptTokens += pTok;
+  perModel.completionTokens += cTok;
 }
 
 function getAiTokenSaverStats() {
   return {
     ...aiTokenSaverStats,
+    totalTokensUsed: aiTokenSaverStats.promptTokensUsed + aiTokenSaverStats.completionTokensUsed,
     cachedPlaybooks: aiPagePlaybookCache.size,
   };
 }
@@ -656,44 +856,78 @@ async function runAiExploreStep(page, step = {}, ctx = {}) {
     i: dom.inputs.map(x => ({ id: x.id, t: x.type, ph: x.placeholder })),
     c: dom.clickables.map(x => ({ id: x.id, txt: x.text })),
   };
-  const userPrompt = JSON.stringify({ goal, p: microPage });
+  const userPrompt = JSON.stringify(redactData({ goal, p: microPage }));
 
   let usedModelLabel = model;
   let planSteps = [];
+  let pageState = null;
   try {
-    const resp = await callAiChat({
-      provider: providerPref,
-      role: 'worker',
-      model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.25,
-      maxTokens: 180,
-      timeoutMs: 20000,
-    });
-    recordTokenUsage(resp.usage);
-    usedModelLabel = resp.provider ? `${resp.provider}:${resp.model}` : resp.model;
-    const parsed = extractJsonObject(resp.content);
-    const rawSteps = Array.isArray(parsed?.steps)
-      ? parsed.steps
-      : (parsed?.act || parsed?.action ? [parsed] : []);
-    planSteps = rawSteps
-      .filter(s => s && typeof s === 'object')
-      .slice(0, maxSteps)
-      .map(s => {
-        const act = String(s.act || s.action || 'scroll').toLowerCase();
-        const clickItem = act === 'click' && Number.isInteger(s.id) ? dom.clickables.find(c => c.id === s.id) : null;
-        const inputItem = act === 'fill' && Number.isInteger(s.id) ? dom.inputs.find(i => i.id === s.id) : null;
-        return {
-          act,
-          id: Number.isInteger(s.id) ? s.id : undefined,
-          val: typeof s.val === 'string' ? s.val : (typeof s.value === 'string' ? s.value : ''),
-          selectorHint: clickItem?.selector || inputItem?.selector || '',
-          targetText: clickItem?.text || '',
-        };
+    if (isDecisionModel(model)) {
+      // A decision model cannot write prose, but it classifies the page and picks one action in a
+      // single ~200-token request, and it cannot invent a selector that is not on the page.
+      const pick = await askActionChoice({
+        model,
+        dom,
+        instructions: 'Which single action would a real visitor take next on this page?',
+        contextNote: goal,
+        askPageState: true,
+        maxClicks: 14,
+        maxInputs: 8,
+        timeoutMs: 12000,
+        emailPlaceholder: ctx.sessionInbox?.address || ctx.sessionInbox?.email || '',
       });
+      if (!pick) throw new Error('decision model returned no usable option');
+      pageState = pick.pageState;
+      usedModelLabel = `systemone:${model}`;
+      if (pageState === 'error' || pageState === 'empty') {
+        aiTokenSaverStats.lastPageState = pageState;
+        return `מוח AI [decision:${pageState}]: הדף אינו שמיש — לא בוצעה פעולה`;
+      }
+      if (pick.act !== 'none') {
+        planSteps = [{
+          act: pick.act,
+          id: pick.id,
+          val: pick.val,
+          selectorHint: pick.selectorHint,
+          targetText: pick.targetText,
+        }];
+      }
+    } else {
+      const resp = await callAiChat({
+        provider: providerPref,
+        role: 'worker',
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.25,
+        maxTokens: 180,
+        timeoutMs: 20000,
+        json: true,
+      });
+      recordTokenUsage(resp.usage, resp.model);
+      usedModelLabel = resp.provider ? `${resp.provider}:${resp.model}` : resp.model;
+      const parsed = extractJsonObject(resp.content);
+      const rawSteps = Array.isArray(parsed?.steps)
+        ? parsed.steps
+        : (parsed?.act || parsed?.action ? [parsed] : []);
+      planSteps = rawSteps
+        .filter(s => s && typeof s === 'object')
+        .slice(0, maxSteps)
+        .map(s => {
+          const act = String(s.act || s.action || 'scroll').toLowerCase();
+          const clickItem = act === 'click' && Number.isInteger(s.id) ? dom.clickables.find(c => c.id === s.id) : null;
+          const inputItem = act === 'fill' && Number.isInteger(s.id) ? dom.inputs.find(i => i.id === s.id) : null;
+          return {
+            act,
+            id: Number.isInteger(s.id) ? s.id : undefined,
+            val: typeof s.val === 'string' ? s.val : (typeof s.value === 'string' ? s.value : ''),
+            selectorHint: clickItem?.selector || inputItem?.selector || '',
+            targetText: clickItem?.text || '',
+          };
+        });
+    }
   } catch (err) {
     const fb = await runScanProductsStep(page, { value: '1', sameOriginOnly }, ctx).catch(() => 'גלילה אנושית');
     return `מוח AI (Fallback ${err.message}): ${fb}`;
@@ -717,7 +951,152 @@ async function runAiExploreStep(page, step = {}, ctx = {}) {
     dom,
     { ...ctx, staySameOrigin: sameOriginOnly }
   );
-  return `מוח AI (${usedModelLabel}): ${actionsDone.join(' -> ') || 'scroll'}`;
+  const stateTag = pageState && pageState !== 'ready' ? ` [page:${pageState}]` : '';
+  return `מוח AI (${usedModelLabel})${stateTag}: ${actionsDone.join(' -> ') || 'scroll'}`;
+}
+
+/** Resolves Ollama credentials and asks the decision transport one typed question set. */
+async function askDecision({ model, state, questions, timeoutMs = 20000 }) {
+  const cred = resolveProviderConfig('ollama_cloud');
+  if (!cred.configured) {
+    const err = new Error('No cloud AI API key configured (OLLAMA_API_KEY).');
+    err.code = 'AI_NOT_CONFIGURED';
+    throw err;
+  }
+  const out = await callDecisionModel({ cred, model, state, questions, timeoutMs });
+  recordTokenUsage(out.usage, model);
+  return { ...out, model };
+}
+
+const PAGE_STATES = ['ready', 'consent_wall', 'login_required', 'empty', 'error'];
+// clef answers typed questions, so the page vocabulary has to be fixed and short. These lines are
+// the whole "prompt" — changing the wording changes the model's behaviour.
+const PAGE_STATE_CRITERIA = {
+  ready: 'Real content is visible and there is at least one safe element to act on.',
+  consent_wall: 'A cookie, consent or age overlay is covering the page.',
+  login_required: 'The page demands credentials before any content is reachable.',
+  empty: 'The page still has no usable content or interactive element.',
+  error: 'The page is a browser error, a server error, or a dead end.',
+};
+
+/**
+ * One decision round-trip over the compact DOM. It can classify the page and pick the next action in
+ * the same call, which is why it costs one 200-token request instead of a chat completion.
+ * Returns { act, id, val, confidence, pageState, selectorHint, targetText, model, latencyMs }.
+ */
+async function askActionChoice({
+  model,
+  dom,
+  instructions,
+  contextNote = '',
+  askPageState = false,
+  maxClicks = 14,
+  maxInputs = 8,
+  timeoutMs = 12000,
+  emailPlaceholder = '',
+}) {
+  const criteria = {};
+  const clickables = (dom.clickables || []).slice(0, maxClicks);
+  const inputs = (dom.inputs || []).slice(0, maxInputs);
+  clickables.forEach(c => {
+    criteria[`click:${c.id}`] = `Click the element labelled "${String(c.text || 'unnamed').slice(0, 60)}".`;
+  });
+  inputs.forEach(i => {
+    const kind = i.type || 'text';
+    const ph = i.placeholder ? ` with placeholder "${String(i.placeholder).slice(0, 40)}"` : '';
+    const useEmail = kind === 'email' && emailPlaceholder ? ' using the session email' : '';
+    criteria[`fill:${i.id}`] = `Type into the ${kind} field${ph}${useEmail}.`;
+  });
+  criteria.scroll = 'Scroll down when the next control is probably below the fold.';
+  criteria.none = 'Do nothing when no safe action is visible.';
+  if (Object.keys(criteria).length < 2) return null;
+
+  const state = {
+    page: String(dom.title || '').slice(0, 120),
+    url: String(dom.url || '').slice(0, 200),
+    buttonsAndLinks: clickables.map(c => String(c.text || '').slice(0, 40)),
+    fields: inputs.map(i => ({ id: i.id, type: i.type || 'text' })),
+    ...(contextNote ? { context: String(contextNote).slice(0, 160) } : {}),
+  };
+
+  const questions = {
+    next_action: { type: 'choice', instructions, criteria },
+  };
+  if (askPageState) {
+    questions.page_state = {
+      type: 'choice',
+      instructions: 'What is this page right now?',
+      criteria: PAGE_STATE_CRITERIA,
+    };
+  }
+
+  const t0 = Date.now();
+  const out = await askDecision({ model, state, questions, timeoutMs });
+  const answer = out.answers?.next_action;
+  const pageAnswer = out.answers?.page_state;
+  const pageState = PAGE_STATES.includes(String(pageAnswer?.choice)) ? String(pageAnswer.choice) : 'unknown';
+  const picked = String(answer?.choice || '').trim();
+  aiTokenSaverStats.decisionCalls += 1;
+
+  const base = {
+    pageState,
+    pageConfidence: typeof pageAnswer?.confidence === 'number' ? pageAnswer.confidence : null,
+    probabilities: answer?.probabilities || null,
+    confidence: typeof answer?.confidence === 'number' ? answer.confidence : null,
+    model,
+    latencyMs: Date.now() - t0,
+  };
+
+  const [kind, rawId] = picked.split(':');
+  const numId = Number(rawId);
+  let act = 'scroll';
+  let id;
+  let selectorHint = '';
+  let targetText = '';
+  if (kind === 'click' && Number.isInteger(numId)) {
+    const item = clickables.find(c => c.id === numId);
+    if (!item) return { ...base, act: 'none' };
+    act = 'click';
+    id = numId;
+    selectorHint = item.selector || '';
+    targetText = item.text || '';
+  } else if (kind === 'fill' && Number.isInteger(numId)) {
+    const item = inputs.find(i => i.id === numId);
+    if (!item) return { ...base, act: 'none' };
+    act = 'fill';
+    id = numId;
+    selectorHint = item.selector || '';
+  } else if (!picked || picked === 'none') {
+    return { ...base, act: 'none' };
+  } else if (picked !== 'scroll') {
+    return { ...base, act: 'none' };
+  }
+
+  return {
+    ...base,
+    act,
+    id,
+    val: act === 'fill' ? emailPlaceholder : '',
+    selectorHint,
+    targetText,
+  };
+}
+
+/**
+ * Asks the decision model which single UI action unblocks a stalled recording step.
+ * Returns { act, id, val, confidence, model, latencyMs } or null when there is nothing to pick.
+ */
+async function askRecoveryDecision(model, dom, ctx = {}, failedHint = '') {
+  const pick = await askActionChoice({
+    model,
+    dom,
+    instructions: 'Which single action moves the form forward with the least risk?',
+    contextNote: `Previous step failed: ${String(failedHint || '').slice(0, 80)}. Goal: move a signup / consent / checkout form one step forward.`,
+    emailPlaceholder: ctx.sessionInbox?.address || ctx.sessionInbox?.email || '',
+    timeoutMs: 12000,
+  });
+  if (!pick || pick.act === 'none') return null;
+  return pick;
 }
 
 /**
@@ -766,29 +1145,44 @@ async function runAiSmartRecoveryStep(page, ctx = {}, failedHint = '') {
     'Pick ONE visible button/link or input id to progress the form/signup/consent naturally, or act="none".',
     'Reply ONLY JSON: {"act":"click|fill|scroll|none","id":0,"val":"..."}',
   ].join(' ');
-  const userPrompt = JSON.stringify({
+  const userPrompt = JSON.stringify(redactData({
     hint: String(failedHint || '').slice(0, 80),
     email: emailPlaceholder ? 'USE_SESSION_EMAIL' : '',
     i: dom.inputs.map(x => ({ id: x.id, t: x.type, ph: x.placeholder })),
     c: dom.clickables.map(x => ({ id: x.id, txt: x.text })),
-  });
+  }));
+
+  const recoveryModel = ctx.aiConfig?.recoveryModel || ctx.aiConfig?.commanderModel || DEFAULT_COMMANDER_MODEL;
 
   try {
     aiTokenSaverStats.recoveryCalls += 1;
-    const resp = await callAiChat({
-      provider: providerPref,
-      role: 'worker',
-      model: ctx.aiConfig?.workerModel || DEFAULT_WORKER_MODEL,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.15,
-      maxTokens: 110,
-      timeoutMs: 14000,
-    });
-    recordTokenUsage(resp.usage);
-    const parsed = extractJsonObject(resp.content);
+    let parsed = null;
+    let usedRecoveryModel = recoveryModel;
+
+    if (isDecisionModel(recoveryModel)) {
+      const pick = await askRecoveryDecision(recoveryModel, dom, ctx, failedHint);
+      if (pick) parsed = { act: pick.act, id: pick.id, val: pick.val };
+    }
+
+    if (!parsed) {
+      const resp = await callAiChat({
+        provider: providerPref,
+        role: 'recovery',
+        model: recoveryModel,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.15,
+        maxTokens: 110,
+        timeoutMs: 14000,
+        json: true,
+      });
+      recordTokenUsage(resp.usage, resp.model);
+      usedRecoveryModel = resp.model;
+      parsed = extractJsonObject(resp.content);
+    }
+
     const act = String(parsed?.act || parsed?.action || 'none').toLowerCase();
     if (!parsed || act === 'none') return null;
 
@@ -807,12 +1201,12 @@ async function runAiSmartRecoveryStep(page, ctx = {}, failedHint = '') {
       targetText: clickItem?.text || '',
     }];
     setCachedPlaybook(recoverKey, {
-      model: `${resp.provider}:${resp.model}`,
+      model: `ollama_cloud:${usedRecoveryModel}`,
       planSteps,
       estTokens: Math.round((systemPrompt.length + userPrompt.length) / 3.5) + 50,
     });
     const done = await executePlannedWorkerActions(page, planSteps, dom, ctx);
-    return done.length ? `התאוששות AI (${resp.model}): ${done.join(' -> ')}` : null;
+    return done.length ? `התאוששות AI (${usedRecoveryModel}): ${done.join(' -> ')}` : null;
   } catch {
     return null;
   }
@@ -926,6 +1320,7 @@ async function askFleetCommander({
   maxTokens = 1800,
   isAutoCheck = false,
 } = {}) {
+  registerStepSecrets(config.taskSteps);
   const chosenModel = model || config.ai?.commanderModel || DEFAULT_COMMANDER_MODEL;
   const providerPref = normalizeAiProvider(provider || config.ai?.provider || 'auto');
   const statusInfo = getOllamaStatusPublic();
@@ -1078,7 +1473,7 @@ async function askFleetCommander({
     ...sanitizedHistory,
     {
       role: 'user',
-      content: `פקודה/שאלה מהמפעיל: ${message || 'תן תמונת מצב קצרה על הצי והמלצה'}\n\nטלמטריה חיה:\n${JSON.stringify(telemetrySummary)}`,
+      content: `פקודה/שאלה מהמפעיל: ${message || 'תן תמונת מצב קצרה על הצי והמלצה'}\n\nטלמטריה חיה:\n${JSON.stringify(redactData(telemetrySummary))}`,
     },
   ];
 
@@ -1093,6 +1488,7 @@ async function askFleetCommander({
       timeoutMs: 22000,
     });
 
+    recordTokenUsage(resp.usage, resp.model);
     const parsedReply = parseCommanderReply(resp.content || '');
 
     return {
@@ -1124,11 +1520,23 @@ module.exports = {
   getOllamaStatusPublic,
   callAiChat,
   callOllamaChat,
+  callDecisionModel,
+  askDecision,
+  askActionChoice,
+  PAGE_STATES,
+  askRecoveryDecision,
+  isDecisionModel,
+  DECISION_MODELS,
+  OLLAMA_DECISION_PATH,
   captureCompactDomForAi,
   sanitizeWorkerGoal,
   getPlaybookCacheKey,
   getRouteGroupCacheKey,
   getAiTokenSaverStats,
+  getModelMemory,
+  preferredTransport,
+  THINK_BY_ROLE,
+  AI_MODELS_FILE,
   aiPagePlaybookCache,
   runAiExploreStep,
   runAiSmartRecoveryStep,

@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
 const { askFleetCommander } = require('./aiCommander');
+const { maskEmail, redactText, redactData, registerStepSecrets } = require('./redaction');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const REPORTS_DIR = path.join(ROOT_DIR, 'reports');
@@ -30,14 +31,21 @@ function savePersistentSessionState({ runState, logHistory, visitDetails, aiHist
       visitDetails: Array.isArray(visitDetails) ? visitDetails.slice(0, 100) : [],
       aiHistory: Array.isArray(aiHistory) ? aiHistory.slice(-40) : [],
     };
-    fs.writeFileSync(SESSION_STATE_FILE, JSON.stringify(payload, null, 2), 'utf8');
+    fs.writeFileSync(SESSION_STATE_FILE, JSON.stringify({ ...redactData(payload), redactionVersion: 1 }, null, 2), 'utf8');
   } catch {}
 }
 
 function loadPersistentSessionState() {
   try {
     if (!fs.existsSync(SESSION_STATE_FILE)) return null;
-    return JSON.parse(fs.readFileSync(SESSION_STATE_FILE, 'utf8'));
+    const state = JSON.parse(fs.readFileSync(SESSION_STATE_FILE, 'utf8'));
+    if (state.redactionVersion === 1) return redactData(state);
+    // Older saved telemetry can include truncated field values that cannot be safely matched.
+    if (state.runState) {
+      const { status, startedAt, finishedAt, totalPlanned, completed, succeeded, failed, streamMode, streamWave } = state.runState;
+      return { runState: { status, startedAt, finishedAt, totalPlanned, completed, succeeded, failed, streamMode, streamWave } };
+    }
+    return null;
   } catch {
     return null;
   }
@@ -86,7 +94,12 @@ async function generateRunPdfReport({
   config = {},
   logs = [],
   visitDetails = [],
+  inboxes = [],
 } = {}) {
+  registerStepSecrets(config.taskSteps);
+  runState = redactData(runState);
+  logs = redactData(logs);
+  visitDetails = redactData(visitDetails);
   ensureReportsDir();
   const now = new Date();
   const stamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -99,91 +112,37 @@ async function generateRunPdfReport({
   const pdfPath = path.join(REPORTS_DIR, pdfFile);
   const jsonPath = path.join(REPORTS_DIR, jsonFile);
 
-  // Extract email addresses created & confirmed from logs
-  const createdEmails = [];
-  const confirmedEmails = [];
-  let convertersCount = 0;
-  let organicCount = 0;
+  const createdEmails = [...new Map(inboxes.map(inbox => [inbox.inbox_id, maskEmail(inbox.address)])).values()];
+  const planned = runState.totalPlanned ?? config.visitCount ?? 0;
+  const succeeded = runState.succeeded ?? 0;
+  const failed = runState.failed ?? 0;
+  const averageLoadMs = runState.avgLoadMs ?? 0;
+  const target = redactText(runState.targetUrl || config.targetUrl);
+  let summary = [
+    'Visits: ' + succeeded + ' succeeded out of ' + planned + ' planned. ' + failed + ' failed.',
+    'Average page load: ' + averageLoadMs + ' ms.',
+    'Live inboxes created: ' + createdEmails.length + '.'
+  ].join('\n');
+  let aiModelUsed = 'Local summary';
 
-  for (const entry of logs) {
-    const msg = String(entry?.message || '');
-    const emailMatch = msg.match(/([a-f0-9]{16,64}@gethirepulse\.xyz)/i);
-    if (msg.includes('נוצרה תיבת מייל חיה לסוכן') && emailMatch) {
-      if (!createdEmails.includes(emailMatch[1])) createdEmails.push(emailMatch[1]);
-    }
-    if (
-      msg.includes('אישור מייל אוטומטי') ||
-      msg.includes('אישור קוד OTP אוטומטי') ||
-      msg.includes('מייל התקבל בתיבת הסוכן') ||
-      msg.includes('נשלף קוד אימות חי מהמייל')
-    ) {
-      const targetEmail = emailMatch ? emailMatch[1] : `otp-${confirmedEmails.length + 1}`;
-      if (!confirmedEmails.includes(targetEmail)) confirmedEmails.push(targetEmail);
-    }
-    if (msg.includes('🎯[מסלול המרה+רישום מייל]') || msg.includes('🎯[מסלול מוקלט מלא]')) convertersCount++;
-    if (msg.includes('🌿[גלישה אורגנית באתר]')) organicCount++;
-  }
-
-  // Ask the connected AI model for a comprehensive Hebrew executive summary
-  let aiSummaryHe = '';
-  let aiModelUsed = config.ai?.commanderModel || 'glm-5.3-flash';
-  try {
-    const proxySaverLine = logs.find(l => String(l?.message || '').includes('[Proxy Saver]'))?.message || '';
-    const aiBrainLine = logs.find(l => String(l?.message || '').includes('[AI Brain]'))?.message || '';
-    const hasEmailFlow = (config.taskSteps || []).some(
-      s => ['fill_email', 'fill_otp'].includes(s?.type) || /mail|email|otp/i.test(`${s?.selector || ''} ${s?.label || ''}`)
-    );
-    const wasManualStop = logs.some(l => /נעצרו ידנית|מתבצעת עצירה מבוקרת/.test(String(l?.message || '')));
-    const summaryPrompt = [
-      'הריצה הסתיימה כעת. כתוב דוח סיכום מנהלים מקצועי ומפורט בעברית בלבד (ללא שום מילה באנגלית וללא COMMAND_JSON).',
-      `יעד הריצה: ${runState.targetUrl || config.targetUrl}`,
-      `תוצאות: ${runState.succeeded || 0}/${runState.totalPlanned || config.visitCount || 0} הצליחו, ${runState.failed || 0} נכשלו, זמן טעינה ממוצע: ${runState.avgLoadMs || 0}ms.`,
-      wasManualStop ? 'הערה חשובה: ההרצה הופסקה ידנית על ידי המפעיל (סגירת דפדפנים אחרי פקודת העצירה היא חלק מכיבוי מבוקר ואינה קריסת זיכרון).' : '',
-      hasEmailFlow
-        ? `פיצול סוכנים: ${convertersCount} סוכני המרה ורישום מייל, ${organicCount} סוכני גלישה אורגנית.`
-        : `פיצול סוכנים: ${convertersCount} סוכני מסלול מוקלט מלא, ${organicCount} סוכני גלישה אורגנית באתר.`,
-      (hasEmailFlow || createdEmails.length > 0)
-        ? `תיבות מייל חיות שנוצרו: ${createdEmails.length} (${confirmedEmails.length} אומתו).`
-        : 'סוג תרחיש: ללא שלב רישום מייל בהקלטה (אין לצפות לתיבות מייל או המרות מייל).',
-      proxySaverLine ? `חיסכון בפרוקסי: ${proxySaverLine}` : '',
-      aiBrainLine ? `חיסכון ופעילות AI: ${aiBrainLine}` : '',
-      'חלק את הסיכום ל-4 סעיפים קצרים וברורים עם נקודות:',
-      '1. ציון כולל וביצועי הרצה',
-      '2. ניתוח מסלולי הסוכנים',
-      '3. יציבות רשת, פרוקסי וזיכרון',
-      '4. מסקנות והמלצות להרצה הבאה',
-    ].filter(Boolean).join('\n');
-
-    const SYNTHETIC_NOISE_RE = /Clipboard|writeText|downloadable font|ResizeObserver loop|favicon\.ico|ERR_BLOCKED_BY_CLIENT/i;
-    const cleanVisitDetails = (visitDetails || []).map(v => {
-      if (!v || !Array.isArray(v.errorDetails)) return v;
-      const filtered = v.errorDetails.filter(e => !SYNTHETIC_NOISE_RE.test(String(e || '')));
-      return { ...v, errorDetails: filtered, pageErrors: filtered.length };
-    });
-
-    const aiRes = await askFleetCommander({
-      message: summaryPrompt,
-      runState,
-      config,
-      recentLogs: logs.slice(-25),
-      visitDetails: cleanVisitDetails,
-      model: config.ai?.commanderModel,
-      provider: config.ai?.provider,
-      maxTokens: 1500,
-    });
-    if (aiRes && aiRes.reply && !/^Let me analyze/i.test(aiRes.reply.trim())) {
-      aiSummaryHe = aiRes.reply.trim();
-      aiModelUsed = `${aiRes.provider || 'cloud'}:${aiRes.model || aiModelUsed}`;
-    }
-  } catch {}
-
-  if (!aiSummaryHe) {
-    aiSummaryHe = [
-      `• ביצועי הריצה: הושלמו ${runState.completed || 0} מתוך ${runState.totalPlanned || config.visitCount || 0} ביקורים מתוכננים ביעד ${runState.targetUrl || config.targetUrl} (${runState.succeeded || 0} הצליחו, ${runState.failed || 0} שגיאות, זמן טעינה ממוצע: ${runState.avgLoadMs || 0}ms).`,
-      `• פיצול משפך: ${convertersCount} סוכנים ביצעו את מסלול ההמרה והרישום המלא, ו-${organicCount} סוכנים ביצעו גלישה אורגנית מגוונת בעמודי האתר.`,
-      `• אימיילים חיים (@gethirepulse.xyz): נוצרו ${createdEmails.length} תיבות מייל ייחודיות לסוכנים (${confirmedEmails.length} אומתו).`,
-      `• רשת ופרוקסי: הריצה פעלה במצב ${config.stealthMode || 'maximum'} עם רוטציית פרוקסי (${(config.proxy?.preferredCountries || []).join(', ') || 'ללא סינון'}).`,
+  if (config.ai?.enabled) {
+    const prompt = [
+      'Summarize this browser QA run in English, focusing on failures and next steps.',
+      'Report only outcomes visible in the supplied data. An inbox created is not evidence of a verified signup.',
+      'Target: ' + target,
+      'Status: ' + (runState.status || 'unknown'),
+      summary,
     ].join('\n');
+    try {
+      const review = await askFleetCommander({
+        message: prompt, runState, config, recentLogs: logs.slice(-25), visitDetails,
+        model: config.ai.commanderModel, provider: config.ai.provider, maxTokens: 1500,
+      });
+      if (!review.fallbackUsed && review.reply && !/^Let me analyze/i.test(review.reply.trim())) {
+        summary = redactText(review.reply.trim());
+        aiModelUsed = review.provider + ':' + review.model;
+      }
+    } catch {}
   }
 
   const visitRowsHtml = (visitDetails || []).slice().reverse().map(v => {
@@ -191,7 +150,7 @@ async function generateRunPdfReport({
       ? v.visitedUrls.map(u => `${u.path || u.url} (${u.status})`).join(' ← ')
       : (v.routeSummary || '-');
     const isOk = Boolean(v.ok || (typeof v.status === 'number' && v.status >= 200 && v.status < 400));
-    const badgeLabel = isOk ? `תקין (${v.status || 200})` : `שגיאה (${v.status || 'err'})`;
+    const badgeLabel = isOk ? `OK (${v.status || 200})` : `Error (${v.status || 'err'})`;
     return `
       <tr>
         <td>#${escapeHtml(v.visit ?? v.visitNumber ?? '-')}</td>
@@ -212,10 +171,10 @@ async function generateRunPdfReport({
   }).join('');
 
   const htmlContent = `<!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8" />
-  <title>דוח הרצה מסכם — ${escapeHtml(reportId)}</title>
+  <title>Run report — ${escapeHtml(reportId)}</title>
   <style>
     @page { size: A4; margin: 14mm; }
     body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; background: #0f172a; color: #f1f5f9; margin: 0; padding: 24px; line-height: 1.55; }
@@ -230,7 +189,7 @@ async function generateRunPdfReport({
     .card h2 { margin: 0 0 10px 0; font-size: 15px; color: #38bdf8; border-bottom: 1px solid #334155; padding-bottom: 6px; }
     .ai-box { white-space: pre-wrap; font-size: 13px; color: #e2e8f0; background: #0f172a; border-right: 4px solid #38bdf8; padding: 14px; border-radius: 8px; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    th, td { border-bottom: 1px solid #334155; padding: 8px 6px; text-align: right; }
+    th, td { border-bottom: 1px solid #334155; padding: 8px 6px; text-align: left; }
     th { color: #94a3b8; background: #0f172a; }
     .badge { padding: 2px 7px; border-radius: 99px; font-size: 10px; font-weight: 700; }
     .badge.ok { background: rgba(74, 222, 128, 0.18); color: #4ade80; }
@@ -245,58 +204,58 @@ async function generateRunPdfReport({
 <body>
   <div class="header">
     <div>
-      <h1>📊 דוח הרצה מסכם ומפורט (AI Fleet Report)</h1>
-      <div class="meta">יעד: <strong>${escapeHtml(runState.targetUrl || config.targetUrl)}</strong> | תאריך: ${escapeHtml(now.toLocaleString('he-IL'))} | מודל מסכם: ${escapeHtml(aiModelUsed)}</div>
+      <h1>Run report</h1>
+      <div class="meta">Target <strong>${escapeHtml(redactText(runState.targetUrl || config.targetUrl))}</strong> | Date ${escapeHtml(now.toLocaleString('en-GB'))} | Summary ${escapeHtml(aiModelUsed)}</div>
     </div>
-    <div style="text-align:left;font-size:12px;color:#4ade80;font-weight:700;">מזהה דוח:<br/>${escapeHtml(reportId)}</div>
+    <div style="text-align:left;font-size:12px;color:#4ade80;font-weight:700;">Report ID<br/>${escapeHtml(reportId)}</div>
   </div>
 
   <div class="kpi-grid">
-    <div class="kpi"><div class="val">${escapeHtml(`${runState.succeeded || 0}/${runState.totalPlanned || config.visitCount || 0}`)}</div><div class="lbl">ביקורים שהצליחו</div></div>
-    <div class="kpi"><div class="val">${escapeHtml(`${runState.avgLoadMs || 0}ms`)}</div><div class="lbl">זמן טעינה ממוצע</div></div>
-    <div class="kpi"><div class="val">${escapeHtml(`${convertersCount} / ${organicCount}`)}</div><div class="lbl">המרה 🎯 מול אורגני 🌿</div></div>
-    <div class="kpi"><div class="val">${escapeHtml(String(createdEmails.length))}</div><div class="lbl">תיבות מייל חיות שנוצרו</div></div>
-    <div class="kpi"><div class="val">${escapeHtml((config.proxy?.preferredCountries || []).join(', ') || 'Direct')}</div><div class="lbl">מדינות Proxy פעילות</div></div>
+    <div class="kpi"><div class="val">${escapeHtml(`${runState.succeeded || 0}/${runState.totalPlanned || config.visitCount || 0}`)}</div><div class="lbl">Successful visits</div></div>
+    <div class="kpi"><div class="val">${escapeHtml(`${runState.avgLoadMs || 0}ms`)}</div><div class="lbl">Average load time</div></div>
+    <div class="kpi"><div class="val">${escapeHtml(`${failed}`)}</div><div class="lbl">Failed visits</div></div>
+    <div class="kpi"><div class="val">${escapeHtml(String(createdEmails.length))}</div><div class="lbl">Inboxes created</div></div>
+    <div class="kpi"><div class="val">${escapeHtml(config.proxy?.enabled ? ((config.proxy.preferredCountries || []).join(', ') || 'Any') : 'Direct')}</div><div class="lbl">Proxy countries</div></div>
   </div>
 
   <div class="card">
-    <h2>🧠 סיכום מנהלים ותובנות מודל ה-AI (${escapeHtml(aiModelUsed)})</h2>
-    <div class="ai-box">${escapeHtml(aiSummaryHe)}</div>
+    <h2>Run summary (${escapeHtml(aiModelUsed)})</h2>
+    <div class="ai-box">${escapeHtml(summary)}</div>
   </div>
 
   <div class="card">
-    <h2>📧 תיבות אימייל חיות שנוצרו בריצה (@gethirepulse.xyz)</h2>
+    <h2>Inboxes created in this run</h2>
     <div style="font-size:12px;color:#cbd5e1;">
       ${createdEmails.length
-        ? createdEmails.map(e => `<div>• <code>${escapeHtml(e)}</code> ${confirmedEmails.includes(e) ? '<span class="badge ok">אומת בהצלחה ✅</span>' : '<span class="badge">נוצר והוזן בטופס</span>'}</div>`).join('')
-        : 'לא נוצרו תיבות מייל חדשות בריצה זו.'}
+        ? createdEmails.map(e => `<div>• <code>${escapeHtml(e)}</code> <span class="badge">Created</span></div>`).join('')
+        : 'No inboxes were created.'}
     </div>
   </div>
 
   <div class="card">
-    <h2>🛣️ פירוט ביקורים ומסלולים (Visit-by-Visit Breakdown)</h2>
+    <h2>Visit results</h2>
     <table>
       <thead>
         <tr>
-          <th>ביקור</th>
-          <th>סטטוס</th>
-          <th>פרסונה</th>
-          <th>מכשיר</th>
-          <th>מדינה (Geo)</th>
-          <th>זמן טעינה</th>
-          <th>מסלול עמודים וטאבים</th>
+          <th>Visit</th>
+          <th>Status</th>
+          <th>Persona</th>
+          <th>Device</th>
+          <th>Country</th>
+          <th>Load time</th>
+          <th>Pages and tabs</th>
         </tr>
       </thead>
       <tbody>
-        ${visitRowsHtml || '<tr><td colspan="7">אין נתוני ביקורים מפורטים.</td></tr>'}
+        ${visitRowsHtml || '<tr><td colspan="7">No visit details available.</td></tr>'}
       </tbody>
     </table>
   </div>
 
   <div class="card" style="page-break-inside: auto;">
-    <h2>📜 יומן לוגים מלא של ההרצה (${logs.length} שורות — שמור לצמיתות)</h2>
+    <h2>Run log (${logs.length} lines)</h2>
     <div class="log-container">
-      ${logLinesHtml || 'אין שורות לוג.'}
+      ${logLinesHtml || 'No log entries.'}
     </div>
   </div>
 </body>
@@ -331,12 +290,9 @@ async function generateRunPdfReport({
     succeeded: runState.succeeded || 0,
     failed: runState.failed || 0,
     avgLoadMs: runState.avgLoadMs || 0,
-    convertersCount,
-    organicCount,
     emailsCreated: createdEmails.length,
-    emailsConfirmed: confirmedEmails.length,
     aiModelUsed,
-    aiSummaryHe,
+    aiSummaryHe: summary,
     pdfFile: pdfCreated ? pdfFile : null,
     htmlFile,
     logLinesCount: logs.length,

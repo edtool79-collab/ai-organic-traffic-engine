@@ -91,7 +91,7 @@ Each step has a `type`. Depending on the handler it can also carry `selector`, `
 | `config.example.json` | Public configuration template. |
 | `config.json` | Ignored local operator configuration. |
 | `proxies.txt`, `proxies-fallback.txt` | Ignored operator-supplied primary and fallback pools. |
-| `site-profiles/` | Named scenario/configuration presets and active-profile metadata. Review profiles before sharing them. |
+| `site-profiles/` | General presets plus ignored local profiles and active-profile metadata. |
 | `session-profiles/` | Ignored browser session and proxy geography cache. |
 | `reports/` | Ignored run and inbox state, report metadata, HTML and PDFs. |
 | `storage/` | Ignored Crawlee runtime storage. |

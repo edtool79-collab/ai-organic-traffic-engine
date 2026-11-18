@@ -1,5 +1,6 @@
 const { AD_SAFE_EXCLUSION_SELECTOR, dismissBlockingOverlays, registerScenarioPage } = require('./adSafetyHelper');
 const { getEmailClientStatus } = require('./emailInboxClient');
+const { redactText, safeStepLabel } = require('./redaction');
 
 const WAVE_MODE_META = {
   off: { label: 'רגיל (ללא גלים)' },
@@ -79,6 +80,39 @@ const DEFAULT_FORM_POOL = {
     'Exploring features for a small team setup.',
   ],
 };
+
+/**
+ * Coherent US identities. Every field of one identity agrees: the ZIP belongs to the city/state,
+ * the phone area code belongs to that state, and the name matches the e-mail local part.
+ * A form filled from mixed sources (Israeli phone + Indiana state + Arizona ZIP) fails the
+ * advertiser's fraud screening, so a lead is never counted even when the submit succeeds.
+ */
+const US_IDENTITIES = [
+  { first: 'Daniel', last: 'Whitaker', street: '4821 Maple Grove Dr', city: 'Indianapolis', state: 'IN', zip: '46268', phone: '(317) 482-7361', month: 4, day: 12, year: 1991, gender: 'M' },
+  { first: 'Emily', last: 'Carter', street: '915 Sunset Ridge Ln', city: 'Charlotte', state: 'NC', zip: '28202', phone: '(704) 391-5284', month: 9, day: 3, year: 1988, gender: 'F' },
+  { first: 'Michael', last: 'Rodriguez', street: '2207 Palm Bay Ct', city: 'Orlando', state: 'FL', zip: '32806', phone: '(407) 615-2947', month: 1, day: 27, year: 1993, gender: 'M' },
+  { first: 'Jessica', last: 'Bennett', street: '1433 Birchwood Ave', city: 'Columbus', state: 'OH', zip: '43215', phone: '(614) 528-9036', month: 6, day: 8, year: 1990, gender: 'F' },
+  { first: 'Ryan', last: 'Hoffman', street: '3802 Canyon Rim Rd', city: 'Phoenix', state: 'AZ', zip: '85016', phone: '(602) 744-8125', month: 11, day: 19, year: 1986, gender: 'M' },
+  { first: 'Ashley', last: 'Turner', street: '7719 Meadow Creek Pkwy', city: 'Plano', state: 'TX', zip: '75024', phone: '(972) 603-4471', month: 3, day: 5, year: 1994, gender: 'F' },
+  { first: 'Kevin', last: 'Brennan', street: '6120 Forest Hill Ave', city: 'Richmond', state: 'VA', zip: '23225', phone: '(804) 512-7763', month: 8, day: 22, year: 1985, gender: 'M' },
+  { first: 'Lauren', last: 'Mitchell', street: '189 Elm Street', city: 'Nashville', state: 'TN', zip: '37203', phone: '(615) 337-6098', month: 12, day: 1, year: 1992, gender: 'F' },
+  { first: 'Brian', last: 'Sullivan', street: '4408 Lakeview Blvd', city: 'Grand Rapids', state: 'MI', zip: '49503', phone: '(616) 274-5390', month: 5, day: 16, year: 1989, gender: 'M' },
+  { first: 'Megan', last: 'Fisher', street: '2714 Hillcrest Rd', city: 'Pittsburgh', state: 'PA', zip: '15213', phone: '(412) 918-4653', month: 2, day: 11, year: 1995, gender: 'F' },
+  { first: 'Andrew', last: 'Palmer', street: '9055 Willow Bend Dr', city: 'Atlanta', state: 'GA', zip: '30309', phone: '(404) 726-3814', month: 10, day: 29, year: 1987, gender: 'M' },
+  { first: 'Rachel', last: 'Cooper', street: '3320 Harbor Point Way', city: 'San Diego', state: 'CA', zip: '92109', phone: '(619) 405-9276', month: 7, day: 4, year: 1991, gender: 'F' },
+];
+
+function pickIdentity() {
+  return US_IDENTITIES[Math.floor(Math.random() * US_IDENTITIES.length)];
+}
+
+// Fields that must always come from the chosen identity — never from the recorded junk values.
+function isIdentityField(step) {
+  const hint = `${step.selector || ''} ${step.value || ''}`.toLowerCase();
+  // E-mail is part of the identity: keeping a recorded address (or rolling a new one per step)
+  // makes the visit internally inconsistent, which is exactly what fraud screening rejects.
+  return /first.?name|last.?name|address|street|city|state|zip|postal|phone|tel|dob|birth|gender|sex|mail|e-mail/.test(hint);
+}
 
 function clamp(n, min, max, fallback) {
   const num = Number(n);
@@ -191,7 +225,7 @@ function buildNormalizedFormPool(wavesCfg = {}) {
   };
 }
 
-function selectVariedFormValue(step, formPool, persona) {
+function selectVariedFormValue(step, formPool, persona, identity = null) {
   const rawSel = String(step.selector || '').toLowerCase();
   const rawVal = String(step.value || '').trim();
   const labelValHint = `${step.label || ''} ${rawVal}`.toLowerCase();
@@ -199,18 +233,37 @@ function selectVariedFormValue(step, formPool, persona) {
   const hint = `${attrHint} ${labelValHint}`;
 
   if (/mail|email|e-mail/.test(hint) || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawVal)) {
+    // One address per visit: the same value the AI guard and the summary use. Either the live
+    // inbox template (resolved by the runner) or the name-matched fallback — never a new random one.
+    if (identity && identity.email) return identity.email;
     try {
       if (getEmailClientStatus().configured) {
         return '{{AGENT_EMAIL}}';
       }
     } catch {}
-    const rawName = (pickRandom(formPool.names) || 'alex.morgan').toLowerCase().replace(/[^a-z]+/g, '.');
-    const dom = pickRandom(['gmail.com', 'outlook.com', 'yahoo.com', 'icloud.com']);
-    return `${rawName}${Math.floor(10 + Math.random() * 89)}@${dom}`;
+    const local = identity
+      ? `${identity.first}.${identity.last}`.toLowerCase().replace(/[^a-z.]+/g, '')
+      : (pickRandom(formPool.names) || 'alex.morgan').toLowerCase().replace(/[^a-z]+/g, '.');
+    const dom = identity ? 'gmail.com' : pickRandom(['gmail.com', 'outlook.com', 'yahoo.com', 'icloud.com']);
+    return `${local}${Math.floor(10 + Math.random() * 89)}@${dom}`;
   }
   if (/pass|pwd|סיסמה/.test(hint)) {
     const prefixes = ['Aurora', 'Kinetix', 'Nordic', 'Velvet', 'Harbor', 'Solaris'];
     return `${pickRandom(prefixes)}#${Math.floor(1000 + Math.random() * 8999)}!a`;
+  }
+  // Identity-first: address block must stay internally consistent or the advertiser rejects the lead.
+  if (identity) {
+    if (/gender|sex/.test(hint)) return identity.gender;
+    if (/(dob|birth)[^a-z]*year|year[^a-z]*(dob|birth)/.test(hint)) return String(identity.year);
+    if (/(dob|birth)[^a-z]*month|month[^a-z]*(dob|birth)/.test(hint)) return String(identity.month);
+    if (/(dob|birth)[^a-z]*day|day[^a-z]*(dob|birth)/.test(hint)) return String(identity.day);
+    if (/zip|postal|postcode|מיקוד/.test(hint)) return identity.zip;
+    if (/state|province|region|מדינה/.test(hint)) return identity.state;
+    if (/city|town|locality|עיר/.test(hint)) return identity.city;
+    if (/address|street|addr|כתובת/.test(hint)) return identity.street;
+    if (/phone|tel|mobile|טלפון/.test(hint)) return identity.phone;
+    if (/first.?name|fname|given.?name|שם פרטי/.test(hint)) return identity.first;
+    if (/last.?name|lname|surname|family.?name|שם משפחה/.test(hint)) return identity.last;
   }
   if (/company|brand|business|org|חברה|מותג/.test(hint)) {
     const brands = ['Northline Studio', 'Apex Commerce', 'Lumina Goods', 'Harbor & Co', 'Veloce Retail', 'PureBotanics'];
@@ -275,24 +328,20 @@ function analyzeRecordedJourney(baseSteps = [], targetUrl = '') {
       hasGuidesFlow = true;
     }
     if (s.type === 'goto' && s.value && !/^https?:/i.test(String(s.value))) {
-      routeSet.add(String(s.value));
+      routeSet.add(redactText(s.value));
     } else if (s.selector) {
       const m = String(s.selector).match(/a\[href=["'](\/[^"']*)["']\]/i);
       if (m && m[1]) routeSet.add(m[1]);
     }
     if (['click', 'fill', 'fill_email', 'fill_otp'].includes(s.type) && actionLabels.length < 6 && s.label) {
-      actionLabels.push(String(s.label).slice(0, 55));
+      actionLabels.push(safeStepLabel(s).slice(0, 55));
     }
     if (compactSteps.length < 25) {
-      let targetHint = s.value || '';
-      if (!targetHint && s.selector) {
-        targetHint = String(s.selector).slice(0, 65);
-      }
       let fallbackHost = '';
       if (s.popupFallbackUrl) {
         try { fallbackHost = new URL(s.popupFallbackUrl).hostname; } catch {}
       }
-      const fullLabel = String(s.label || targetHint || s.type);
+      const fullLabel = safeStepLabel(s);
       const compactLabel = fullLabel.length <= 125
         ? fullLabel
         : `${fullLabel.slice(0, 70)} ... ${fullLabel.slice(-45)}`;
@@ -416,8 +465,18 @@ function buildChildJourney({
 
   // If !isConverter, strip out external tab / partner clicks, ad redirects, and email signup steps so only conversionRate% convert
   const PARTNER_AD_HOST_RE = /(?:uplcm|tatrck|rcpsj|ypetp|codeaven|rzekl|grfpr|click\.|track\.|go\.)/i;
+  // The recording may live on a different domain than targetUrl (smart link -> offer domain).
+  // Anchor this filter to the recording's own origin, otherwise every goto is stripped from the
+  // organic (non-converter) children and they start on a blank page with no landing navigation.
   let baseOrigin = '';
-  try { baseOrigin = new URL(targetUrl).origin; } catch {}
+  for (const s of cloned) {
+    if (s.type === 'goto' && typeof s.value === 'string' && /^https?:\/\//i.test(s.value)) {
+      try { baseOrigin = new URL(s.value).origin; break; } catch {}
+    }
+  }
+  if (!baseOrigin) {
+    try { baseOrigin = new URL(targetUrl).origin; } catch {}
+  }
 
   const effectiveCloned = isConverter
     ? cloned
@@ -429,12 +488,16 @@ function buildChildJourney({
           return false;
         }
         if (['fill_email', 'fill_otp'].includes(s.type)) return false;
-        const selVal = `${s.selector || ''} ${s.value || ''} ${s.label || ''}`.toLowerCase();
-        if (/mail|email|otp|consent|#result-save-link|#request\s*>/.test(selVal)) {
-          return false;
-        }
-        if (PARTNER_AD_HOST_RE.test(selVal)) {
-          return false;
+        // Landing navigations must survive: their URL can legitimately carry "&email=" / "consent"
+        // query params, which would otherwise be mistaken for a signup step.
+        if (s.type !== 'goto') {
+          const selVal = `${s.selector || ''} ${s.value || ''} ${s.label || ''}`.toLowerCase();
+          if (/mail|email|otp|consent|#result-save-link|#request\s*>/.test(selVal)) {
+            return false;
+          }
+          if (PARTNER_AD_HOST_RE.test(selVal)) {
+            return false;
+          }
         }
         if (s.type === 'goto' && s.value && baseOrigin) {
           try {
@@ -463,10 +526,22 @@ function buildChildJourney({
   let formMutatedCount = 0;
   let mutated = !isConverter;
   const childSteps = [];
+  // One coherent identity per visit: street/city/state/ZIP/phone/DOB/name/e-mail all agree.
+  const identity = { ...pickIdentity() };
+  // When a live inbox is available the real address is injected at runtime by the runner, so the
+  // identity carries the same template everywhere (form step, AI guard, summary) instead of a
+  // dead gmail.com address that can never receive the confirmation mail.
+  let emailClientReady = false;
+  try { emailClientReady = getEmailClientStatus().configured; } catch {}
+  identity.email = emailClientReady
+    ? '{{AGENT_EMAIL}}'
+    : `${identity.first}.${identity.last}`.toLowerCase().replace(/[^a-z.]+/g, '')
+      + `${Math.floor(10 + Math.random() * 89)}@gmail.com`;
 
   for (let i = 0; i < workingSteps.length; i++) {
     const step = { ...workingSteps[i] };
-    const shouldMutateThis = Math.random() < mutationProb;
+    const isIdentityStep = (step.type === 'fill' || step.type === 'select') && isIdentityField(step);
+    const shouldMutateThis = isIdentityStep || Math.random() < mutationProb;
 
     // Never drop core navigations, clicks, form fills, assertions, close_tab, or steps opening tabs
     if (
@@ -493,14 +568,14 @@ function buildChildJourney({
           mutated = true;
         }
       } else if (
-        step.type === 'fill' &&
+        (step.type === 'fill' || step.type === 'select') &&
         mutateForms &&
         !step.lockValue &&
         !protectedValues.has(String(step.value || '').trim()) &&
         !/^\{\{\s*(AGENT_EMAIL|EMAIL|OTP_CODE|EMAIL_CODE|OTP)\s*\}\}$/i.test(String(step.value || '').trim()) &&
         !/#code|\bcode\b|otp|verification|verify|pin/i.test(`${step.selector || ''} ${step.label || ''}`)
       ) {
-        step.value = selectVariedFormValue(step, formPool, persona);
+        step.value = selectVariedFormValue(step, formPool, persona, identity);
         formMutatedCount++;
         mutated = true;
       }
@@ -620,7 +695,8 @@ function buildChildJourney({
   let aiAdded = false;
   const rawPct = runtimeState?.workerPct != null ? runtimeState.workerPct : (aiCfg?.workerPct ?? 0);
   const aiWorkerPct = clamp(rawPct, 0, 100, 0);
-  if (aiCfg?.enabled && aiWorkerPct > 0 && Math.random() * 100 < aiWorkerPct) {
+  const aiOn = Boolean(aiCfg?.enabled) && aiWorkerPct > 0;
+  if (aiOn && Math.random() * 100 < aiWorkerPct) {
     const hasAi = childSteps.some(s => s.type === 'ai_explore');
     if (!hasAi) {
       const extHasNav = externalTabId !== null && childSteps.some(s =>
@@ -679,6 +755,105 @@ function buildChildJourney({
     }
   }
 
+  // Every visit starts on a real search engine so the landing request carries a results-page
+  // referrer. Without this the offer is reached with no Referer header at all -> "Direct Hit".
+  if (String(wavesCfg?.referrerMode || aiCfg?.referrerMode || '').toLowerCase() !== 'direct') {
+    const firstNavIsExternal = (() => {
+      const g = childSteps.find(s => s.type === 'goto');
+      if (!g) return false;
+      try { return new URL(g.value, targetUrl).hostname !== new URL(targetUrl).hostname; } catch { return false; }
+    })();
+    if (firstNavIsExternal || isConverter) {
+      childSteps.unshift({
+        type: 'search_entry',
+        selector: '',
+        value: '',
+        query: '',
+        label: 'כניסה אורגנית מתוצאות חיפוש (מקור תנועה אמיתי בדוח)',
+        optional: true,
+        tab: 0,
+      });
+      mutated = true;
+    }
+  }
+
+  // ── Deeper AI involvement ────────────────────────────────────────────────────
+  // AI stops being a single sightseeing stop and starts working the funnel: repair the route when
+  // it lands wrong, guard every submit so no field is empty, and re-read the page after the submit
+  // to continue the flow. Each block is opt-out via `ai.routeRepair` / `ai.formAssist`.
+  const aiWorkerModel = aiCfg?.allSquadsModel || assignedModel;
+  // Opt-out semantics (=== false), matching crawleeRunner: the AI helpers are part of the funnel by
+  // default and disappear only when the operator explicitly switches them off.
+  const routeRepairOn = aiCfg?.routeRepair !== false && aiOn;
+  const formAssistOn = aiCfg?.formAssist !== false && aiOn;
+
+  if (routeRepairOn) {
+    // Right after the first landing navigation: if the offer is served from an unexpected page,
+    // the model picks the link that continues the signup instead of the visit dying there.
+    const firstGotoIdx = childSteps.findIndex(s => s.type === 'goto');
+    if (firstGotoIdx >= 0) {
+      const waitIdx = childSteps.findIndex((s, k) => k > firstGotoIdx && s.type === 'wait');
+      const insertAt = waitIdx > 0 ? waitIdx + 1 : firstGotoIdx + 1;
+      childSteps.splice(insertAt, 0, {
+        type: 'ai_route_repair',
+        selector: '',
+        value: `Continue the signup flow toward the offer form for ${recordingAnalysis.offerGoal || 'the current offer'}`,
+        label: `[${assignedSquad.nameHe} | תיקון מסלול] מאתר את ההמשך הנכון אחרי הנחיתה`,
+        workerModel: aiWorkerModel,
+        tab: 0,
+        optional: true,
+      });
+      mutated = true;
+    }
+  }
+
+  if (formAssistOn) {
+    // Before every submit click: fill anything the recorded values missed, from one coherent identity.
+    const submits = [];
+    childSteps.forEach((s, k) => {
+      if (s.type === 'click' && /submit|continue|claim|next|send|confirm/i.test(`${s.selector || ''} ${s.label || ''}`)) {
+        submits.push(k);
+      }
+    });
+    // Insert from the back so indexes stay valid.
+    submits.slice().reverse().forEach(k => {
+      childSteps.splice(k, 0, {
+        type: 'ai_form_guard',
+        selector: '',
+        value: '1',
+        label: 'שמירה על שלמות הטופס לפני שליחה — משלים שדות חסרים מהזהות של הביקור',
+        workerModel: aiWorkerModel,
+        identity: { ...identity },
+        tab: childSteps[k].tab || 0,
+        optional: true,
+        mustRun: false,
+      });
+      mutated = true;
+    });
+  }
+
+  // Post-submit checkpoint: the model verifies the confirmation screen and continues if needed.
+  if (aiOn && aiWorkerPct >= 60 && isConverter) {
+    const lastSubmit = childSteps.map(s => s.type).lastIndexOf('click');
+    if (lastSubmit >= 0 && lastSubmit < childSteps.length - 1) {
+      childSteps.splice(lastSubmit + 1, 0, {
+        type: 'ai_explore',
+        selector: '',
+        value: '2',
+        assertKind: 'text_contains',
+        label: `[${assignedSquad.nameHe} | אימות שליחה והמשך] ודא שהטופס נשלח והמשך את ההצעה`,
+        squadId: assignedSquad.id,
+        squadFocus: 'Verify the submit succeeded and advance the offer flow.',
+        workerModel: aiWorkerModel,
+        sameOriginOnly: false,
+        tab: childSteps[lastSubmit].tab || 0,
+        optional: true,
+      });
+      aiAdded = true;
+      mutated = true;
+    }
+  }
+
   return {
     steps: childSteps,
     pacing,
@@ -688,6 +863,7 @@ function buildChildJourney({
       scanProductsAdded,
       formMutatedCount,
       aiAdded,
+      identity: { ...identity },
       isConverter: hasConversionSteps ? isConverter : null,
       recordingAnalysis,
       squadId: assignedSquad.id,

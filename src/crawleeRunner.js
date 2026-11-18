@@ -27,6 +27,7 @@ const {
 
 const {
   pickDeviceKey,
+  pickDeviceKeyForEngine,
   acquireProfileSlot,
   releaseProfileSlot,
   openSessionContext,
@@ -62,10 +63,28 @@ const {
 
 const { runAiExploreStep, getAiTokenSaverStats } = require('./aiCommander');
 const { resolveTargetUrl } = require('./behaviorEngine');
+const { pickReferrer } = require('./referrerEngine');
+const proxyScore = require('./proxyScoreboard');
+const residentialPool = require('./residentialPool');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const DEFAULT_CONFIG_PATH = path.join(ROOT_DIR, 'config.json');
 const PROFILES_DIR = path.join(ROOT_DIR, 'session-profiles');
+
+/**
+ * Turns a visit error message into one of the scoreboard outcomes. Only outcomes that really mean
+ * "this offer refuses this proxy" trigger a cooldown; a generic timeout must not punish a proxy.
+ */
+function classifyVisitFailure(msg) {
+  const s = String(msg || '');
+  if (/ERR_OFFER_REDIRECT|offer.*redirect/i.test(s)) return 'offer_redirect';
+  if (/\b403\b|forbidden|access denied/i.test(s)) return 'block403';
+  if (/\b429\b|too many requests|rate limit/i.test(s)) return 'block429';
+  if (/sorry|unusual traffic|captcha|are you a robot|verify you are human|challenge/i.test(s)) return 'captcha';
+  if (/ERR_TUNNEL|ERR_PROXY|ECONNREFUSED|ECONNRESET|ERR_SOCKS/i.test(s)) return 'blocked';
+  if (/timeout|ERR_TIMED_OUT|ETIMEDOUT|ERR_CONNECTION/i.test(s)) return 'timeout';
+  return 'error';
+}
 
 function parseTimeMinutes(hhmm, fallbackMinutes) {
   if (typeof hhmm !== 'string') return fallbackMinutes;
@@ -99,24 +118,68 @@ function loadConfig(configPath) {
   return cfg;
 }
 
+// Datacenter proxies used only after the metered residential budget is spent. Kept in its own file
+// so that saving the dashboard (which rewrites `proxy.servers`) can never delete the fallback.
+function readDatacenterList() {
+  try {
+    const p = process.env.WTG_DATACENTER_FILE || path.join(ROOT_DIR, 'data', 'proxies-datacenter.json');
+    if (!fs.existsSync(p)) return [];
+    const arr = JSON.parse(fs.readFileSync(p, 'utf8'));
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
 function resolveProxies(cfg) {
   if (!cfg.proxy?.enabled) return [];
   if (isLoopbackUrl(cfg.targetUrl)) {
     console.log(`[Proxy] יעד מקומי (${cfg.targetUrl}) אינו עובר דרך Proxy מרוחק — מדלג על רוטציית פרוקסי לריצה זו.`);
     return [];
   }
-  const list = Array.isArray(cfg.proxy?.servers) && cfg.proxy.servers.length
-    ? cfg.proxy.servers
-    : readProxiesTxt();
-  const normalized = [];
-  for (const raw of list) {
-    try {
-      const n = normalizeProxyLine(typeof raw === 'string' ? raw : raw?.server);
-      if (n) normalized.push(n);
-    } catch {}
+
+  const normalizeList = raw => {
+    const out = [];
+    for (const entry of Array.isArray(raw) ? raw : []) {
+      try {
+        const n = normalizeProxyLine(typeof entry === 'string' ? entry : entry?.server);
+        if (n) out.push(n);
+      } catch {}
+    }
+    return out;
+  };
+
+  // `proxy.servers` (the list the dashboard shows) is the single source of truth. Entries that
+  // point at the metered Webshare gateway are residential and are charged per byte; everything
+  // else is an unmetered static proxy. No hidden second list, so what you see is what runs.
+  const configured = normalizeList(
+    Array.isArray(cfg.proxy?.servers) && cfg.proxy.servers.length ? cfg.proxy.servers : readProxiesTxt()
+  );
+  const resiCfg = cfg.proxy?.residential || {};
+  const metered = resiCfg.enabled === false ? [] : configured.filter(u => residentialPool.isResidentialUrl(u));
+
+  if (!metered.length) return configured;
+
+  const budget = residentialPool.summary(resiCfg);
+  if (budget.exhausted) {
+    const fallback = normalizeList(
+      Array.isArray(cfg.proxy?.fallbackServers) && cfg.proxy.fallbackServers.length
+        ? cfg.proxy.fallbackServers
+        : readDatacenterList()
+    );
+    console.log(
+      `[Residential] המכסה נוצלה (${budget.usedMb}/${budget.budgetMb}MB) — עובר למאגר החלופי (${fallback.length} פרוקסים).`
+    );
+    if (fallback.length) return fallback;
+    console.log('[Residential] אין מאגר חלופי מוגדר — הריצה תעצור כדי לא לשרוף מכסה בתשלום.');
+    return [];
   }
-  return normalized;
+  console.log(
+    `[Residential] פעיל מתוך הרשימה בדאשבורד: ${metered.length} סשנים, נותרו ${budget.remainingMb}MB מתוך ${budget.budgetMb}MB (${budget.usedPct}% נוצל).`
+  );
+  return metered;
 }
+
 
 function sendIpc(payload) {
   if (typeof process.send === 'function') {
@@ -136,6 +199,8 @@ async function executeVisitWorkload({
   initialLoadMs = 0,
   initialReferer = '',
   precomputedChildPlan = null,
+  geoInfo = null,
+  avoidEngines = [],
 }) {
   const {
     targetUrl,
@@ -218,6 +283,9 @@ async function executeVisitWorkload({
       onFrame,
       onStep,
       attribution: cfgVars.attribution,
+      geoInfo,
+      identityInfo: waveSummary?.identity || null,
+      avoidEngines,
     });
     combined = { ...combined, ...scenRes, waveSummary };
   }
@@ -358,14 +426,75 @@ function logVisitFailure(visitIndex, persona, err, stats) {
   });
 }
 
+
+/**
+ * Normalizes the optional `cfg.targets` list into { index, url, pages, visitCount }.
+ * When it is absent the classic single `targetUrl` + `pages` pair is used, so old configs run
+ * exactly as before.
+ */
+function buildTargets(cfg, { targetUrl, pages, totalVisits }) {
+  const raw = Array.isArray(cfg.targets)
+    ? cfg.targets.filter(t => t && typeof t === 'object' && t.url)
+    : [];
+  if (!raw.length) {
+    return [{ index: 0, url: targetUrl, pages: normalizePages(pages), visitCount: totalVisits }];
+  }
+
+  const list = raw.map((t, index) => ({
+    index,
+    url: String(t.url).replace(/\/$/, ''),
+    pages: normalizePages(t.pages && t.pages.length ? t.pages : pages),
+    visitCount: Math.max(0, parseInt(String(t.visitCount ?? 0), 10) || 0),
+  }));
+
+  // Explicit per-target budgets win. The rest of the total budget is split evenly between the
+  // targets that did not declare one, so `visitCount` keeps meaning "total visits".
+  const fixedSum = list.reduce((a, t) => a + t.visitCount, 0);
+  const open = list.filter(t => !t.visitCount);
+  if (!open.length) return list;
+  const remaining = Math.max(0, totalVisits - fixedSum);
+  const base = Math.floor(remaining / open.length);
+  let extra = remaining - base * open.length;
+  return list.map(t => (t.visitCount ? t : { ...t, visitCount: base + (extra-- > 0 ? 1 : 0) }));
+}
+
+/** Round-robins target indexes so every site gets traffic early instead of one site first. */
+function buildVisitPlan(targets) {
+  const plan = [];
+  const deepest = targets.reduce((a, t) => Math.max(a, t.visitCount), 0);
+  for (let k = 0; k < deepest; k += 1) {
+    targets.forEach((t, idx) => {
+      if (k < t.visitCount) plan.push(idx);
+    });
+  }
+  return plan;
+}
+
+/** Per-target counters that ride along in telemetry as `stats.byTarget`. */
+function bumpTargetStat(statsObj, url, field) {
+  if (!url) return;
+  const key = String(url);
+  const bucket = statsObj.byTarget[key] || (statsObj.byTarget[key] = {
+    planned: 0, completed: 0, succeeded: 0, failed: 0,
+  });
+  bucket[field] = (bucket[field] || 0) + 1;
+  if (field === 'succeeded' || field === 'failed') bucket.completed += 1;
+}
+
 async function run() {
   const configPath = process.argv[2] || DEFAULT_CONFIG_PATH;
   const cfg = loadConfig(configPath);
-  console.log(`Loaded config: ${configPath}`);
+  console.log('Loaded config: ' + path.basename(configPath));
 
   const targetUrl = cfg.targetUrl.replace(/\/$/, '');
   const pages = normalizePages(cfg.pages);
-  const visitCount = Math.max(1, parseInt(String(process.env.VISIT_COUNT_OVERRIDE ?? cfg.visitCount ?? 10), 10) || 10);
+  const totalVisits = Math.max(1, parseInt(String(process.env.VISIT_COUNT_OVERRIDE ?? cfg.visitCount ?? 10), 10) || 10);
+  // `targets` (optional) wins over `targetUrl`: each entry keeps its own pages, visit budget and
+  // cookie jar, so two sites never share a session.
+  const targets = buildTargets(cfg, { targetUrl, pages, totalVisits });
+  const plan = buildVisitPlan(targets);
+  const visitCount = plan.length;
+  const isMultiTarget = targets.length > 1;
   const maxConcurrency = Math.max(1, parseInt(String(process.env.CONCURRENCY ?? cfg.concurrency ?? 5), 10) || 5);
   const minConcurrency = Math.min(maxConcurrency, Math.max(1, parseInt(String(cfg.minConcurrency ?? 1), 10) || 1));
   const firstPagePriority = Math.min(100, Math.max(0, Number(cfg.firstPagePriority ?? 60)));
@@ -400,7 +529,9 @@ async function run() {
   const snippet = cfg.snippet || null;
   const schedule = cfg.schedule || { enabled: false, startHour: '00:00', endHour: '23:59' };
   const taskMode = ['behavior', 'scenario', 'hybrid'].includes(cfg.taskMode) ? cfg.taskMode : 'behavior';
-  const referrerMode = cfg.referrerMode === 'google_organic' ? 'google_organic' : 'mixed';
+  const referrerMode = ['google_organic', 'search_engines', 'social', 'direct'].includes(cfg.referrerMode)
+    ? cfg.referrerMode
+    : 'mixed';
   const taskSteps = Array.isArray(cfg.taskSteps) ? cfg.taskSteps : [];
   const keepBrowserOpenMs = Math.max(0, Math.min(30000, Number(cfg.keepBrowserOpenMs ?? 1500) || 0));
   const interVisitDelayMs = Math.max(0, Math.min(120000, Number(cfg.interVisitDelayMs ?? 0) || 0));
@@ -420,6 +551,9 @@ async function run() {
     mutateForms: cfg.waves?.mutateForms !== false,
     maxProductsPerVisit: Number(cfg.waves?.maxProductsPerVisit ?? 2),
     formInputs: cfg.waves?.formInputs || [],
+    // Traffic-source mode must reach the planner too, otherwise `direct` is silently ignored
+    // and every visit is forced through a search engine.
+    referrerMode,
   };
   const aiConfig = {
     enabled: Boolean(cfg.ai?.enabled),
@@ -428,7 +562,13 @@ async function run() {
     workerModel: cfg.ai?.workerModel || 'deepseek-v4.1-flash',
     workerPct: Number(cfg.ai?.workerPct ?? 0),
     commanderDirective: cfg.ai?.commanderDirective || '',
+    allSquadsModel: String(cfg.ai?.allSquadsModel || '').trim(),
+    formAssist: cfg.ai?.formAssist !== false,
+    routeRepair: cfg.ai?.routeRepair !== false,
   };
+  // When one model is forced for every squad, the whole run reasons with that model
+  // instead of the per-squad defaults (alpha/beta/gamma/delta).
+  const squadOverride = aiConfig.allSquadsModel;
   const runtimeState = {
     aiDirective: aiConfig.commanderDirective || '',
     workerPct: aiConfig.workerPct,
@@ -436,12 +576,14 @@ async function run() {
     interVisitDelayMs,
     previewActive: true,
     preferredCountries: Array.isArray(cfg.proxy?.preferredCountries) ? cfg.proxy.preferredCountries : [],
-    squadModels: {
-      alpha: 'deepseek-v4.1-flash',
-      bravo: 'beam',
-      charlie: 'minimax-m3.1-flash',
-      delta: 'gpt-oss:20b',
-    },
+    squadModels: squadOverride
+      ? { alpha: squadOverride, bravo: squadOverride, charlie: squadOverride, delta: squadOverride }
+      : {
+        alpha: 'deepseek-v4.1-flash',
+        bravo: 'beam',
+        charlie: 'minimax-m3.1-flash',
+        delta: 'gpt-oss:20b',
+      },
   };
 
   const originExtraHeaders = buildAdSafetyHeaders(adSafety);
@@ -475,6 +617,16 @@ async function run() {
   };
 
   const rawProxyUrls = resolveProxies(cfg);
+  // The residential pool returns either entirely residential or entirely datacenter proxies, so
+  // checking one entry is enough and avoids re-reading the pool file on every comparison.
+  const residentialActive = rawProxyUrls.some(u => residentialPool.isResidentialUrl(u));
+  // A run without a proxy exits from the operator's own home IP (Israel). Sites with geo/ISP
+  // filtering either block it outright (the Hebrew "Partner 5G" page) or silently void the lead.
+  if (cfg.proxy?.enabled && !rawProxyUrls.length) {
+    throw new Error(
+      'פרוקסי מופעל בהגדרות אבל אין אף כתובת פרוקסי ברשימה. ההרצה נעצרה כדי לא לשלוח תנועה מהכתובת המקומית (ישראל). הוסף פרוקסים או בטל את מתג הפרוקסי במפורש.'
+    );
+  }
   let proxyUrls = rawProxyUrls;
   let proxyCountryByUrl = {};
   const fallbackProxyUrls = (cfg.proxy?.enabled && cfg.proxy?.fallbackToStatic !== false && rawProxyUrls.length)
@@ -489,7 +641,9 @@ async function run() {
     return sel.proxies;
   };
   let startedOnFallback = false;
-  if (rawProxyUrls.length) {
+  // Residential runs skip country filtering and the latency prefilter on purpose: both probe every
+  // proxy, and on a metered 1 GB plan that is pure waste. The pool is already one provider network.
+  if (rawProxyUrls.length && !residentialActive) {
     const countrySel = await selectProxiesForCountries(rawProxyUrls, {
       preferredCountries: cfg.proxy?.preferredCountries,
       countryFilterEnabled: cfg.proxy?.countryFilterEnabled !== false,
@@ -543,7 +697,17 @@ async function run() {
         }
       }
       const anyAlive = (doFullPrefilter && prefilterKeptAlive) || probeResults.some(r => r && r.ok);
-      if (!anyAlive) {
+      let aliveNow = anyAlive;
+      if (!aliveNow) {
+        // One bad moment (proxy restart, ISP hiccup) must not turn the whole run into Israeli traffic.
+        console.log('[Proxy Prefilter] אף פרוקסי לא ענה בניסיון הראשון — בודק שוב אחרי 3 שניות...');
+        await sleep(3000);
+        for (const p of proxyUrls) {
+          const r = await checkSingleProxy(p, 7000).catch(() => null);
+          if (r && r.ok) { aliveNow = true; break; }
+        }
+      }
+      if (!aliveNow) {
         const errReasons = [...new Set(probeResults.map(r => r?.error || 'Unreachable'))].join(', ');
         if (fallbackProxyUrls.length) {
           const fbList = await filterFallbackProxies(fallbackProxyUrls).catch(() => fallbackProxyUrls);
@@ -557,19 +721,32 @@ async function run() {
           }
         }
         if (!startedOnFallback) {
-          if (errReasons.includes('402')) {
+          if (cfg.proxy?.allowDirectFallback === true) {
             console.log(
-              `⚠️ [Proxy Alert — HTTP 402] מכסת הנתונים בשרתי Webshare הסתיימה (${errReasons})! עובר אוטומטית לחיבור ישיר כדי שההרצה לא תיכשל ב-ERR_TUNNEL_CONNECTION_FAILED.`
+              errReasons.includes('402')
+                ? `⚠️ [Proxy Alert — HTTP 402] מכסת הנתונים הסתיימה (${errReasons}). חיבור ישיר הותר במפורש (allowDirectFallback=true) — התנועה תצא מהכתובת המקומית.`
+                : `⚠️ [Proxy Alert] שרתי הפרוקסי אינם מגיבים (${errReasons}). חיבור ישיר הותר במפורש (allowDirectFallback=true) — התנועה תצא מהכתובת המקומית.`
             );
+            proxyUrls = [];
           } else {
-            console.log(
-              `⚠️ [Proxy Alert] שרתי הפרוקסי אינם מגיבים כעת (${errReasons}) — עובר אוטומטית לחיבור ישיר להמשך ההרצה.`
+            throw new Error(
+              `כל ${proxyUrls.length} שרתי הפרוקסי אינם זמינים כרגע (${errReasons}). ההרצה נעצרה בכוונה: בלי פרוקסי התנועה יוצאת מהכתובת המקומית בישראל, אתרים חוסמים אותה (עמוד "הגלישה לאתר לא בטוחה") וההמרות לא נספרות. בדוק את רשימת הפרוקסים ונסה שוב.`
             );
           }
-          proxyUrls = [];
         }
       }
     }
+  }
+  // Per-offer proxy memory: a proxy blocked on one offer keeps its turn on the others, and only
+  // the (proxy, offer) pair that actually got blocked is cooled down for a while.
+  const offerDomain = proxyScore.hostOf(targetUrl);
+  if (proxyUrls.length > 1 && offerDomain) {
+    const ranked = proxyScore.rankProxies(proxyUrls, offerDomain);
+    proxyUrls = ranked.ordered;
+    console.log(
+      `[Proxy Score] הצעה ${offerDomain}: ${ranked.stats.ready}/${ranked.stats.total} פרוקסים מוכנים, ` +
+      `${ranked.stats.cooling} בהסגר זמני (ניקוד מוביל ${ranked.stats.bestScore}) — הסדר נקבע לפי הצלחות קודמות מול אותה הצעה.`
+    );
   }
   const proxyPool = createFailoverProxyPool(proxyUrls, startedOnFallback ? [] : fallbackProxyUrls, {
     filterFallback: filterFallbackProxies,
@@ -585,7 +762,7 @@ async function run() {
 
   try { resetRunInboxFile(); } catch (resetErr) { console.log(`[Email] run-inboxes reset skipped: ${String(resetErr?.message || resetErr).slice(0, 80)}`); }
   console.log(
-    `Engine: ${engineMode} | Visits: ${visitCount} | Concurrency: ${minConcurrency}-${maxConcurrency} | Headless: ${headless} | Stealth: ${stealthMode} | RAM: ${resourceMode} | Waves: ${wavesCfg.enabled ? wavesCfg.mode : 'off'} | Proxies: ${proxyUrls.length}`
+    `Engine: ${engineMode} | Visits: ${visitCount} | Concurrency: ${minConcurrency}-${maxConcurrency} | Headless: ${headless} | Browser: ${cfg.browserEngine || 'chromium'} | Stealth: ${stealthMode} | RAM: ${resourceMode} | Waves: ${wavesCfg.enabled ? wavesCfg.mode : 'off'} | Proxies: ${proxyUrls.length}`
   );
   try {
     const cdpSt = getCdpIntegrationsStatus();
@@ -598,6 +775,7 @@ async function run() {
 
   const stats = {
     totalPlanned: visitCount,
+    byTarget: {},
     completed: 0,
     succeeded: 0,
     timedOut: 0,
@@ -831,9 +1009,18 @@ async function run() {
         }
         const proxyObj = toPlaywrightProxy(selectedProxyUrl);
         const geo = await resolveNetworkGeo(selectedProxyUrl).catch(() => null);
-        const referrer = referrerMode === 'google_organic'
-          ? buildGoogleSearchReferrer(geo)
-          : buildRandomReferrer(targetUrl);
+        // Real-looking source: a search result page / social post URL instead of a bare homepage
+        // (or nothing at all, which is what made every visit show up as "Direct Hit").
+        const referrerPick = pickReferrer({
+          geo,
+          title: typeof snippet === 'string' ? snippet.slice(0, 120) : '',
+          targetUrl,
+          mode: referrerMode,
+        });
+        const referrer = referrerPick.url;
+        // Google itself remembers this proxy (the "sorry" page). Only Google is avoided — and only
+        // while its own cooldown lasts; the same proxy keeps searching on Bing/DuckDuckGo/Yahoo.
+        const avoidEngines = proxyScore.isCoolingDown('google.com', selectedProxyUrl) ? ['google'] : [];
         const sessionSlot = acquireProfileSlot({
           ...sessionCfg,
           countryCode: geo?.countryCode || null,
@@ -900,6 +1087,9 @@ async function run() {
             stealthMode,
             resourceMode: effectiveResourceMode,
             sessionSeed: i + 100,
+            browserEngine: cfg.browserEngine || 'chromium',
+            // Mode A has no Crawlee Request object; pick the device here, pinned to the engine.
+            deviceKey: pickDeviceKeyForEngine(deviceWeights, cfg.browserEngine || 'chromium'),
           });
 
           onRespSize = async req => {
@@ -942,6 +1132,8 @@ async function run() {
             visitIndex: i,
             initialReferer: sessionHandle.referrer || referrer,
             precomputedChildPlan,
+            geoInfo: geo,
+            avoidEngines,
           });
 
           stats.completed++;
@@ -960,6 +1152,18 @@ async function run() {
             if (lastSkip?.label) stats.lastSkippedSelector = String(lastSkip.label).slice(0, 90);
           }
           stats.proxyTransferBytes += sessionTransferBytes;
+          if (residentialActive && sessionTransferBytes > 0) {
+            // Playwright reports body+header bytes per request, which understates what the provider
+            // bills (TLS handshakes, retries). Charging a 15% overhead keeps the budget honest.
+            const overheadRaw = Number(cfg.proxy?.residential?.overheadFactor);
+            const overhead = Number.isFinite(overheadRaw) && overheadRaw >= 1 ? overheadRaw : 1.15;
+            const usage = residentialPool.addBytes(Math.round(sessionTransferBytes * overhead), { visits: 1 });
+            const budgetMb = residentialPool.budgetMbOf(cfg.proxy?.residential || {});
+            const usedMb = usage.bytes / (1024 * 1024);
+            if (usedMb >= budgetMb) {
+              console.log(`[Residential] המכסה נוצלה (${usedMb.toFixed(2)}/${budgetMb}MB) — הביקורים הבאים יעברו לדאטה־סנטר.`);
+            }
+          }
           if (sessionSlot) {
             if (sessionHandle.isReturning) stats.returningSessions++;
             else stats.newSessions++;
@@ -981,6 +1185,20 @@ async function run() {
           const proxyTag = selectedProxyUrl ? `, proxy: ${maskProxyLabel(selectedProxyUrl)}${geoTag}${kbTag}${refTag}` : `${geoTag}${kbTag}${refTag}`;
           logVisitOutcome(i, persona, sessionHandle.deviceLabel, sessionHandle.engine, { ...result, skippedSteps: skippedInVisit.length }, sessionTag, proxyTag, { country: resolvedCountry });
           proxyPool.reportSuccess();
+          proxyScore.reportOutcome({ domain: offerDomain, proxyUrl: selectedProxyUrl, outcome: 'ok' });
+          if (result?.engineChallenged) {
+            const engineDomain = result.engineChallenged === 'google' ? 'google.com' : `${result.engineChallenged}.com`;
+            proxyScore.reportOutcome({
+              domain: engineDomain,
+              proxyUrl: selectedProxyUrl,
+              outcome: 'captcha',
+              note: 'search engine challenge',
+            });
+            console.log(
+              `[${i + 1}] ⚠️ [Engine Challenge] ${result.engineChallenged} חסם את הפרוקסי הזה — ` +
+              `הביקורים הבאים עליו יעברו אוטומטית למנוע חיפוש אחר (רק מול ${result.engineChallenged}).`
+            );
+          }
           } catch (err) {
             const errMsg = String(err?.message || err || '');
             const isTransient = err?.name === 'TimeoutError' || errMsg.includes('timeout') || /net::|ERR_TUNNEL|ERR_SSL|ERR_CONNECTION/i.test(errMsg);
@@ -994,6 +1212,13 @@ async function run() {
               continue;
             }
             if (sessionSlot && !sessionHandle) releaseProfileSlot(sessionSlot);
+            const visitOutcome = classifyVisitFailure(errMsg);
+            proxyScore.reportOutcome({
+              domain: offerDomain,
+              proxyUrl: selectedProxyUrl,
+              outcome: visitOutcome,
+              note: errMsg.slice(0, 90),
+            });
             logVisitFailure(i, persona, err, stats);
             proxyPool.reportFailure(err);
           } finally {
@@ -1093,24 +1318,33 @@ async function run() {
     logLevel: 'WARNING',
   });
 
-  const allPages = normalizePages(pages);
-  const firstPage = allPages[0];
-  const requests = Array.from({ length: visitCount }, (_, i) => {
-    const otherPages = allPages.filter(p => p !== firstPage);
+  const requests = plan.map((targetIdx, i) => {
+    const target = targets[targetIdx] || targets[0];
+    const targetPages = normalizePages(target.pages);
+    const firstPage = targetPages[0];
+    const otherPages = targetPages.filter(p => p !== firstPage);
     const entryPath = (Math.random() < (firstPagePriority / 100) || !otherPages.length)
       ? firstPage
       : randomChoice(otherPages);
     return {
-      url: resolveTargetUrl(targetUrl, entryPath),
+      url: resolveTargetUrl(target.url, entryPath),
       uniqueKey: `visit-${i}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       userData: {
         visitIndex: i,
+        targetIndex: targetIdx,
+        targetUrl: target.url,
+        targetPages,
         persona: randomChoice(personas),
-        deviceKey: pickDeviceKey(deviceWeights),
-        referrer: referrerMode === 'google_organic' ? buildGoogleSearchReferrer(null) : buildRandomReferrer(targetUrl),
+        deviceKey: pickDeviceKeyForEngine(deviceWeights, cfg.browserEngine || 'chromium'),
+        referrer: referrerMode === 'google_organic' ? buildGoogleSearchReferrer(null) : buildRandomReferrer(target.url),
       },
     };
   });
+
+  requests.forEach(r => bumpTargetStat(stats, r.userData.targetUrl, 'planned'));
+  if (isMultiTarget) {
+    targets.forEach(t => console.log(`[Targets] ${t.url} — ${t.visitCount} ביקורים | עמודים: ${t.pages.join(', ')}`));
+  }
 
   const crawler = new PlaywrightCrawler({
     minConcurrency,
@@ -1150,7 +1384,7 @@ async function run() {
           await applyResourceMode(ctx, resourceMode).catch(() => {});
         }
         if (Object.keys(originExtraHeaders).length) {
-          await applyOriginScopedHeaders(ctx, targetUrl, originExtraHeaders);
+          await applyOriginScopedHeaders(ctx, request.userData.targetUrl || targetUrl, originExtraHeaders);
         }
         if (!headless) {
           await page.bringToFront().catch(() => {});
@@ -1161,7 +1395,8 @@ async function run() {
         if (sessionCfg.enabled) {
           fs.mkdirSync(sessionCfg.profilesDir, { recursive: true });
           const slotNum = 1 + Math.floor(Math.random() * Math.max(1, sessionCfg.profilePoolSize));
-          const stateFile = path.join(sessionCfg.profilesDir, `crawlee_state_${String(slotNum).padStart(2, '0')}.json`);
+          const perTarget = isMultiTarget ? `t${request.userData.targetIndex}_` : '';
+          const stateFile = path.join(sessionCfg.profilesDir, `crawlee_state_${perTarget}${String(slotNum).padStart(2, '0')}.json`);
           const isReturning = fs.existsSync(stateFile) && Math.random() < (sessionCfg.returningUserRate / 100);
           request.userData._crawleeState = { slot: slotNum, file: stateFile, isReturning };
           if (isReturning) {
@@ -1203,9 +1438,13 @@ async function run() {
             await applyResourceMode(ctxObj, resourceMode).catch(() => {});
           }
         }
+        // A request carries its own site, so pages/steps/cookies of one domain never leak into another.
+        const visitCfgVars = request.userData.targetUrl
+          ? { ...cfgVars, targetUrl: request.userData.targetUrl, pages: request.userData.targetPages }
+          : cfgVars;
         const res = await executeVisitWorkload({
           page,
-          cfgVars,
+          cfgVars: visitCfgVars,
           persona,
           visitIndex: i,
           alreadyNavigated: true,
@@ -1224,6 +1463,7 @@ async function run() {
 
         stats.completed++;
         stats.succeeded++;
+        bumpTargetStat(stats, request.userData.targetUrl, 'succeeded');
         stats.errorsTotal += res.pageErrors;
         stats.loadTimesMs.push(res.loadMs);
         if (cState) {
@@ -1235,7 +1475,7 @@ async function run() {
           ? `, session: ${cState.isReturning ? 'returning' : 'new'}(#${cState.slot})`
           : '';
         const proxyTag = proxyInfo?.url ? `, proxy: ${maskProxyLabel(proxyInfo.url)}` : '';
-        logVisitOutcome(i, persona, 'Crawlee Chromium', request.userData.deviceKey, res, sessionTag, proxyTag);
+        logVisitOutcome(i, persona, request.userData.deviceKey, cfg.browserEngine || 'chromium', res, sessionTag, proxyTag);
         proxyPool.reportSuccess();
       } finally {
         stopPopunderShield();
@@ -1244,6 +1484,7 @@ async function run() {
     },
     failedRequestHandler({ request }, err) {
       logVisitFailure(request.userData?.visitIndex, request.userData?.persona, err, stats);
+      bumpTargetStat(stats, request.userData?.targetUrl, 'failed');
       proxyPool.reportFailure(err);
       emitTelemetry(null);
     },
@@ -1286,17 +1527,24 @@ process.on('unhandledRejection', err => {
   console.error('UnhandledRejection:', msg);
 });
 
-run()
-  .then(() => {
-    if (typeof process.disconnect === 'function' && process.connected) {
-      process.disconnect();
-    }
-    process.exit(0);
-  })
-  .catch(err => {
-    console.error('Fatal error:', err.message || err);
-    if (typeof process.disconnect === 'function' && process.connected) {
-      process.disconnect();
-    }
-    process.exit(1);
-  });
+// Safety: this module starts a real traffic run the moment it is loaded. Only do that when it is
+// executed directly (`node src/crawleeRunner.js <config>`) — never when a test or another module
+// merely `require()`s it, which would silently launch live visits (and burn metered proxy bytes).
+if (require.main === module) {
+  run()
+    .then(() => {
+      if (typeof process.disconnect === 'function' && process.connected) {
+        process.disconnect();
+      }
+      process.exit(0);
+    })
+    .catch(err => {
+      console.error('Fatal error:', err.message || err);
+      if (typeof process.disconnect === 'function' && process.connected) {
+        process.disconnect();
+      }
+      process.exit(1);
+    });
+}
+
+module.exports = { run, resolveProxies };

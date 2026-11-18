@@ -25,7 +25,9 @@ const MAX_SECRETS = 500;
 const secrets = new Set();
 
 /** Field selectors and labels that mean "this value must never be printed". */
+const LABEL_ONLY_ACTIONS = new Set(['fill', 'select', 'press', 'fill_email', 'fill_otp']);
 const SECRET_FIELD_RE = /password|passwd|pwd|passcode|\bpass\b|secret|token|api[-_]?key|otp|one[-_]?time|verification[-_]?code|\bpin\b/i;
+const SECRET_OUTPUT_KEY_RE = /^(?:(?:proxy|client|user)?password|passwd|pwd|passcode|pin|(?:client)?secret|(?:access|refresh|auth|bearer|session|id)?token|(?:proxy)?authorization|(?:set)?cookie|apikey|otp|verificationcode)$/;
 
 function isSecretField(selector, label) {
   const haystack = `${selector || ''} ${label || ''}`;
@@ -87,9 +89,40 @@ function redactText(input) {
   );
 
   // Credential-shaped URL userinfo: scheme://user:pass@host — keep the scheme and host.
-  out = out.replace(/(https?:\/\/)[^\s/@:]+:[^\s/@]+@/gi, `$1${REDACTED}:${REDACTED}@`);
+  out = out.replace(/((?:https?|socks(?:4a?|5h?)?):\/\/)[^\s/@:]+(?::[^\s/@]*)?@/gi, `$1${REDACTED}:${REDACTED}@`);
 
-  return out;
+  return out.replace(/[a-z0-9.!#$%&'*+/=?^_{}|~-]+@[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}/gi,
+    address => address.startsWith(`${REDACTED}@`) ? address : maskEmail(address));
+}
+
+function safeStepLabel(step) {
+  if (step.secret === true || isSecretField(step.selector, step.label)) {
+    return [step.type, REDACTED].filter(Boolean).join(' ');
+  }
+  if (LABEL_ONLY_ACTIONS.has(step.type)) {
+    return redactText([step.type, step.selector].filter(Boolean).join(' '));
+  }
+  return redactText(step.label || [step.type, step.selector || step.value].filter(Boolean).join(' '));
+}
+
+function registerStepSecrets(steps) {
+  for (const step of Array.isArray(steps) ? steps : []) {
+    if (step && ['fill', 'select'].includes(step.type) &&
+        (step.secret === true || isSecretField(step.selector, step.label))) {
+      registerSecret(step.value);
+    }
+  }
+}
+
+function redactData(value) {
+  if (typeof value === 'string') return redactText(value);
+  if (Array.isArray(value)) return value.map(redactData);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.entries(value).map(([key, entry]) => {
+    const normalizedKey = key.toLowerCase().replace(/[-_ ]/g, '');
+    const hasSecret = entry != null && entry !== '' && SECRET_OUTPUT_KEY_RE.test(normalizedKey);
+    return [key, hasSecret ? REDACTED : redactData(entry)];
+  }));
 }
 
 module.exports = {
@@ -100,4 +133,7 @@ module.exports = {
   secretCount,
   maskEmail,
   redactText,
+  safeStepLabel,
+  registerStepSecrets,
+  redactData,
 };

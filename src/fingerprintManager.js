@@ -63,25 +63,88 @@ function getStealthChromium() {
   return stealthChromiumInstance;
 }
 
-let cachedNativeChromeUA = null;
-function getNativeChromeUserAgent() {
-  if (cachedNativeChromeUA) return cachedNativeChromeUA;
-  let version = '145.0.7632.6';
+let patchrightChromiumInstance = null;
+// Patchright patches the Playwright driver/CDP layer (no Runtime.enable leak, no automation
+// flags) instead of injecting JS evasions. Mixing it with playwright-extra would re-introduce
+// the leaks it removes, so it is used on its own and only when explicitly selected.
+function getPatchrightChromium() {
+  if (patchrightChromiumInstance) return patchrightChromiumInstance;
   try {
-    const exeDir = path.dirname(chromium.executablePath());
-    if (fs.existsSync(exeDir)) {
-      const manifest = fs.readdirSync(exeDir).find(f => /^\d+\.\d+\.\d+\.\d+\.manifest$/i.test(f));
-      if (manifest) version = manifest.replace(/\.manifest$/i, '');
-    }
-  } catch {}
+    const pr = require('patchright');
+    patchrightChromiumInstance = pr.chromium;
+    console.log('[Browser] מנוע patchright פעיל (Chromium מוטמע, ללא playwright-extra).');
+  } catch (err) {
+    console.log(`[Browser] patchright לא זמין (${String(err && err.message || err).split('\n')[0]}) — חוזר ל-Playwright הרגיל.`);
+    patchrightChromiumInstance = getStealthChromium();
+  }
+  return patchrightChromiumInstance;
+}
+
+let cachedNativeChromeUA = null;
+let cachedRealChromeUA = null;
+let cachedInstalledChromeVersion = '';
+
+function compareDottedVersions(a, b) {
+  const pa = String(a).split('.').map(Number);
+  const pb = String(b).split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i += 1) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+// The bundled Chromium lags behind the installed Chrome (145 vs 157 on this machine), so a UA
+// derived from it never matched the browser actually launched. Chrome also reduced its UA string
+// to `<major>.0.0.0` on desktop — reporting a full build number is itself a fingerprint.
+function getInstalledChromeVersion() {
+  if (cachedInstalledChromeVersion !== '') return cachedInstalledChromeVersion;
+  cachedInstalledChromeVersion = '';
+  const roots = [process.env.PROGRAMFILES, process.env['PROGRAMFILES(X86)'], process.env.LOCALAPPDATA]
+    .filter(Boolean)
+    .map(root => path.join(root, 'Google', 'Chrome', 'Application'));
+  let best = '';
+  for (const root of roots) {
+    try {
+      if (!fs.existsSync(root)) continue;
+      for (const name of fs.readdirSync(root)) {
+        if (!/^\d+\.\d+\.\d+\.\d+$/.test(name)) continue;
+        if (!best || compareDottedVersions(name, best) > 0) best = name;
+      }
+    } catch {}
+  }
+  cachedInstalledChromeVersion = best;
+  return best;
+}
+
+function getNativeChromeUserAgent(preferRealChrome = false) {
+  if (preferRealChrome && cachedRealChromeUA) return cachedRealChromeUA;
+  if (!preferRealChrome && cachedNativeChromeUA) return cachedNativeChromeUA;
+
+  const installed = preferRealChrome ? getInstalledChromeVersion() : '';
+  let version = installed ? `${installed.split('.')[0]}.0.0.0` : '';
+  if (!version) {
+    version = '145.0.7632.6';
+    try {
+      const exeDir = path.dirname(chromium.executablePath());
+      if (fs.existsSync(exeDir)) {
+        const manifest = fs.readdirSync(exeDir).find(f => /^\d+\.\d+\.\d+\.\d+\.manifest$/i.test(f));
+        if (manifest) version = manifest.replace(/\.manifest$/i, '');
+      }
+    } catch {}
+  }
+
   const osToken = IS_WIN
     ? 'Windows NT 10.0; Win64; x64'
     : IS_MAC
       ? 'Macintosh; Intel Mac OS X 10_15_7'
       : 'X11; Linux x86_64';
-  cachedNativeChromeUA = `Mozilla/5.0 (${osToken}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`;
-  return cachedNativeChromeUA;
+  const ua = `Mozilla/5.0 (${osToken}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`;
+  if (preferRealChrome) cachedRealChromeUA = ua;
+  else cachedNativeChromeUA = ua;
+  return ua;
 }
+
 
 const HOST_DESKTOP_OS = IS_WIN ? ['windows'] : IS_MAC ? ['macos'] : ['linux', 'windows'];
 
@@ -171,6 +234,44 @@ function pickDeviceKey(deviceWeights) {
     entries = consistentEntries;
   }
   if (!entries.length) return 'desktopChrome';
+  const total = entries.reduce((sum, [, w]) => sum + Number(w), 0);
+  let r = Math.random() * total;
+  for (const [k, w] of entries) {
+    r -= Number(w);
+    if (r <= 0) return k;
+  }
+  return entries[entries.length - 1][0];
+}
+
+// Every device spec belongs to exactly one engine family. patchright is a Chromium build and
+// camoufox is a real Firefox build, so both map onto the family of the binary they run.
+const ENGINE_DEFAULT_DEVICE = {
+  chromium: 'desktopChrome',
+  patchright: 'desktopChrome',
+  firefox: 'desktopFirefox',
+  camoufox: 'desktopFirefox',
+  webkit: 'desktopSafari',
+};
+
+function specEngineFor(launchEngine) {
+  if (launchEngine === 'patchright') return 'chromium';
+  if (launchEngine === 'camoufox') return 'firefox';
+  return launchEngine;
+}
+
+// Picks a device spec that belongs to the same engine family as the launcher. Without this,
+// browserEngine:'chromium' could still hand a firefox spec to the Chromium launcher and the
+// reported engine, the UA and the real binary would disagree.
+function pickDeviceKeyForEngine(deviceWeights, launchEngine) {
+  const family = specEngineFor(launchEngine);
+  const fallback = ENGINE_DEFAULT_DEVICE[launchEngine] || 'desktopChrome';
+  const merged = { ...DEFAULT_DEVICE_WEIGHTS, ...(deviceWeights || {}) };
+  let entries = Object.entries(merged).filter(
+    ([k, w]) => DEVICE_SPECS[k] && DEVICE_SPECS[k].engine === family && Number(w) > 0
+  );
+  if (!entries.length) return DEVICE_SPECS[fallback] ? fallback : 'desktopChrome';
+  const consistentEntries = entries.filter(([k]) => DEVICE_SPECS[k].hostConsistent);
+  if (consistentEntries.length) entries = consistentEntries;
   const total = entries.reduce((sum, [, w]) => sum + Number(w), 0);
   let r = Math.random() * total;
   for (const [k, w] of entries) {
@@ -288,9 +389,12 @@ async function applyMaximumStealth(context, { spec, proxied = false, seed = 1337
         return fn;
       };
 
-      // Clean lingering automation globals if any
+      // Clean lingering automation globals if any.
+      // Only ChromeDriver-style markers are removed here: Playwright keeps its binding/exposeFunction
+      // registry on `__playwright*` globals, and deleting those silently kills every exposed binding
+      // (the journey recorder's step capture, the live rrweb bridge) without any error surfacing.
       for (const k of Object.keys(window)) {
-        if (/^(cdc_|__playwright|__pw_|domAutomation)/i.test(k)) {
+        if (/^(cdc_|domAutomation)/i.test(k)) {
           try { delete window[k]; } catch {}
         }
       }
@@ -881,6 +985,8 @@ async function applyResourceMode(context, resourceMode = 'full') {
 const { execFile } = require('child_process');
 
 function getLauncher(engine) {
+  if (engine === 'camoufox') return require('./camoufoxEngine');
+  if (engine === 'patchright') return getPatchrightChromium();
   if (engine === 'firefox') return firefox;
   if (engine === 'webkit') return webkit;
   return getStealthChromium();
@@ -949,25 +1055,43 @@ async function getSharedBrowser(engine, headless, proxy, { stealthMode = 'standa
       return await getCdpBrowserConnection({ mode: resourceMode, headless, proxy: null, stealthArgs });
     } catch {}
   }
-  const supportsContextProxy = engine === 'chromium' || engine === 'firefox';
+  const supportsContextProxy = engine === 'chromium' || engine === 'firefox' || engine === 'patchright' || engine === 'camoufox';
   const proxyKey = proxy
     ? (supportsContextProxy ? 'proxied-pool' : `${proxy.server}|${proxy.username || ''}`)
     : 'direct';
-  const key = `${engine}|${headless ? 'hl' : 'hd'}|${stealthMode}|${proxyKey}`;
+  // Real Chrome (`channel: 'chrome'`) brings a genuine TLS/HTTP2 stack, a real GPU profile and no
+  // automation build flags, which datacenter-facing WAFs score far better than bundled Chromium.
+  // The automatic fallback below keeps machines without Chrome working exactly as before.
+  const preferRealChrome = (engine === 'chromium' || engine === 'patchright') && process.env.WTG_BROWSER_CHANNEL !== 'bundle';
+  const key = `${engine}|${headless ? 'hl' : 'hd'}|${stealthMode}|${preferRealChrome ? 'chrome' : 'bundle'}|${proxyKey}`;
   const existing = sharedBrowsers.get(key);
   if (existing && existing.isConnected()) return existing;
   if (launchingBrowsers.has(key)) return launchingBrowsers.get(key);
 
   const launcher = getLauncher(engine);
-  const browserLevelProxy = proxy
+  // Camoufox (Firefox) accepts a per-context proxy — verified live — so it must NOT receive the
+  // Chromium-only `http://per-context` placeholder as a browser-level proxy.
+  const browserLevelProxy = proxy && engine !== 'camoufox'
     ? (supportsContextProxy ? { server: proxy.server || 'http://per-context' } : proxy)
     : undefined;
   const launchOpts = {
     headless,
-    ...(engine === 'chromium' ? { args: getChromiumStealthArgs(headless, { stealthMode, proxied: Boolean(proxy) }) } : {}),
+    ...((engine === 'chromium' || engine === 'patchright') ? { args: getChromiumStealthArgs(headless, { stealthMode, proxied: Boolean(proxy) }) } : {}),
     ...(browserLevelProxy ? { proxy: browserLevelProxy } : {}),
   };
-  const p = launcher.launch(launchOpts)
+  const launchOnce = async (opts) => {
+    try {
+      return await launcher.launch(opts);
+    } catch (err) {
+      if (opts.channel) {
+        console.log('[Browser] ערוץ Chrome המותקן לא זמין — חוזר אוטומטית ל-Chromium המצורף.');
+        const { channel, ...rest } = opts;
+        return launcher.launch(rest);
+      }
+      throw err;
+    }
+  };
+  const p = launchOnce({ ...launchOpts, ...(preferRealChrome ? { channel: 'chrome' } : {}) })
     .then(b => {
       sharedBrowsers.set(key, b);
       launchingBrowsers.delete(key);
@@ -1136,8 +1260,25 @@ async function openSessionContext({
   stealthMode = 'standard',
   resourceMode = 'full',
   sessionSeed = null,
+  browserEngine = 'chromium',
+  deviceKey: pinnedDeviceKey = null,
 }) {
-  let deviceKey = pickDeviceKey(deviceWeights);
+  // The launcher is derived from the requested engine and nothing else. It used to be taken from
+  // the randomly-picked device spec, so browserEngine:'chromium' could launch Firefox while the
+  // dashboard, the report and the caller all believed they were looking at Chromium.
+  const launchEngine = browserEngine === 'patchright' ? 'patchright'
+    : browserEngine === 'camoufox' ? 'camoufox'
+      : browserEngine === 'firefox' ? 'firefox'
+        : browserEngine === 'webkit' ? 'webkit'
+          : 'chromium';
+  const camoufoxForced = launchEngine === 'camoufox';
+  // The device spec must come from the same engine family as the launcher, otherwise the
+  // fingerprint, the user agent and the binary contradict each other.
+  // The caller (crawleeRunner) picks the device once per visit and records it in the report.
+  // Re-drawing here would make the logged device a different coin flip from the real one.
+  const pinnedAllowed = pinnedDeviceKey && DEVICE_SPECS[pinnedDeviceKey]
+    && DEVICE_SPECS[pinnedDeviceKey].engine === specEngineFor(launchEngine);
+  let deviceKey = pinnedAllowed ? pinnedDeviceKey : pickDeviceKeyForEngine(deviceWeights, launchEngine);
   let fpBundle = null;
   let meta = null;
 
@@ -1148,7 +1289,9 @@ async function openSessionContext({
         (geo?.countryCode && meta.countryCode && meta.countryCode !== geo.countryCode) ||
         (geo?.locale && meta.locale && meta.locale !== geo.locale)
       );
-      if (meta.deviceKey && DEVICE_SPECS[meta.deviceKey] && (DEVICE_SPECS[meta.deviceKey].hostConsistent || IS_MAC) && !geoMismatch) {
+      if (meta.deviceKey && DEVICE_SPECS[meta.deviceKey]
+        && DEVICE_SPECS[meta.deviceKey].engine === specEngineFor(launchEngine)
+        && (DEVICE_SPECS[meta.deviceKey].hostConsistent || IS_MAC) && !geoMismatch) {
         deviceKey = meta.deviceKey;
       } else {
         sessionSlot.isReturning = false;
@@ -1171,7 +1314,7 @@ async function openSessionContext({
   const fp = spec.nativeEngine ? null : (fpBundle || generated.fp);
   const viewport = meta?.viewport || generated.viewport;
   const userAgent = spec.nativeEngine
-    ? (spec.engine === 'chromium' ? getNativeChromeUserAgent() : undefined)
+    ? ((launchEngine === 'chromium' || launchEngine === 'patchright') ? getNativeChromeUserAgent(process.env.WTG_BROWSER_CHANNEL !== 'bundle') : undefined)
     : (fp?.fingerprint?.navigator?.userAgent || spec.pwDevice?.userAgent);
 
   const baseContextOpts = {
@@ -1181,7 +1324,7 @@ async function openSessionContext({
     ignoreHTTPSErrors: true,
     ...(locale ? { locale } : {}),
     ...(timezoneId ? { timezoneId } : {}),
-    ...(spec.engine === 'chromium' ? { args: getChromiumStealthArgs(headless, { stealthMode, proxied: Boolean(proxy) }) } : {}),
+    ...((launchEngine === 'chromium' || launchEngine === 'patchright') ? { args: getChromiumStealthArgs(headless, { stealthMode, proxied: Boolean(proxy) }) } : {}),
     ...(proxy ? { proxy } : {}),
   };
 
@@ -1207,7 +1350,7 @@ async function openSessionContext({
       }
       const nextMeta = {
         deviceKey,
-        engine: spec.engine,
+        engine: launchEngine,
         viewport,
         countryCode: geo?.countryCode || meta?.countryCode || null,
         locale: locale || meta?.locale || null,
@@ -1220,7 +1363,7 @@ async function openSessionContext({
       fs.writeFileSync(sessionSlot.metaPath, JSON.stringify(nextMeta), 'utf8');
     }
 
-    const browser = await getSharedBrowser(spec.engine, headless, proxy, { stealthMode, resourceMode });
+    const browser = await getSharedBrowser(launchEngine, headless, proxy, { stealthMode, resourceMode });
     const { headless: _hl, args: _args, ...ctxOpts } = baseContextOpts;
     if (storageStatePath) {
       ctxOpts.storageState = storageStatePath;
@@ -1235,7 +1378,10 @@ async function openSessionContext({
       ? Number(sessionSeed)
       : (sessionSlot?.slot ? Number(sessionSlot.slot) * 7919 : Math.floor(Math.random() * 100000));
 
-    if (stealthMode === 'maximum') {
+    if (camoufoxForced) {
+      // Camoufox spoofs navigator/plugins at the engine level; extra JS evasions here would
+      // create a surface that contradicts the real Firefox build it actually runs.
+    } else if (stealthMode === 'maximum') {
       await applyMaximumStealth(context, {
         spec,
         proxied: Boolean(proxy),
@@ -1269,7 +1415,7 @@ async function openSessionContext({
       page,
       deviceKey,
       deviceLabel: spec.label,
-      engine: spec.engine,
+      engine: launchEngine,
       viewport,
       locale,
       timezoneId,
@@ -1295,6 +1441,7 @@ module.exports = {
   DEVICE_SPECS,
   DEFAULT_DEVICE_WEIGHTS,
   pickDeviceKey,
+  pickDeviceKeyForEngine,
   generateDeviceFingerprint,
   getChromiumStealthArgs,
   applyMaximumStealth,
@@ -1311,4 +1458,6 @@ module.exports = {
   getFpInjector,
   getStealthChromium,
   getCdpIntegrationsStatus,
+  getLauncher,
+  getNativeChromeUserAgent,
 };

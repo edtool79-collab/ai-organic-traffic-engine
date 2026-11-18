@@ -21,8 +21,19 @@ const {
   auditAdPlacements,
 } = require('./adSafetyHelper');
 const { runScanProductsStep } = require('./wavePlanner');
-const { runAiExploreStep, runAiSmartRecoveryStep } = require('./aiCommander');
-const { redactText, registerSecret, maskEmail, isSecretField } = require('./redaction');
+const { runAiExploreStep, runAiSmartRecoveryStep, callAiChat, captureCompactDomForAi, isDecisionModel } = require('./aiCommander');
+// clef:27b (and any other decision-only model) rejects /api/chat with MODEL_NEEDS_DECISION_API.
+// Scenario steps here need free-form JSON back, so they must stay on a chat model: when the
+// configured worker model is decision-only, fall back to the commander model, then the default.
+function resolveChatModel(step, ctx, fallback = 'deepseek-v4.1-flash') {
+  const wanted = String(step?.workerModel || ctx?.aiConfig?.workerModel || '').trim();
+  if (wanted && !isDecisionModel(wanted)) return wanted;
+  const alt = String(ctx?.aiConfig?.commanderModel || '').trim();
+  if (alt && !isDecisionModel(alt)) return alt;
+  return fallback;
+}
+const { pickSearchEngine, searchEngineProfile, buildQuery, buildSerpUrl } = require('./referrerEngine');
+const { redactText, registerSecret, maskEmail, isSecretField, safeStepLabel, registerStepSecrets } = require('./redaction');
 const {
   createEmailInbox,
   getEmailCode,
@@ -32,7 +43,7 @@ const {
   getEmailClientStatus,
 } = require('./emailInboxClient');
 
-const RUN_INBOXES_FILE = path.join(__dirname, '..', 'reports', 'run-inboxes.jsonl');
+const { RUN_INBOXES_FILE, readRunInboxes } = require('./runInboxStore');
 
 async function ensureVisitInbox(ctx, emit) {
   if (ctx.sessionInbox && ctx.sessionInbox.address && ctx.sessionInbox.inbox_id) {
@@ -62,7 +73,7 @@ async function ensureVisitInbox(ctx, emit) {
     if (typeof emit === 'function') emit(`[HirePulse Email] Inbox persist skipped: ${String((persistErr && persistErr.message) || persistErr).slice(0, 80)}`);
   }
   if (typeof emit === 'function') {
-    emit(`[HirePulse Email] נוצרה תיבת מייל חיה לסוכן: ${inbox.address}`);
+    emit(`[HirePulse Email] נוצרה תיבת מייל חיה לסוכן: ${maskEmail(inbox.address)}`);
   }
   return ctx.sessionInbox;
 }
@@ -198,7 +209,7 @@ async function enforceLockerDwellGate(step, ctx, emit) {
   } catch {}
 }
 
-async function resolveInteractiveLocator(page, rawSelector, timeoutMs = 10000) {
+async function resolveInteractiveLocator(page, rawSelector, timeoutMs = 20000) {
   const sel = String(rawSelector || '').trim();
   if (!sel) throw new Error('חסר בורר (Selector) או טקסט לאלמנט.');
 
@@ -206,7 +217,10 @@ async function resolveInteractiveLocator(page, rawSelector, timeoutMs = 10000) {
   // Partner offer anchors (full https href selectors) render lazily inside lockers through proxies
   // (measured: offers materialize 9-18s after the lock click) — give them a much longer first wait.
   const isHrefAnchorStep = /a\[href=["']https?:\/\//i.test(sel);
-  const primaryWaitMs = Math.min(timeoutMs, isHrefAnchorStep ? 15000 : 4500);
+  // Offer landing pages ship a "Loading Offer.." JS shell and build their form only
+  // after the offer renders (measured: 9-18s behind a locker or slow proxy).
+  const DEFAULT_LOCATE_MS = 20000;
+  const primaryWaitMs = Math.min(timeoutMs, isHrefAnchorStep ? 15000 : DEFAULT_LOCATE_MS);
   try {
     await primary.waitFor({ state: 'attached', timeout: primaryWaitMs });
     await primary.waitFor({ state: 'visible', timeout: 1800 }).catch(() => {});
@@ -286,7 +300,7 @@ async function resolveInteractiveLocator(page, rawSelector, timeoutMs = 10000) {
     const looksLikeSelector = /[#.\[>+=~:]/.test(sel) || sel.startsWith('text=') || sel.startsWith('xpath=');
     if (!looksLikeSelector) {
       const byText = page.getByText(sel, { exact: false }).first();
-      await byText.waitFor({ state: 'visible', timeout: Math.min(timeoutMs, 4500) });
+      await byText.waitFor({ state: 'visible', timeout: Math.min(timeoutMs, DEFAULT_LOCATE_MS) });
       return byText;
     }
     throw firstErr;
@@ -499,27 +513,371 @@ async function resolveFallbackExternalClick(page, step) {
   return null;
 }
 
+// Link shorteners / interstitials answer 403 to a cold, direct deep-link request. A real visitor
+// arrives on the domain first, accepts the consent banner and only then continues — same here.
+const SHORTENER_HOST_RE = /(^|\.)(shrinkme\.\w+|shrinke\.\w+|shrinkearn|shrinklink|ouo\.\w+|exe\.io|fc\.lc|cuty\.io|gplinks|za\.gl|mboost|boostellar|linkvertise|adf\.ly|shorte\.st|cutt\.ly|rebrand\.ly|tinyurl\.com|bit\.ly|clk\.sh|shorturl\.at|surl\.li)$/i;
+
+const CONSENT_SELECTORS = [
+  '#onetrust-accept-btn-handler',
+  'button:has-text("Accept all")',
+  'button:has-text("Accept")',
+  'button:has-text("I agree")',
+  'button:has-text("Agree")',
+  '.fc-consent-root button.fc-button-label',
+  'button[aria-label="Accept all"]',
+  '#cookie-accept',
+];
+
+/**
+ * Opens the shortener's own domain first (with the search-engine referrer), accepts the consent
+ * banner and lets the clearance cookies settle. Returns a note appended to the goto result, or ''.
+ */
+async function warmUpShortener(page, dest, ctx) {
+  if (ctx.__wtgShortenerWarmed) return '';
+  let host = '';
+  try { host = new URL(dest).hostname.toLowerCase(); } catch { return ''; }
+  if (!SHORTENER_HOST_RE.test(host)) return '';
+  ctx.__wtgShortenerWarmed = true;
+  const root = `https://${host}/`;
+  const ref = ctx.serpUrl || '';
+  try {
+    await page.goto(root, ref
+      ? { referer: ref, waitUntil: 'domcontentloaded', timeout: 15000 }
+      : { waitUntil: 'domcontentloaded', timeout: 15000 });
+  } catch {
+    return '';
+  }
+  ctx.pagesVisited++;
+  ctx.shortenerRoot = root;
+  await sleep(600 + Math.round(Math.random() * 900));
+  for (const sel of CONSENT_SELECTORS) {
+    const loc = page.locator(sel).first();
+    if ((await loc.count().catch(() => 0)) > 0 && (await loc.isVisible().catch(() => false))) {
+      await loc.click({ timeout: 2500 }).catch(() => {});
+      await sleep(450);
+      break;
+    }
+  }
+  // Small dwell so the WAF sees a real session, not an instant bounce.
+  await sleep(900 + Math.round(Math.random() * 1600));
+  return ` + חימום דומיין ${host} (אישור קוקיז)`;
+}
+
 const STEP_HANDLERS = {
+  /**
+   * Organic search warm-up. Walks a real search engine, types the query like a person, submits,
+   * and remembers the results URL. The next navigation then leaves that SERP as its referrer,
+   * so the visit is classified as organic search instead of a direct hit.
+   */
+  async search_entry(page, step, ctx) {
+    const geo = ctx.geo || null;
+    const engine = pickSearchEngine(step.engine || '', ctx.avoidEngines || []);
+    const profile = searchEngineProfile(engine.id, geo?.countryCode || geo?.cc || 'US');
+    const query = String(step.query || '').trim() || buildQuery({
+      title: ctx.parsedSnippet?.title || '',
+      targetUrl: ctx.targetUrl,
+    });
+
+    let navigated = false;
+    try {
+      // Short leash: the warm-up is optional. A captcha/slow engine must not eat the visit budget.
+      await page.goto(profile.homeUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+      navigated = true;
+    } catch {
+      navigated = false;
+    }
+
+    if (navigated) {
+      ctx.pagesVisited++;
+      await sleep(600 + Math.round(Math.random() * 900));
+      // EU/UK proxies get a consent interstitial before the search box is usable.
+      for (const sel of profile.acceptSelectors) {
+        const loc = page.locator(sel).first();
+        if ((await loc.count().catch(() => 0)) > 0 && (await loc.isVisible().catch(() => false))) {
+          await loc.click({ timeout: 3000 }).catch(() => {});
+          await sleep(700);
+          break;
+        }
+      }
+      let box = null;
+      for (const sel of profile.inputSelectors) {
+        const loc = page.locator(sel).first();
+        if ((await loc.count().catch(() => 0)) > 0 && (await loc.isVisible().catch(() => false))) {
+          box = loc;
+          break;
+        }
+      }
+      if (box) {
+        await box.click({ timeout: 4000 }).catch(() => {});
+        await humanType(page, box, query).catch(async () => { await box.fill(query).catch(() => {}); });
+        await sleep(300 + Math.round(Math.random() * 500));
+        await page.keyboard.press('Enter').catch(() => {});
+        await page.waitForLoadState('domcontentloaded', { timeout: 20000 }).catch(() => {});
+        await sleep(900 + Math.round(Math.random() * 1200));
+      }
+      try {
+        const landed = new URL(page.url());
+        if (/search|results|\?q=|\?p=/.test(`${landed.pathname}${landed.search}`)) {
+          ctx.serpUrl = landed.toString();
+        }
+      } catch {}
+      // Google answers a datacenter IP with a "sorry / unusual traffic" wall instead of results.
+      // Remember it so the next visits on this proxy simply use Bing/DuckDuckGo/Yahoo.
+      try {
+        if (/\/sorry\//i.test(page.url())) {
+          ctx.engineChallenged = engine.id;
+        } else {
+          const bodyText = await page.locator('body').innerText({ timeout: 2500 }).catch(() => '');
+          if (/unusual traffic|automated queries|before you continue|are you a robot|not a robot|verify you are human/i.test(String(bodyText || ''))) {
+            ctx.engineChallenged = engine.id;
+          }
+        }
+      } catch {}
+    }
+
+    // Even if the engine UI failed (captcha, blocked proxy), the referrer must still be a real
+    // results URL — build it directly so the offer navigation is never logged as a direct hit.
+    if (!ctx.serpUrl) {
+      ctx.serpUrl = buildSerpUrl(engine.id, query, geo?.countryCode || geo?.cc || 'US');
+    }
+    ctx.searchQuery = query;
+    ctx.searchEngine = engine.id;
+    return `חיפוש אורגני ב-${engine.id}: "${query}" → מפנה אל היעד מתוצאות החיפוש`;
+  },
+
+  /**
+   * AI form guard — runs right before a submit. Fills any visible empty field from the visit
+   * identity, then (only if something is still unmapped) asks the model which selector to use.
+   */
+  async ai_form_guard(page, step, ctx) {
+    const identity = step.identity || ctx.identity || null;
+    if (!identity) return 'AI Form Guard: אין זהות לביקור — דולג';
+    const emit = msg => { if (ctx.onStep) ctx.onStep(msg); };
+    // The identity stores the inbox as a template; resolve it here so the guard never types
+    // the literal "{{AGENT_EMAIL}}" into a field that the visit cannot verify.
+    let emailValue = String(identity.email || '');
+    if (!emailValue || /^\{\{\s*(AGENT_EMAIL|EMAIL)\s*\}\}$/i.test(emailValue)) {
+      const inbox = await ensureVisitInbox(ctx, emit).catch(() => null);
+      emailValue = inbox?.address || '';
+    }
+
+    const filled = await page.evaluate((id) => {
+      const setVal = (el, value) => {
+        // Each element type has its own value setter; calling the <input> setter on a
+        // <textarea> throws Illegal invocation and used to kill this whole pass.
+        const proto = el.tagName === 'SELECT' ? window.HTMLSelectElement.prototype
+          : el.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype
+            : window.HTMLInputElement.prototype;
+        const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+        if (setter) setter.call(el, value); else el.value = value;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        el.dispatchEvent(new Event('blur', { bubbles: true }));
+      };
+      const pick = (hint) => {
+        const h = String(hint || '').toLowerCase();
+        if (/first/.test(h)) return id.first;
+        if (/last|surname/.test(h)) return id.last;
+        if (/mail/.test(h)) return id.email;
+        if (/address|street/.test(h)) return id.street;
+        if (/city|town/.test(h)) return id.city;
+        if (/zip|postal/.test(h)) return id.zip;
+        if (/state|province/.test(h)) return id.state;
+        if (/phone|tel|mobile/.test(h)) return id.phone;
+        return '';
+      };
+      const out = [];
+      const nodes = Array.from(document.querySelectorAll('input, select, textarea'));
+      for (const el of nodes) {
+        const type = (el.getAttribute('type') || el.tagName).toLowerCase();
+        if (['hidden', 'password', 'file', 'submit', 'button', 'checkbox', 'radio'].includes(type)) continue;
+        const r = el.getBoundingClientRect();
+        if (r.width < 10 || r.height < 10) continue;
+        const st = getComputedStyle(el);
+        if (st.display === 'none' || st.visibility === 'hidden') continue;
+        const current = String(el.value || '').trim();
+        if (current && !/^(select|choose|-{0,2}select.{0,6}-{0,2})$/i.test(current)) continue;
+        const hint = `${el.id || ''} ${el.getAttribute('name') || ''} ${el.getAttribute('placeholder') || ''} ${el.getAttribute('aria-label') || ''}`;
+        const value = pick(hint);
+        if (!value) { out.push({ selector: el.id ? `#${el.id}` : '', hint: hint.trim().slice(0, 40), filled: '' }); continue; }
+        try {
+          setVal(el, value);
+          out.push({ selector: el.id ? `#${el.id}` : '', hint: hint.trim().slice(0, 40), filled: value });
+        } catch {
+          out.push({ selector: el.id ? `#${el.id}` : '', hint: hint.trim().slice(0, 40), filled: '' });
+        }
+      }
+      return out;
+    }, {
+      first: identity.first || '',
+      last: identity.last || '',
+      street: identity.street || '',
+      city: identity.city || '',
+      zip: identity.zip || '',
+      state: identity.state || '',
+      phone: identity.phone || '',
+      email: emailValue,
+    }).catch(() => []);
+
+    const filledNow = filled.filter(f => f.filled);
+    const unknown = filled.filter(f => !f.filled && f.selector);
+    if (process.env.TRAFFIC_DEBUG_GUARD) {
+      console.error(`[guard] url=${page.url()} fields=${filled.length} filled=${filledNow.length} unknown=${unknown.length} model=${resolveChatModel(step, ctx)}`);
+    }
+
+    // Only spend an API call when the deterministic pass could not map a field.
+    let aiNote = '';
+    if (unknown.length && ctx.aiConfig?.enabled !== false) {
+      try {
+        const dom = await captureCompactDomForAi(page, Boolean(ctx.avoidAdClicks), { sameOriginOnly: false });
+        const res = await callAiChat({
+          provider: ctx.aiConfig?.provider || 'auto',
+          role: 'worker',
+          model: resolveChatModel(step, ctx),
+          temperature: 0.1,
+          maxTokens: 160,
+          timeoutMs: 20000,
+          messages: [
+            { role: 'system', content: 'You complete signup forms. Reply ONLY JSON: {"fills":[{"selector":"#id","value":"..."}]}' },
+            {
+              role: 'user',
+              content: `Unmapped fields: ${unknown.map(u => u.hint).join(' | ').slice(0, 300)}\nInputs: ${JSON.stringify(dom.inputs).slice(0, 700)}\nIdentity: ${JSON.stringify({ first: identity.first, last: identity.last, email: emailValue, street: identity.street, city: identity.city, state: identity.state, zip: identity.zip, phone: identity.phone })}`,
+            },
+          ],
+        });
+        const text = typeof res === 'string' ? res : (res?.text || res?.content || '');
+        const match = String(text).match(/\{[\s\S]*\}/);
+        if (match) {
+          const parsed = JSON.parse(match[0]);
+          for (const f of (parsed.fills || []).slice(0, 6)) {
+            if (!f || !f.selector || f.value == null) continue;
+            const loc = page.locator(String(f.selector)).first();
+            if ((await loc.count().catch(() => 0)) > 0) {
+              await loc.fill(String(f.value)).catch(() => {});
+              filledNow.push({ selector: String(f.selector), filled: String(f.value) });
+            }
+          }
+          if ((parsed.fills || []).length) aiNote = ` + ${parsed.fills.length} שדות שהושלמו ע"י AI`;
+        }
+      } catch (err) {
+        aiNote = ` (AI Form Guard לא זמין: ${String(err?.message || err).slice(0, 60)})`;
+      }
+    }
+
+    if (!filledNow.length && !unknown.length) return 'AI Form Guard: כל השדות הגלויים כבר מלאים';
+    const summary = filledNow.map(f => `${f.selector || f.hint}=${String(f.filled).slice(0, 18)}`).join(', ');
+    emit(`[ביקור ${ctx.visitIndex + 1 ?? ''} | AI Form Guard] הושלמו ${filledNow.length} שדות${aiNote}`);
+    return `AI Form Guard: הושלמו ${filledNow.length} שדות ריקים${aiNote}${summary ? ` (${summary})` : ''}`;
+  },
+
+  /**
+   * AI route repair — when the visit lands somewhere unexpected, ask the model which on-page link
+   * continues the journey, and click it. Keeps a visit alive instead of dying on a wrong page.
+   */
+  async ai_route_repair(page, step, ctx) {
+    if (!page || page.isClosed()) return 'AI Route Repair: אין דף פעיל';
+    // Never let the model pick a link when the page already shows the signup form — clicking
+    // "a better link" there would abandon a working funnel (and burn an API call).
+    const formVisible = await page.evaluate(() => {
+      const nodes = Array.from(document.querySelectorAll('input, select'));
+      return nodes.some(el => {
+        const type = (el.getAttribute('type') || el.tagName).toLowerCase();
+        if (['hidden', 'file', 'submit', 'button'].includes(type)) return false;
+        const r = el.getBoundingClientRect();
+        if (r.width < 10 || r.height < 10) return false;
+        const st = getComputedStyle(el);
+        if (st.display === 'none' || st.visibility === 'hidden') return false;
+        const hint = `${el.id || ''} ${el.getAttribute('name') || ''} ${el.getAttribute('type') || ''}`.toLowerCase();
+        return /mail|first|last|name|address|zip|phone|tel/.test(hint);
+      });
+    }).catch(() => false);
+    if (formVisible) return 'AI Route Repair: הטופס כבר על המסך — אין צורך לתקן מסלול';
+    const dom = await captureCompactDomForAi(page, Boolean(ctx.avoidAdClicks), { sameOriginOnly: false });
+    if (!dom.clickables.length) return 'AI Route Repair: אין קישורים בדף';
+    const goal = String(step.value || ctx.aiDirective || 'continue to the offer form').slice(0, 200);
+    try {
+      const res = await callAiChat({
+        provider: ctx.aiConfig?.provider || 'auto',
+        role: 'worker',
+        model: resolveChatModel(step, ctx),
+        temperature: 0.1,
+        maxTokens: 120,
+        timeoutMs: 20000,
+        messages: [
+          { role: 'system', content: 'You pick the single best link to continue a signup flow. Reply ONLY JSON: {"id":0,"why":"short"}' },
+          { role: 'user', content: `Goal: ${goal}\nURL: ${dom.url}\nHeadings: ${dom.headings.join(' | ')}\nLinks: ${JSON.stringify(dom.clickables.slice(0, 10))}` },
+        ],
+      });
+      const text = typeof res === 'string' ? res : (res?.text || res?.content || '');
+      const match = String(text).match(/\{[\s\S]*\}/);
+      if (!match) return 'AI Route Repair: לא התקבלה הכרעה';
+      const picked = JSON.parse(match[0]);
+      const target = dom.clickables.find(c => Number(c.id) === Number(picked.id));
+      if (!target || !target.selector) return 'AI Route Repair: היעד לא נמצא בדף';
+      const loc = page.locator(target.selector).first();
+      if ((await loc.count().catch(() => 0)) === 0) return 'AI Route Repair: הסלקטור לא קיים';
+      await loc.scrollIntoViewIfNeeded({ timeout: 2500 }).catch(() => {});
+      await loc.click({ timeout: 6000 }).catch(() => {});
+      await sleep(1200);
+      return `AI Route Repair: עבר ל-"${String(target.text || target.selector).slice(0, 40)}" (${String(picked.why || '').slice(0, 40)})`;
+    } catch (err) {
+      return `AI Route Repair נכשל: ${String(err?.message || err).slice(0, 60)}`;
+    }
+  },
+
   async goto(page, step, ctx) {
     const dest = resolveTargetUrl(ctx.targetUrl, step.value || step.selector || '/');
     const started = Date.now();
+    // Cold deep-links into shortener domains are the #1 source of 403 in this funnel.
+    const warmNote = await warmUpShortener(page, dest, ctx).catch(() => '');
     const gotoOpts = { waitUntil: 'domcontentloaded', timeout: 25000 };
+    // A real browser always sends the page it is standing on as the Referer. `page.goto()` sends
+    // none, which is why the affiliate report showed "Direct Hit" for almost every visit.
+    const currentUrl = String(page.url() || '');
+    const hasRealCurrentPage = /^https?:\/\//i.test(currentUrl) && !/^about:blank/i.test(currentUrl);
     if (step.referer === 'google') {
       gotoOpts.referer = (ctx.initialReferer && /google\./i.test(ctx.initialReferer))
         ? ctx.initialReferer
         : 'https://www.google.com/';
       ctx.initialRefererConsumed = true;
+    } else if (step.referer === 'serp' && ctx.serpUrl) {
+      gotoOpts.referer = ctx.serpUrl;
+      ctx.initialRefererConsumed = true;
     } else if (typeof step.referer === 'string' && /^https?:\/\//i.test(step.referer.trim())) {
       gotoOpts.referer = step.referer.trim();
+      ctx.initialRefererConsumed = true;
+    } else if (!ctx.initialRefererConsumed && ctx.serpUrl) {
+      // Warm-up search step already produced a genuine results-page URL.
+      gotoOpts.referer = ctx.serpUrl;
       ctx.initialRefererConsumed = true;
     } else if (!ctx.initialRefererConsumed && ctx.initialReferer) {
       gotoOpts.referer = ctx.initialReferer;
       ctx.initialRefererConsumed = true;
+    } else if (hasRealCurrentPage) {
+      // Same-page continuation (offer step 2, internal hop): the previous page is the referrer.
+      const here = String(currentUrl).split('#')[0];
+      let sameSite = true;
+      try { sameSite = new URL(here).origin === new URL(dest).origin; } catch {}
+      gotoOpts.referer = sameSite ? here : (ctx.serpUrl || here);
+    } else if (ctx.serpUrl) {
+      gotoOpts.referer = ctx.serpUrl;
     }
     const resp = await page.goto(dest, gotoOpts);
     await sleep(withHumanJitter(350, 220, 900, 0.28));
     const loadMs = Date.now() - started;
     const status = resp ? resp.status() : 'n/a';
+    // Geo/ASN cloaking: some offers bounce non-qualifying proxies to google.com instead of
+    // rendering the form. Treat that as a transient transport failure so the visit is retried
+    // on a different proxy instead of silently burning its whole step budget on a blank page.
+    try {
+      const destHost = new URL(dest).hostname;
+      const finalHost = new URL(page.url()).hostname;
+      if (destHost && finalHost && !/(^|\.)google\./i.test(destHost) && /(^|\.)google\.[a-z.]+$/i.test(finalHost)) {
+        throw new Error(`net::ERR_OFFER_REDIRECT — היעד החזיר הפניה ל-${finalHost} (הפרוקסי חסום גיאוגרפית בהצעה)`);
+      }
+    } catch (geoErr) {
+      if (/ERR_OFFER_REDIRECT/.test(String(geoErr?.message || ''))) throw geoErr;
+    }
     ctx.lastStatus = status;
     ctx.loadTimes.push(loadMs);
     ctx.pagesVisited++;
@@ -528,7 +886,7 @@ const STEP_HANDLERS = {
     if (typeof status === 'number' && status >= 400) {
       throw new Error(`הדף ${dest} החזיר שגיאת HTTP ${status}`);
     }
-    return `נטען ${page.url()} (HTTP ${status}, ${loadMs}ms)`;
+    return `נטען ${page.url()} (HTTP ${status}, ${loadMs}ms)${warmNote}`;
   },
 
   async click(page, step, ctx) {
@@ -554,9 +912,11 @@ const STEP_HANDLERS = {
     try {
       const selTest = String(step.selector || step.value || '');
       const isPartnerHrefStep = /a\[href=["']https?:\/\//i.test(selTest);
+      // Offer pages render their buttons late (JS shell + redirects), so the default
+      // click wait matches the 20s locator budget instead of cutting off at 10s.
       const locatorTimeout = isPartnerHrefStep
         ? 24000
-        : ((step.optional && Number.isInteger(step.tab) && step.tab > 0) ? 2200 : 10000);
+        : ((step.optional && Number.isInteger(step.tab) && step.tab > 0) ? 2200 : 20000);
       loc = await resolveInteractiveLocator(page, selectorStr, locatorTimeout);
     } catch (selErr) {
       const canFallbackExt = Number.isInteger(step.tab) && step.tab > 0 && selectorStr.includes(':nth-of-type(');
@@ -752,7 +1112,7 @@ const STEP_HANDLERS = {
       trimmedUpper === '{{EMAIL}}' ||
       (isEmailField && !step.lockValue && getEmailClientStatus().configured)
     ) {
-      const inbox = await ensureVisitInbox(ctx, emit).catch(() => null);
+      const inbox = await ensureVisitInbox(ctx, emit);
       if (inbox && inbox.address) {
         val = inbox.address;
         usedLiveInbox = true;
@@ -761,26 +1121,25 @@ const STEP_HANDLERS = {
       trimmedUpper === '{{OTP_CODE}}' ||
       trimmedUpper === '{{EMAIL_CODE}}' ||
       trimmedUpper === '{{OTP}}' ||
-      (isOtpField && ctx.sessionInbox && ctx.sessionInbox.inbox_id)
+      (isOtpField && !step.lockValue && ctx.sessionInbox && ctx.sessionInbox.inbox_id)
     ) {
-      const inbox = await ensureVisitInbox(ctx, emit).catch(() => ctx.sessionInbox);
+      const inbox = await ensureVisitInbox(ctx, emit);
       if (inbox && inbox.inbox_id) {
         const otpRes = await waitForEmailCode({
           inbox_id: inbox.inbox_id,
           capability: inbox.capability,
           timeoutMs: isOtpField ? 18000 : 45000,
-          intervalMs: 2500,
+          pollIntervalMs: 2500,
           onPoll: ({ attempts, status }) => emit(`[HirePulse OTP] בדיקה #${attempts} מול התיבה (${status})...`),
-        }).catch(() => null);
+        });
         if (otpRes && otpRes.code) {
           val = String(otpRes.code);
           registerSecret(val);
           emit(`[HirePulse OTP] נשלף קוד אימות חי מהמייל והוזן אוטומטית (${val.length} תווים, הערך מוסתר מהיומן)`);
-        } else if (isOtpField && !/^\d{4,8}$/.test(val.trim())) {
-          val = String(Math.floor(100000 + Math.random() * 900000));
         }
       }
     }
+    if (isSecretValue) registerSecret(val);
     if (isStoreField && val && !val.includes('@')) {
       ctx.lastStoreDomain = val;
     }
@@ -816,7 +1175,6 @@ const STEP_HANDLERS = {
     if (actual !== val) {
       await loc.fill(val).catch(() => {});
     }
-    if (isSecretValue) registerSecret(val);
 
     if (usedLiveInbox) {
       // Live-inbox submissions are conversion surface — remember for end-of-session beacon flush
@@ -845,11 +1203,11 @@ const STEP_HANDLERS = {
       inbox_id: inbox.inbox_id,
       capability: inbox.capability,
       timeoutMs,
-      onPoll: ({ attempts, status }) => emit(`[HirePulse OTP] ממתין לקוד אימות בתיבה ${inbox.address} (ניסיון #${attempts}, סטטוס: ${status})...`),
+      onPoll: ({ attempts, status }) => emit(`[HirePulse OTP] ממתין לקוד אימות בתיבה ${maskEmail(inbox.address)} (ניסיון #${attempts}, סטטוס: ${status})...`),
     });
     const selector = String(step.selector || '').trim() ||
       'input[autocomplete="one-time-code"], input[name*="code" i], input[name*="otp" i], input[id*="code" i], input[id*="otp" i]';
-    await STEP_HANDLERS.fill(page, { ...step, selector, value: otpRes.code }, ctx);
+    await STEP_HANDLERS.fill(page, { ...step, selector, value: otpRes.code, secret: true, lockValue: true }, ctx);
     return `הוזן קוד אימות OTP מהמייל (${otpRes.code.length} תווים, התקבל תוך ${Math.round(otpRes.elapsedMs / 100) / 10}s)`;
   },
 
@@ -859,7 +1217,7 @@ const STEP_HANDLERS = {
     await loc.selectOption(val).catch(async () => {
       await loc.selectOption({ label: val });
     });
-    return `נבחרה אפשרות "${val}" מתוך ${step.selector}`;
+    return 'Selected an option in ' + redactText(step.selector) + '.';
   },
 
   async press(page, step) {
@@ -1084,7 +1442,7 @@ function pickBestOpenExternalTab(ctx, preferredTabId) {
 async function getStepPage(step, ctx) {
   const tabId = Number.isInteger(step.tab) && step.tab >= 0 ? step.tab : 0;
   let targetPage = ctx.tabs.get(tabId);
-  const isDynamicOptionalStep = ['ai_explore', 'scan_products', 'human_browse', 'read_article'].includes(step.type) || Boolean(step.optional);
+  const isDynamicOptionalStep = ['ai_explore', 'scan_products', 'human_browse', 'read_article', 'ai_form_guard', 'ai_route_repair'].includes(step.type) || Boolean(step.optional);
 
   if (tabId > 0 && (!targetPage || targetPage.isClosed() || targetPage.url() === 'about:blank' || ctx.emptyExternalTabs?.has(tabId)) && isDynamicOptionalStep) {
     const ext = pickBestOpenExternalTab(ctx, tabId);
@@ -1095,7 +1453,7 @@ async function getStepPage(step, ctx) {
       return targetPage;
     }
     const basePage = ctx.tabs.get(0);
-    if (['ai_explore', 'scan_products', 'human_browse', 'read_article'].includes(step.type) && basePage && !basePage.isClosed()) {
+    if (['ai_explore', 'scan_products', 'human_browse', 'read_article', 'ai_form_guard', 'ai_route_repair'].includes(step.type) && basePage && !basePage.isClosed()) {
       ctx.activeTabId = 0;
       await basePage.bringToFront().catch(() => {});
       return basePage;
@@ -1153,7 +1511,11 @@ async function executeTaskSteps({
   onFrame = null,
   onStep = null,
   attribution = {},
+  geoInfo = null,
+  identityInfo = null,
+  avoidEngines = [],
 }) {
+  registerStepSecrets(steps);
   const parsedSnippet = parseSnippet(snippet);
   const telemetry = attachPageTelemetry(page);
   const ctx = {
@@ -1167,8 +1529,15 @@ async function executeTaskSteps({
     staySameOrigin: Boolean(staySameOrigin),
     sessionInbox: null,
     onStep,
+    visitIndex,
+    geo: geoInfo || null,
+    identity: identityInfo || null,
+    serpUrl: '',
+    searchQuery: '',
+    searchEngine: '',
     initialReferer: initialReferer || '',
     initialRefererConsumed: Boolean(alreadyNavigated),
+    avoidEngines: Array.isArray(avoidEngines) ? avoidEngines : [],
     lastStatus: initialStatus,
     loadTimes: initialLoadMs ? [initialLoadMs] : [],
     pagesVisited: alreadyNavigated ? 1 : 0,
@@ -1188,7 +1557,9 @@ async function executeTaskSteps({
     if (alreadyNavigated) {
       await injectSnippet(page, parsedSnippet);
       await captureFrameSafe(page, { visitIndex, label: 'דף כניסה למשימה', persona: personaName }, onFrame);
-    } else if (!steps.length || steps[0].type !== 'goto') {
+    } else if (!steps.length || !['goto', 'search_entry'].includes(steps[0].type)) {
+      // A leading `search_entry` is the entry point: navigating to the target here first would
+      // hit the offer twice per visit (and before the search engine exists).
       const entryOpts = { waitUntil: 'domcontentloaded', timeout: 25000 };
       if (!ctx.initialRefererConsumed && ctx.initialReferer) {
         entryOpts.referer = ctx.initialReferer;
@@ -1235,7 +1606,7 @@ async function executeTaskSteps({
         && (skipsByTabUrl.get(preFailKey) || 0) >= (stepTab > 0 ? 2 : FAIL_FAST_SKIP_LIMIT)
       ) {
         const skippedDetail = `דולג מיידית (Fail-Fast: העמוד לא תואם אחרי ${skipsByTabUrl.get(preFailKey)} דילוגים רצופים)`;
-        const label = step.label || `${step.type} ${step.selector || step.value || ''}`.trim();
+        const label = safeStepLabel(step);
         stepResults.push({ index: idx + 1, type: step.type, label, ok: false, durationMs: 0, detail: skippedDetail });
         emitStep(`[ביקור ${visitIndex + 1} | צעד ${idx + 1}/${steps.length}] ${skippedDetail}`);
         continue;
@@ -1253,9 +1624,9 @@ async function executeTaskSteps({
         emitStep(`[Tab #${stepTab}] זוהה דף "הצעה לא זמינה" — הטאב נסגר אוטומטית לחיסכון בזמן`);
       }
 
-      if (stepTab > 0 && ctx.emptyExternalTabs.has(stepTab) && !['ai_explore', 'scan_products', 'close_tab', 'goto'].includes(step.type) && !step.mustRun) {
+      if (stepTab > 0 && ctx.emptyExternalTabs.has(stepTab) && !['ai_explore', 'ai_form_guard', 'ai_route_repair', 'scan_products', 'close_tab', 'goto'].includes(step.type) && !step.mustRun) {
         const skippedDetail = `דולג מיידית (טאב #${stepTab} נותר ללא קישורים/תוכן ניווט בדף החיצוני)`;
-        const label = step.label || `${step.type} ${step.selector || step.value || ''}`.trim();
+        const label = safeStepLabel(step);
         stepResults.push({ index: idx + 1, type: step.type, label, ok: false, durationMs: 0, detail: skippedDetail });
         emitStep(`[ביקור ${visitIndex + 1} | צעד ${idx + 1}/${steps.length}] ${skippedDetail}`);
         continue;
@@ -1271,7 +1642,7 @@ async function executeTaskSteps({
         throw new Error(`סוג צעד לא מוכר במשימה: ${step.type}`);
       }
 
-      const stepLabel = step.label || `${step.type} ${step.selector || step.value || ''}`.trim();
+      const stepLabel = safeStepLabel(step);
       const started = Date.now();
       let detail;
       let ok = true;
@@ -1282,7 +1653,7 @@ async function executeTaskSteps({
           throw new Error(`טאב #${stepTab} לא נפתח`);
         }
         if (
-          ['ai_explore', 'scan_products'].includes(step.type)
+          ['ai_explore', 'scan_products', 'ai_form_guard', 'ai_route_repair'].includes(step.type)
           && tabPage
           && !tabPage.isClosed()
           && tabPage.url() === 'about:blank'
@@ -1297,21 +1668,44 @@ async function executeTaskSteps({
         activeStepPage = tabPage || page;
         detail = await handler(tabPage, step, ctx);
       } catch (err) {
-        if (page.isClosed() || /Target page, context or browser has been closed/i.test(err?.message || '')) {
+        // Offer pages bounce through two or three URLs during a visit. A redirect that
+        // lands mid-step destroys the JS execution context and the whole visit used to
+        // die on it. Wait for the navigation to settle and replay the same step once.
+        let recovered = false;
+        const navRace = /Execution context was destroyed|Cannot find context|because of a navigation|frame was detached/i
+          .test(String(err?.message || ''));
+        if (navRace && !page.isClosed()) {
+          await page.waitForTimeout(1500).catch(() => {});
+          try {
+            detail = await handler(activeStepPage || page, step, ctx);
+            recovered = true;
+          } catch (retryErr) {
+            err = retryErr;
+          }
+        }
+        if (!recovered) {
+          if (page.isClosed() || /Target page, context or browser has been closed/i.test(err?.message || '')) {
           if (!step.optional && page.isClosed()) {
             emitStep(`[ביקור ${visitIndex + 1}] הדפדפן נסגר במהלך צעד ${idx + 1} — מסיים ביקור`);
             break;
           }
         }
         const canSoftSkip = step.optional || ['click', 'hover', 'scroll_to'].includes(step.type);
-        if (!canSoftSkip) throw err;
+        if (!canSoftSkip) {
+          if (err instanceof Error) {
+            err.message = redactText(err.message);
+            if (err.stack) err.stack = redactText(err.stack);
+          }
+          throw err;
+        }
         if (step.type === 'click' && /a\[href=["']https?:/i.test(String(step.selector || ''))) {
           // Attribution diagnostics: show what offers/anchors actually existed on skip
           await dumpLockerAnchors(activeStepPage || page, step.selector).catch(() => {});
         }
         ok = false;
-        const shortErr = String(err?.message || err).split('\n')[0].slice(0, 110);
+        const shortErr = redactText(err?.message || err).split('\n')[0].slice(0, 110);
         detail = `דולג (האלמנט לא הופיע בדף הנוכחי): ${shortErr}`;
+        }
       }
       const durationMs = Date.now() - started;
 
@@ -1352,7 +1746,7 @@ async function executeTaskSteps({
         }
       }
 
-      if (['goto', 'click', 'go_back', 'close_tab', 'fill', 'fill_email', 'fill_otp', 'select', 'hover', 'scroll', 'scroll_to', 'read_article', 'human_browse', 'scan_products', 'ai_explore', 'dismiss_overlays', 'audit_ads', 'screenshot'].includes(step.type)) {
+      if (['goto', 'click', 'go_back', 'close_tab', 'fill', 'fill_email', 'fill_otp', 'select', 'hover', 'scroll', 'scroll_to', 'read_article', 'human_browse', 'scan_products', 'ai_explore', 'search_entry', 'ai_form_guard', 'ai_route_repair', 'dismiss_overlays', 'audit_ads', 'screenshot'].includes(step.type)) {
         const framePage = ctx.tabs.get(ctx.activeTabId) && !ctx.tabs.get(ctx.activeTabId).isClosed()
           ? ctx.tabs.get(ctx.activeTabId)
           : page;
@@ -1386,7 +1780,7 @@ async function executeTaskSteps({
             : page;
           await activeP.goto(confirmUrl, { waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
           await sleep(1500);
-          emitStep(`[ביקור ${visitIndex + 1} | ✅ אישור מייל אוטומטי] נפתח קישור האימות שהתקבל בתיבת ${ctx.sessionInbox.address}: ${confirmUrl.slice(0, 75)}`);
+          emitStep(`[ביקור ${visitIndex + 1} | ✅ אישור מייל אוטומטי] נפתח קישור האימות שהתקבל בתיבת ${maskEmail(ctx.sessionInbox.address)}`);
           confirmed = true;
           break;
         }
@@ -1401,9 +1795,9 @@ async function executeTaskSteps({
             await otpLoc.fill(String(inboxCheck.code)).catch(() => {});
             await activeP.keyboard.press('Enter').catch(() => {});
             await sleep(1500);
-            emitStep(`[ביקור ${visitIndex + 1} | ✅ אישור קוד OTP אוטומטי] הוזן ואושר קוד ${inboxCheck.code} מתיבת ${ctx.sessionInbox.address}`);
+            emitStep(`[ביקור ${visitIndex + 1} | ✅ אישור קוד OTP אוטומטי] הוזן קוד אימות מתיבת ${maskEmail(ctx.sessionInbox.address)}`);
           } else {
-            emitStep(`[ביקור ${visitIndex + 1} | תיבת דוח חיה] התקבל קוד/אישור בתיבת ${ctx.sessionInbox.address}: ${inboxCheck.code}`);
+            emitStep(`[ביקור ${visitIndex + 1} | תיבת דוח חיה] התקבל קוד/אישור בתיבת ${maskEmail(ctx.sessionInbox.address)}`);
           }
           confirmed = true;
           break;
@@ -1413,14 +1807,13 @@ async function executeTaskSteps({
           ? msgsPayload.messages
           : (Array.isArray(msgsPayload?.items) ? msgsPayload.items : []);
         if (msgList.length > 0) {
-          const subj = msgList[0]?.subject || 'הודעה חדשה';
-          emitStep(`[ביקור ${visitIndex + 1} | ✅ מייל התקבל בתיבת הסוכן] ${ctx.sessionInbox.address} — נושא: "${subj}"`);
+          emitStep(`[ביקור ${visitIndex + 1} | ✅ מייל התקבל בתיבת הסוכן] ${maskEmail(ctx.sessionInbox.address)}`);
           confirmed = true;
           break;
         }
 
         if (pollAttempt === 6 && inboxCheck) {
-          emitStep(`[ביקור ${visitIndex + 1} | תיבת דוח חיה] נבדקה תיבת ${ctx.sessionInbox.address} (סטטוס: ${inboxCheck.status} — האתר החיצוני טרם שלח מייל אימות)`);
+          emitStep(`[ביקור ${visitIndex + 1} | תיבת דוח חיה] נבדקה תיבת ${maskEmail(ctx.sessionInbox.address)} (סטטוס: ${inboxCheck.status} — האתר החיצוני טרם שלח מייל אימות)`);
         }
       }
     }
@@ -1438,6 +1831,8 @@ async function executeTaskSteps({
       visitedUrls: ctx.visitedUrls,
       stepResults,
       partnerActivity: Boolean(ctx.partnerActivity),
+      // Which search engine challenged this proxy ("" when none did). Feeds the per-offer scoreboard.
+      engineChallenged: ctx.engineChallenged || '',
     };
   } finally {
     const openExternalTabs = Array.from(ctx.tabs.entries()).filter(([id, p]) => id > 0 && p && !p.isClosed());
@@ -1464,23 +1859,7 @@ function resetRunInboxFile() {
 
 async function confirmRunInboxes({ maxPasses = 4, passDelayMs = 30000 } = {}) {
   const summary = { total: 0, confirmed: 0, failed: 0, passes: 0, ranAt: new Date().toISOString() };
-  let entries = [];
-  try {
-    if (!fs.existsSync(RUN_INBOXES_FILE)) return summary;
-    const lines = fs.readFileSync(RUN_INBOXES_FILE, 'utf8').split(/\r?\n/).filter(Boolean);
-    const seen = new Set();
-    for (const line of lines) {
-      try {
-        const obj = JSON.parse(line);
-        if (obj && obj.inbox_id && obj.capability && !seen.has(obj.inbox_id)) {
-          seen.add(obj.inbox_id);
-          entries.push(obj);
-        }
-      } catch {}
-    }
-  } catch {
-    return summary;
-  }
+  const entries = readRunInboxes().filter(inbox => inbox.capability);
   summary.total = entries.length;
   const confirmedIds = new Set();
   for (let pass = 1; pass <= maxPasses; pass++) {
@@ -1500,7 +1879,7 @@ async function confirmRunInboxes({ maxPasses = 4, passDelayMs = 30000 } = {}) {
         }).catch(() => {});
         confirmedIds.add(entry.inbox_id);
         summary.confirmed++;
-        console.log(`📧 [Email Sweep] אישור מייל אוטומטי — נפתח קישור האימות שהתקבל בתיבת ${entry.address}`);
+        console.log(`📧 [Email Sweep] אישור מייל אוטומטי — נפתח קישור האימות שהתקבל בתיבת ${maskEmail(entry.address)}`);
       } catch {
         summary.failed++;
       }

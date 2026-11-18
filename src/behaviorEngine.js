@@ -625,7 +625,8 @@ async function captureFrameSafe(page, meta, onFrame) {
         return;
       }
     }
-    const buf = await page.screenshot({ type: 'jpeg', quality: 55, timeout: 4000 });
+    const mask = page.frames().map(frame => frame.locator('input, textarea, select, [contenteditable]'));
+    const buf = await page.screenshot({ type: 'jpeg', quality: 55, timeout: 4000, mask });
     const title = await page.title().catch(() => '');
     onFrame({
       imageDataUrl: 'data:image/jpeg;base64,' + buf.toString('base64'),

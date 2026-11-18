@@ -109,6 +109,7 @@ function syncFormFromConfig() {
 
   $('targetUrl').value = cfg.targetUrl || '';
   $('engineMode').value = cfg.engineMode || 'crawlee_autoscaled';
+$('browserEngine').value = cfg.browserEngine || 'chromium';
   $('taskMode').value = cfg.taskMode || 'behavior';
   $('visitCount').value = cfg.visitCount ?? 3;
   $('minConcurrency').value = cfg.minConcurrency ?? 1;
@@ -143,6 +144,7 @@ function syncFormFromConfig() {
   if ($('waves-extra-page-chance')) $('waves-extra-page-chance').value = cfg.waves?.extraPageChance ?? 40;
   if ($('waves-max-products')) $('waves-max-products').value = cfg.waves?.maxProductsPerVisit ?? 2;
   if ($('waves-mutate-forms')) $('waves-mutate-forms').checked = cfg.waves?.mutateForms !== false;
+  if ($('referrer-mode')) $('referrer-mode').value = cfg.waves?.referrerMode || cfg.referrerMode || 'mixed';
   if ($('waves-form-inputs')) $('waves-form-inputs').value = Array.isArray(cfg.waves?.formInputs) ? cfg.waves.formInputs.join('\n') : '';
 
   if ($('ai-enabled')) $('ai-enabled').checked = Boolean(cfg.ai?.enabled);
@@ -151,6 +153,9 @@ function syncFormFromConfig() {
   if ($('ai-commander-model')) $('ai-commander-model').value = cfg.ai?.commanderModel || 'glm-5.3-flash';
   if ($('ai-worker-model')) $('ai-worker-model').value = cfg.ai?.workerModel || 'deepseek-v4.1-flash';
   if ($('ai-worker-pct')) $('ai-worker-pct').value = cfg.ai?.workerPct ?? 0;
+  if ($('ai-all-squads-model')) $('ai-all-squads-model').value = cfg.ai?.allSquadsModel || '';
+  if ($('ai-form-assist')) $('ai-form-assist').checked = cfg.ai?.formAssist !== false;
+  if ($('ai-route-repair')) $('ai-route-repair').checked = cfg.ai?.routeRepair !== false;
   if ($('ai-directive-input')) $('ai-directive-input').value = cfg.ai?.commanderDirective || '';
 
   $('session-enabled').checked = Boolean(cfg.sessionPersistence?.enabled);
@@ -176,6 +181,7 @@ function collectSimpleFieldsToConfig() {
   if (!cfg) return;
   cfg.targetUrl = $('targetUrl').value.trim();
   cfg.engineMode = $('engineMode').value;
+cfg.browserEngine = $('browserEngine').value;
   cfg.taskMode = $('taskMode').value;
   cfg.visitCount = Number($('visitCount').value) || 1;
   cfg.concurrency = Math.max(1, Number($('concurrency').value) || 1);
@@ -209,9 +215,13 @@ function collectSimpleFieldsToConfig() {
   if ($('resource-mode')) cfg.resourceMode = $('resource-mode').value || 'full';
 
   if ($('waves-enabled')) {
+    const crRaw = Number($('waves-conversion-rate')?.value);
     cfg.waves = {
       enabled: $('waves-enabled').checked,
       mode: $('waves-mode')?.value || 'natural_peaks',
+      // Missing here used to reset the conversion rate to 25% on every save.
+      conversionRate: Number.isFinite(crRaw) ? Math.min(100, Math.max(0, crRaw)) : 25,
+      referrerMode: $('referrer-mode')?.value || 'mixed',
       childMutationRate: Math.min(100, Math.max(0, Number($('waves-mutation-rate')?.value) || 0)),
       scanProductsChance: Math.min(100, Math.max(0, Number($('waves-scan-chance')?.value) || 0)),
       extraPageChance: Math.min(100, Math.max(0, Number($('waves-extra-page-chance')?.value) || 0)),
@@ -219,6 +229,7 @@ function collectSimpleFieldsToConfig() {
       mutateForms: $('waves-mutate-forms') ? $('waves-mutate-forms').checked : true,
       formInputs: ($('waves-form-inputs')?.value || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean),
     };
+    cfg.referrerMode = cfg.waves.referrerMode;
   }
 
   if ($('ai-enabled')) {
@@ -229,6 +240,9 @@ function collectSimpleFieldsToConfig() {
       commanderModel: $('ai-commander-model')?.value.trim() || 'glm-5.3-flash',
       workerModel: $('ai-worker-model')?.value.trim() || 'deepseek-v4.1-flash',
       workerPct: Math.min(100, Math.max(0, Number($('ai-worker-pct')?.value) || 0)),
+      allSquadsModel: $('ai-all-squads-model')?.value.trim() || '',
+      formAssist: $('ai-form-assist') ? $('ai-form-assist').checked : true,
+      routeRepair: $('ai-route-repair') ? $('ai-route-repair').checked : true,
       commanderDirective: $('ai-directive-input')?.value.trim() || '',
     };
   }
@@ -605,6 +619,24 @@ function renderRecorderState(rec) {
 
   const active = Boolean(rec && rec.active);
   const steps = Array.isArray(rec?.steps) ? rec.steps : [];
+
+  // Detection only: the recorder never clicks a bot check. It tells the operator one is on screen.
+  const challengeEl = $('recorder-challenge-warning');
+  const challenge = rec?.challenge || null;
+  if (challengeEl) {
+    if (challenge && challenge.detected) {
+      const labelText = Array.isArray(challenge.labels) && challenge.labels.length
+        ? challenge.labels.join(' + ')
+        : (challenge.interstitial ? 'דף אימות של Cloudflare' : 'אתגר כללי');
+      challengeEl.style.display = 'block';
+      challengeEl.textContent = challenge.solved
+        ? `✅ זוהה ${labelText} — נראה שכבר עברת את הבדיקה. אפשר להמשיך לגלוש.`
+        : `🤖 זוהה ${labelText} בעמוד — יש לאשר אותו ידנית בחלון ההקלטה (לחיצה על התיבה), ואז להמשיך לגלוש.`;
+    } else {
+      challengeEl.style.display = 'none';
+      challengeEl.textContent = '';
+    }
+  }
 
   box.classList.toggle('recording', active);
   if (dot) dot.classList.toggle('recording', active);
@@ -1461,15 +1493,64 @@ function renderAiChatFeed({ forceScroll = false } = {}) {
 
 // ─── Actions & SSE ────────────────────────────────────────────────────────────
 
+const RECORDER_CC_LABEL = {
+  US: 'ארה״ב', CA: 'קנדה', GB: 'בריטניה', AU: 'אוסטרליה', DE: 'גרמניה', AT: 'אוסטריה',
+  FR: 'צרפת', IT: 'איטליה', NL: 'הולנד', CZ: 'צ׳כיה', RO: 'רומניה', JP: 'יפן',
+  KR: 'קוריאה', SG: 'סינגפור',
+};
+
+function flagOf(cc) {
+  const key = String(cc || '').toUpperCase();
+  if (!/^[A-Z]{2}$/.test(key)) return '🌐';
+  return String.fromCodePoint(...[...key].map(ch => 0x1F1E6 + ch.charCodeAt(0) - 65));
+}
+
+function countryLabel(cc) {
+  const key = String(cc || '').toUpperCase();
+  if (!key) return 'לא ידוע';
+  return `${flagOf(key)} ${RECORDER_CC_LABEL[key] || key}`;
+}
+
+// ממלא את רשימת הפרוקסים במסך ההקלטה (מדינה · עיר — host:port, כולל ✅/⛔ מול ההצעה).
+async function loadRecorderProxyList() {
+  const group = $('recorder-proxy-country-group');
+  if (!group) return;
+  group.innerHTML = '<option value="" disabled>טוען רשימת פרוקסים…</option>';
+  try {
+    const data = await api('/api/proxy/list');
+    const list = Array.isArray(data?.proxies) ? data.proxies : [];
+    if (!list.length) {
+      group.innerHTML = '<option value="" disabled>לא נמצאו פרוקסים בהגדרות</option>';
+      return;
+    }
+    const order = Object.keys(RECORDER_CC_LABEL);
+    list.sort((a, b) => {
+      const ia = order.indexOf(a.cc);
+      const ib = order.indexOf(b.cc);
+      return ((ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)) || String(a.city || '').localeCompare(String(b.city || ''));
+    });
+    group.innerHTML = list.map(p => {
+      const offerMark = p.offerOk === true ? '✅' : (p.offerOk === false ? '⛔' : '');
+      const city = p.city ? ` · ${p.city}` : '';
+      const ms = p.ms ? ` · ${p.ms}ms` : '';
+      // The metered gateway publishes one host:port for every sticky session, so it has no single country.
+      const label = p.cc ? countryLabel(p.cc) : (/webshare/i.test(p.hostPort) ? '🌍 רזידנציאלי (Webshare)' : 'לא ידוע');
+      return `<option value="${p.hostPort}">${label}${city} — ${p.hostPort}${ms} ${offerMark}</option>`;
+    }).join('');
+  } catch {
+    group.innerHTML = '<option value="" disabled>טעינת רשימת הפרוקסים נכשלה</option>';
+  }
+}
+
 function wireActions() {
   [
-    'targetUrl', 'engineMode', 'taskMode', 'visitCount', 'minConcurrency', 'concurrency',
+    'targetUrl', 'engineMode', 'browserEngine', 'taskMode', 'visitCount', 'minConcurrency', 'concurrency',
     'pageMinMs', 'sessionTimeoutMs', 'keepBrowserOpenMs', 'interVisitDelayMs', 'firstPagePriority', 'quick-watch-mode',
     'schedule-enabled', 'schedule-start', 'schedule-end', 'snippet',
     'proxy-enabled', 'proxy-mode', 'proxy-country-filter', 'proxy-country-fallback', 'proxy-servers',
     'stealth-mode', 'resource-mode',
-    'waves-enabled', 'waves-mode', 'waves-mutation-rate', 'waves-scan-chance', 'waves-extra-page-chance', 'waves-max-products', 'waves-mutate-forms', 'waves-form-inputs',
-    'ai-enabled', 'ai-auto-manage', 'ai-provider', 'ai-commander-model', 'ai-worker-model', 'ai-worker-pct', 'ai-directive-input',
+    'waves-enabled', 'waves-mode', 'waves-conversion-rate', 'referrer-mode', 'waves-mutation-rate', 'waves-scan-chance', 'waves-extra-page-chance', 'waves-max-products', 'waves-mutate-forms', 'waves-form-inputs',
+    'ai-enabled', 'ai-auto-manage', 'ai-provider', 'ai-commander-model', 'ai-worker-model', 'ai-all-squads-model', 'ai-form-assist', 'ai-route-repair', 'ai-worker-pct', 'ai-directive-input',
     'session-enabled', 'session-returning-rate', 'session-pool-size',
     'ad-avoid-clicks', 'ad-dismiss-overlays', 'ad-close-popunders', 'ad-skip-telemetry',
   ].forEach(id => {
@@ -1550,14 +1631,27 @@ function wireActions() {
     startBtn.disabled = true;
     startBtn.textContent = '⏳ פותח דפדפן הקלטה...';
     try {
-      const proxyMode = $('recorder-proxy-mode')?.value || 'us';
+      const modeRaw = $('recorder-proxy-mode')?.value || 'resi:';
+      // `resi:<cc>` = metered residential pool pinned to one country (Webshare `-<cc>` suffix).
+      const isResi = modeRaw.startsWith('resi:');
+      const proxyMode = isResi ? 'auto' : modeRaw;
+      const proxyCountry = isResi ? modeRaw.slice(5) : '';
       const data = await api('/api/recorder/start', {
         method: 'POST',
-        body: JSON.stringify({ targetUrl: urlInput, proxyMode }),
+        body: JSON.stringify({ targetUrl: urlInput, proxyMode, proxyCountry }),
       });
       renderRecorderState(data.recorder);
-      const geoNote = data.proxyCountry === 'US' ? ' (מחובר דרך פרוקסי ארה״ב 🇺🇸)' : ' (חיבור ישיר)';
-      showToast(`נפתח חלון Chromium נפרד להקלטה${geoNote}! בסיום לחצו "סיים הקלטה" או סגרו אותו.`);
+      const isDirect = !data.proxyHost || data.proxyHost === 'DIRECT';
+      const geoLabel = isDirect
+        ? ' (חיבור ישיר — IP שלך)'
+        : ` (יוצא מהארץ: ${countryLabel(data.proxyCountry)} · ${data.proxyHost})`;
+      const statusEl = $('recorder-proxy-status');
+      if (statusEl) {
+        statusEl.textContent = isDirect
+          ? '🌐 IP הקלטה: ישיר מהמחשב שלך (ישראל)'
+          : `📍 IP הקלטה: ${countryLabel(data.proxyCountry)} · ${data.proxyHost}`;
+      }
+      showToast(`נפתח חלון Chrome נפרד להקלטה${geoLabel}! בסיום לחצו "סיים הקלטה" או סגרו אותו.`);
     } catch (err) {
       startBtn.disabled = false;
       startBtn.textContent = '🔴 הקלט מסלול בדפדפן';
@@ -1596,6 +1690,17 @@ function wireActions() {
       }
     };
   }
+
+  const refreshProxyBtn = $('btn-recorder-proxy-refresh');
+  if (refreshProxyBtn) {
+    refreshProxyBtn.onclick = async () => {
+      refreshProxyBtn.disabled = true;
+      await loadRecorderProxyList();
+      refreshProxyBtn.disabled = false;
+      showToast('רשימת הפרוקסים רועננה — בחר מדינה ופתח הקלטה.');
+    };
+  }
+  loadRecorderProxyList();
 
   $('btn-recorder-load-last').onclick = async () => {
     try {
@@ -1648,37 +1753,6 @@ function wireActions() {
     state.mapperFilter = e.target.value;
     renderPageMapperResults();
   });
-
-  $('btn-tpl-cleantab').onclick = () => {
-    state.config.targetUrl = 'https://cleantab-lab.hirepulse-commerce-sandbox.workers.dev';
-    state.config.pages = ['/', '/tools', '/guides', '/about', '/tools/link-cleaner', '/tools/prompt-formatter', '/tools/password-entropy'];
-    state.config.taskMode = 'scenario';
-    state.config.visitCount = 1;
-    state.config.minConcurrency = 1;
-    state.config.concurrency = 1;
-    state.config.headless = true;
-    state.config.keepBrowserOpenMs = 2500;
-    state.config.adSafety = {
-      avoidAdClicks: false,
-      dismissOverlays: true,
-      closePopunders: true,
-      skipTelemetryHeader: true,
-    };
-    state.config.taskSteps = [
-      { type: 'goto', selector: '', value: '/tools/link-cleaner', label: 'פתיחת כלי ניקוי לינקים' },
-      { type: 'wait', selector: '', value: '2000', label: 'המתנת טעינת מודעות ו-DOM (2s)' },
-      { type: 'audit_ads', selector: '', value: '', label: 'ביקורת סלוטי מודעות (ללא לחיצה)' },
-      { type: 'dismiss_overlays', selector: '', value: '', label: 'סגירת Vignette/Push אם חוסמים' },
-      { type: 'fill', selector: '#lc-input', value: 'https://example.com/offer?utm_source=test&fbclid=IwAR999&v=42', label: 'הדבקת URL עם פרמטרי מעקב' },
-      { type: 'click', selector: '#lc-clean', value: '', label: 'לחיצה על Strip Trackers' },
-      { type: 'wait', selector: '', value: '400', label: 'המתנה לעיבוד' },
-      { type: 'assert', selector: '#lc-output', value: 'https://example.com/offer?v=42', assertKind: 'text_contains', label: 'אימות שהלינק נוקה' },
-      { type: 'scroll_to', selector: 'aside.ad-slot-box[data-ad-position="in_content_mid"]', value: '', label: 'גלילה בטוחה לסלוט מודעה במאמר (אפס לחיצה)' },
-      { type: 'screenshot', selector: '', value: 'CleanTab Ad-Safe Audit', label: 'צילום תוצאה סופית' },
-    ];
-    syncFormFromConfig();
-    showToast('נטענה משימת Ad-Safe QA מלאה עבור CleanTab Link Cleaner!');
-  };
 
   $('btn-tpl-demosite').onclick = () => {
     state.config.targetUrl = `${location.origin}/demo-site`;
@@ -1799,15 +1873,21 @@ function wireActions() {
   api('/api/email/status')
     .then(res => {
       const badge = $('email-pilot-status-badge');
+      const pilotBox = $('agent-email-pilot-box');
       if (!badge) return;
       if (res.email?.configured) {
         badge.textContent = res.email.isFreeOwnerPilot
-          ? '✅ Owner Pilot פעיל ($0.00 ללא הגבלה)'
-          : `✅ מחובר (${res.email.mode})`;
+          ? 'מחובר (Owner Pilot)'
+          : 'מחובר (מפתח API)';
+        $('btn-create-live-inbox').disabled = false;
         badge.style.color = '#4ade80';
+        if (pilotBox) pilotBox.style.display = '';
       } else {
-        badge.textContent = '⚠️ לא נמצא מפתח Owner Pilot';
-        badge.style.color = '#facc15';
+        // Optional feature: no key means no inbox — the box simply stays out of the way instead of
+        // asking the operator to set an environment variable that traffic generation never needs.
+        badge.textContent = 'לא מוגדר — תיבת מייל זמנית כבויה';
+        badge.style.color = '#94a3b8';
+        if (pilotBox) pilotBox.style.display = 'none';
       }
     })
     .catch(() => {});
@@ -1816,20 +1896,20 @@ function wireActions() {
     $('btn-create-live-inbox').onclick = async () => {
       const btn = $('btn-create-live-inbox');
       btn.disabled = true;
-      btn.textContent = 'יוצר תיבה...';
+      btn.textContent = 'Creating inbox…';
       try {
         const res = await api('/api/email/create', { method: 'POST', body: JSON.stringify({ ttlSeconds: 600 }) });
         currentLiveInboxId = res.inbox.inbox_id;
         $('live-inbox-address').value = res.inbox.address || '';
         $('btn-copy-live-inbox').disabled = false;
         $('btn-check-live-otp').disabled = false;
-        $('live-otp-result').textContent = 'תיבה פעילה (ממתין למייל אימות)';
-        showToast(`נוצרה תיבת מייל חיה: ${res.inbox.address}`);
+        $('live-otp-result').textContent = 'Inbox ready. Waiting for verification email.';
+        showToast('Live inbox created.');
       } catch (err) {
         showToast(err.message, true);
       } finally {
         btn.disabled = false;
-        btn.textContent = '📧 צור תיבת מייל חיה עכשיו ($0.00 Pilot)';
+        btn.textContent = 'Create live inbox';
       }
     };
   }
@@ -1840,7 +1920,7 @@ function wireActions() {
       if (!addr) return;
       try {
         await navigator.clipboard.writeText(addr);
-        showToast(`הכתובת הועתקה: ${addr}`);
+        showToast('Inbox address copied.');
       } catch {
         showToast('העתק ידנית מהשדה.', true);
       }
@@ -1863,7 +1943,7 @@ function wireActions() {
           $('live-otp-result').textContent = `🔑 קוד אימות: ${res.code}`;
           $('live-otp-result').style.color = '#4ade80';
           try { await navigator.clipboard.writeText(String(res.code)); } catch {}
-          showToast(`התקבל קוד אימות (והועתק ללוח): ${res.code}`);
+          showToast('Verification code received.');
         } else if (res.status === 'message_received') {
           $('live-otp-result').textContent = `📩 התקבל מייל בתיבה: "${res.subject || 'הודעה חדשה'}"`;
           $('live-otp-result').style.color = '#4ade80';
@@ -2410,7 +2490,28 @@ async function init() {
     const tabBtn = document.querySelector(`#config-tabs .tab-btn[data-tab="tab-${reqTab}"]`);
     if (tabBtn) tabBtn.click();
   }
-  wireActions();
+  async function refreshResidentialStatus() {
+  const el = $('residential-status');
+  if (!el) return;
+  try {
+    const res = await fetch('/api/proxy/residential');
+    const d = await res.json();
+    if (!d.ok) throw new Error(d.error || 'failed');
+    const inList = ($('proxy-servers').value || '')
+      .split(/\r?\n/)
+      .filter(l => l.trim() && /webshare/i.test(l)).length;
+    const tail = d.exhausted
+      ? ' · המכסה נוצלה — הריצה הבאה תעבור למאגר הדאטה־סנטר'
+      : '';
+    el.textContent = `מאגר רזידנציאלי: ${inList} סשנים ברשימה · נוצלו ${d.usedMb}MB מתוך ${d.budgetMb}MB · נותרו ${d.remainingMb}MB · ${d.visits} ביקורים${tail}`;
+  } catch {
+    el.textContent = 'מאגר רזידנציאלי: לא ניתן לקרוא סטטוס מהשרת';
+  }
+}
+
+wireActions();
+refreshResidentialStatus();
+setInterval(refreshResidentialStatus, 20000);
 
   try {
     const [sys, cfgData, profilesData, countriesData, aiData] = await Promise.all([

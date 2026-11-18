@@ -7,9 +7,6 @@ const COMMERCIAL_CATALOG_URL = 'https://gethirepulse.xyz/v1/email/catalog';
 const COMMERCIAL_CREDITS_URL = 'https://gethirepulse.xyz/credits';
 const OWNER_PILOT_DOC_URL = 'https://gethirepulse.xyz/email-pilot';
 
-const DEFAULT_OWNER_PILOT_SECRET_PATH =
-  'C:\\Users\\sales\\agy-inbox\\codex\\agent-hardening\\outputs\\agent-otp-tools-2026-10-23\\email\\secrets\\native-pilot.json';
-
 let cachedToken = null;
 let cachedMode = null;
 
@@ -36,9 +33,9 @@ function resolveEmailAuthToken() {
     return { token: cachedToken, mode: cachedMode };
   }
 
-  const secretPath = process.env.HIREPULSE_OWNER_PILOT_FILE || DEFAULT_OWNER_PILOT_SECRET_PATH;
+  const secretPath = process.env.HIREPULSE_OWNER_PILOT_FILE;
   try {
-    if (fs.existsSync(secretPath)) {
+    if (secretPath && fs.existsSync(secretPath)) {
       const raw = fs.readFileSync(secretPath, 'utf8');
       const parsed = JSON.parse(raw);
       const token = parsed?.API_KEYS?.['owner-pilot'];
@@ -96,8 +93,10 @@ async function requestEmailApi(url, { headers = {}, timeoutMs = 15000, ...option
       data = { raw: text };
     }
     if (!res.ok) {
-      const errCode = data?.error || data?.code || `HTTP_${res.status}`;
-      throw new Error(`HirePulse Email API (${res.status}): ${errCode}`);
+      const message = res.status === 402 ? 'HirePulse Email: out of credits.' : 'HirePulse Email API returned HTTP ' + res.status + '.';
+      const error = new Error(message);
+      error.httpStatus = res.status;
+      throw error;
     }
     return data;
   } finally {
@@ -113,7 +112,7 @@ async function requestEmailApi(url, { headers = {}, timeoutMs = 15000, ...option
 async function createEmailInbox({ idempotencyKey = randomUUID(), ttlSeconds = 600 } = {}) {
   const key = String(idempotencyKey || randomUUID()).trim();
   const ttl = Math.max(60, Math.min(3600, Number(ttlSeconds) || 600));
-  return requestEmailApi(DEFAULT_INBOX_ENDPOINT, {
+  const inbox = await requestEmailApi(DEFAULT_INBOX_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -121,6 +120,10 @@ async function createEmailInbox({ idempotencyKey = randomUUID(), ttlSeconds = 60
       ttl_seconds: ttl,
     }),
   });
+  if (!inbox?.inbox_id || !inbox.address || !inbox.capability) {
+    throw new Error('HirePulse Email did not return a usable inbox.');
+  }
+  return inbox;
 }
 
 /**
@@ -207,6 +210,7 @@ async function waitForEmailCode({
         elapsedMs: Date.now() - startedAt,
       };
     }
+    if (result?.status === 'expired') throw new Error('The email inbox expired before a verification code arrived.');
     if (typeof onPoll === 'function') {
       onPoll({ attempts, status: result?.status || 'pending', elapsedMs: Date.now() - startedAt });
     }

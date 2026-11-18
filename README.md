@@ -1,6 +1,6 @@
-# Browser QA Dashboard
+# Traffic Engine — Self-Hosted Browser QA
 
-A self-hosted dashboard for running real Playwright browser sessions with Crawlee. Record and replay multi-step journeys, exercise a site across device and persona profiles, inspect the DOM, and review run logs and PDF reports.
+Record a signup and replay it in a real Playwright browser. With the inbox service connected, Traffic Engine can open a fresh inbox, fill the registration form, wait for the verification email and enter the one-time code. Watch each step from the dashboard and chat with the AI commander while the run is active.
 
 ![Dashboard overview on the built-in demo site](docs/img/dashboard-overview.png)
 
@@ -29,6 +29,23 @@ Copy-Item config.example.json config.json
 ```
 
 Edit `targetUrl` in `config.json` to point to a site you own or are authorized to test. The example points to the dashboard's local demo site. Run `start-dashboard.bat` and open [http://127.0.0.1:4310](http://127.0.0.1:4310).
+
+## Test a signup with a live inbox
+
+If you have a commercial HirePulse Email API key, configure it in the dashboard process environment as `HIREPULSE_EMAIL_API_KEY`, then restart the dashboard. The [local email status endpoint](http://127.0.0.1:4310/api/email/status) reports whether a key is configured and which credential mode is selected. This check makes no inbox request.
+
+1. Use the journey recorder on a test site you control. Record the email field, the registration button, the verification-code field and the confirmation button.
+2. Review the recording. Sensitive fields such as passwords are blank in recorded steps. Supply test values in the local configuration before replay. The recorder uses an OTP placeholder for recognized code fields.
+3. Use the `fill_email` and `fill_otp` actions if the site uses selectors that automatic detection misses.
+4. Add a final assertion for the success text or destination URL. A code entered in the page is evidence of a completed step. The assertion checks whether the site accepted it.
+
+An inbox is created when a visit reaches its first inbox step. The same visit reuses that inbox. An expired inbox, a missing code or a credit error fails the affected step. The [public service catalog](https://gethirepulse.xyz/v1/email/catalog) describes x402 access. The dashboard uses a bearer API key. Ask the service operator for a compatible key before depending on live inboxes.
+
+For an existing owner-pilot installation, set `HIREPULSE_OWNER_PILOT_FILE` to your existing local credential file or supply `HIREPULSE_OWNER_PILOT_TOKEN` in the process environment.
+
+## Bring your own AI key
+
+Set `OLLAMA_API_KEY` for Ollama Cloud or `ULLM_API_KEY` for UncensoredLLM in the dashboard process environment. Restart the dashboard and select the provider and model in its AI settings. The local advisor is available without a cloud key. Cloud usage is billed through the provider account.
 
 ## Proxies
 

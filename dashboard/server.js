@@ -1,3 +1,6 @@
+// Local secrets come from `.env.local` (gitignored). Must run before any module reads process.env.
+require('../src/localEnv').loadLocalEnv();
+
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
@@ -12,7 +15,9 @@ const {
   writeProxiesTxt,
   checkProxiesBatch,
   selectProxiesForCountries,
+  resolveNetworkGeo,
 } = require('../src/proxyManager');
+const residentialPool = require('../src/residentialPool');
 const {
   ensureBuiltinSiteProfiles,
   listSiteProfiles,
@@ -31,7 +36,8 @@ const {
   getDesktopSessionInfo,
 } = require('../src/journeyRecorder');
 const { getEmailClientStatus, createEmailInbox, getEmailCode, listEmailMessages, extractConfirmationUrlFromMessages } = require('../src/emailInboxClient');
-const { redactText } = require('../src/redaction');
+const { maskEmail, redactText, redactData, registerStepSecrets, safeStepLabel, isSecretField } = require('../src/redaction');
+const { readRunInboxes } = require('../src/runInboxStore');
 const {
   REPORTS_DIR,
   savePersistentSessionState,
@@ -108,6 +114,7 @@ const DEFAULT_CONFIG = {
     preferredCountries: ['US', 'GB', 'CA', 'AU', 'DE'],
     servers: [],
   },
+  browserEngine: 'chromium',
   stealthMode: 'maximum',
   resourceMode: 'full',
   waves: {
@@ -120,6 +127,7 @@ const DEFAULT_CONFIG = {
     mutateForms: true,
     maxProductsPerVisit: 2,
     formInputs: [],
+    referrerMode: 'mixed',
   },
   ai: {
     enabled: false,
@@ -128,6 +136,9 @@ const DEFAULT_CONFIG = {
     commanderModel: 'glm-5.3-flash',
     workerModel: 'deepseek-v4.1-flash',
     workerPct: 0,
+    allSquadsModel: '',
+    formAssist: true,
+    routeRepair: true,
     commanderDirective: '',
   },
   sessionPersistence: {
@@ -275,7 +286,11 @@ function validateAndNormalizeConfig(input) {
           selector: typeof s.selector === 'string' ? s.selector.trim() : '',
           value: s.value != null ? String(s.value) : '',
           assertKind: typeof s.assertKind === 'string' ? s.assertKind.trim() : 'text_contains',
-          label: typeof s.label === 'string' ? s.label.trim() : '',
+          label: typeof s.label === 'string'
+            ? (s.secret === true || isSecretField(s.selector, s.label) ? safeStepLabel(s) : redactText(s.label.trim()))
+            : '',
+          ...(s.secret === true ? { secret: true } : {}),
+          ...(s.lockValue === true ? { lockValue: true } : {}),
           ...(Number.isInteger(s.tab) && s.tab >= 0 ? { tab: s.tab } : {}),
           ...(Number.isInteger(s.opensTab) && s.opensTab > 0 ? { opensTab: s.opensTab } : {}),
           ...(typeof s.popupFallbackUrl === 'string' && /^https?:\/\//i.test(s.popupFallbackUrl.trim())
@@ -301,8 +316,11 @@ function validateAndNormalizeConfig(input) {
     pageMinMs: clampInt(input.pageMinMs, 0, 120000, 4000),
     headless: input.headless !== false,
     engineMode: input.engineMode === 'crawlee_playwright' ? 'crawlee_playwright' : 'crawlee_autoscaled',
+    browserEngine: ['chromium', 'patchright', 'camoufox'].includes(input.browserEngine) ? input.browserEngine : 'chromium',
     taskMode: ['behavior', 'scenario', 'hybrid'].includes(input.taskMode) ? input.taskMode : 'behavior',
-    referrerMode: input.referrerMode === 'google_organic' ? 'google_organic' : 'mixed',
+    referrerMode: ['mixed', 'google_organic', 'search_engines', 'social', 'direct'].includes(input.referrerMode)
+      ? input.referrerMode
+      : 'mixed',
     taskSteps,
     keepBrowserOpenMs: clampInt(input.keepBrowserOpenMs, 0, 30000, 1500),
     interVisitDelayMs: clampInt(input.interVisitDelayMs, 0, 120000, 0),
@@ -327,6 +345,12 @@ function validateAndNormalizeConfig(input) {
         return arr;
       })(),
       servers: proxyServers,
+      residential: {
+        enabled: input.proxy?.residential?.enabled !== false,
+        byteBudgetMb: clampInt(input.proxy?.residential?.byteBudgetMb, 50, 5000, 800),
+        country: String(input.proxy?.residential?.country || '').toLowerCase().replace(/[^a-z]/g, '').slice(0, 2),
+        overheadFactor: Math.min(3, Math.max(1, Number(input.proxy?.residential?.overheadFactor) || 1.15)),
+      },
     },
     stealthMode: input.stealthMode === 'standard' ? 'standard' : 'maximum',
     resourceMode: ['full', 'lite', 'ultra_lite', 'browserless_cdp', 'lightpanda_cdp'].includes(input.resourceMode) ? input.resourceMode : 'ultra_lite',
@@ -344,6 +368,13 @@ function validateAndNormalizeConfig(input) {
       formInputs: Array.isArray(input.waves?.formInputs)
         ? input.waves.formInputs.map(s => String(s || '').trim()).filter(Boolean).slice(0, 50)
         : [],
+      // Where the traffic pretends to come from: mixed (search+social+small direct tail),
+      // search_engines (no direct at all), social, google_organic or direct.
+      referrerMode: ['mixed', 'google_organic', 'search_engines', 'social', 'direct'].includes(input.waves?.referrerMode)
+        ? input.waves.referrerMode
+        : (['mixed', 'google_organic', 'search_engines', 'social', 'direct'].includes(input.referrerMode)
+          ? input.referrerMode
+          : 'mixed'),
     },
     ai: {
       enabled: Boolean(input.ai?.enabled),
@@ -361,6 +392,13 @@ function validateAndNormalizeConfig(input) {
         return rawWm.toLowerCase() === 'inkling-2-small' ? 'deepseek-v4.1-flash' : rawWm;
       })(),
       workerPct: clampInt(input.ai?.workerPct, 0, 100, 0),
+      allSquadsModel: typeof input.ai?.allSquadsModel === 'string'
+        ? input.ai.allSquadsModel.trim().slice(0, 80)
+        // The dashboard has no input for this key yet; an unrelated save must not wipe the
+        // "every squad uses DeepSeek" override that the operator set in config.json.
+        : String(readConfigFromDisk().ai?.allSquadsModel || '').slice(0, 80),
+      formAssist: input.ai?.formAssist !== false,
+      routeRepair: input.ai?.routeRepair !== false,
       commanderDirective: typeof input.ai?.commanderDirective === 'string'
         ? input.ai.commanderDirective.trim().slice(0, 300)
         : '',
@@ -503,6 +541,7 @@ let logHistory = Array.isArray(persistedSession?.logHistory) ? persistedSession.
 let logSeq = logHistory.reduce((m, x) => Math.max(m, Number(x?.id) || 0), 0);
 let currentRunStartLogSeq = logSeq;
 let latestFrame = null;
+const runInboxSummary = new Map();
 let visitDetails = Array.isArray(persistedSession?.visitDetails) ? persistedSession.visitDetails : [];
 let saveStateTimer = null;
 
@@ -520,6 +559,7 @@ function scheduleSaveSessionState() {
 }
 
 function resetRunStats(cfg) {
+  runInboxSummary.clear();
   latestFrame = null;
   visitDetails = [];
   currentRunStartLogSeq = logSeq;
@@ -1183,7 +1223,7 @@ app.post('/api/email/create', async (req, res) => {
       },
     });
   } catch (err) {
-    res.status(400).json({ error: err.message || 'יצירת תיבת המייל נכשלה.' });
+    res.status(err.httpStatus === 402 ? 402 : 400).json({ error: redactText(err.message || 'Could not create an inbox.') });
   }
 });
 
@@ -1291,6 +1331,92 @@ app.get('/api/reports/:filename', (req, res) => {
 // רוטציית IP להקלטות: זכירת הפרוקסי האחרון שנבחר כדי שההקלטה הבאה תיפתח עם IP אחר (ללא חזרה עצמית)
 let lastRecorderProxyUrl = '';
 
+// ---- בחירת פרוקסי להקלטה -------------------------------------------------
+// data/proxy-geo.json נבנה ע"י tools/build-proxy-geo.js (ip-api.com חינמי + בדיקת ההצעה).
+// מחזיר מיפוי "host:port" -> { cc, city, ms, offerOk }. לעולם לא נשמרים כאן פרטי התחברות.
+function readProxyGeoMap() {
+  try {
+    const raw = fs.readFileSync(path.join(__dirname, '..', 'data', 'proxy-geo.json'), 'utf8');
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed.proxies === 'object' ? parsed.proxies : {};
+  } catch {
+    return {};
+  }
+}
+
+function hostPortOf(proxyUrl) {
+  const s = String(proxyUrl || '');
+  const at = s.lastIndexOf('@');
+  return at > 0 ? s.slice(at + 1) : s;
+}
+
+function recorderProxyCandidates(cfg) {
+  const fromCfg = Array.isArray(cfg?.proxy?.servers) ? cfg.proxy.servers : [];
+  const fromLegacy = Array.isArray(cfg?.proxyList) ? cfg.proxyList : [];
+  const fromFileRaw = readProxiesTxt();
+  const fromFile = Array.isArray(fromFileRaw) ? fromFileRaw : [];
+  return Array.from(new Set([...fromCfg, ...fromLegacy, ...fromFile].map(s => String(s || '').trim()).filter(Boolean)));
+}
+
+const RECORDER_LOCALE_BY_CC = {
+  US: ['en-US', 'America/New_York'],
+  CA: ['en-CA', 'America/Toronto'],
+  GB: ['en-GB', 'Europe/London'],
+  AU: ['en-AU', 'Australia/Sydney'],
+  DE: ['de-DE', 'Europe/Berlin'],
+  AT: ['de-AT', 'Europe/Vienna'],
+  FR: ['fr-FR', 'Europe/Paris'],
+  IT: ['it-IT', 'Europe/Rome'],
+  NL: ['nl-NL', 'Europe/Amsterdam'],
+  CZ: ['cs-CZ', 'Europe/Prague'],
+  RO: ['ro-RO', 'Europe/Bucharest'],
+  JP: ['ja-JP', 'Asia/Tokyo'],
+  KR: ['ko-KR', 'Asia/Seoul'],
+  SG: ['en-SG', 'Asia/Singapore'],
+};
+
+// רשימת הפרוקסים הזמינים לבחירה במסך ההקלטה (ללא סיסמאות).
+// יתרת המכסה הרזידנציאלית (1GB) — נספרת מהבייטים שירדו בפועל בכל ביקור, לא מהערכה.
+app.get('/api/proxy/residential', (_req, res) => {
+  try {
+    const cfg = readConfigFromDisk();
+    const residentialPool = require('../src/residentialPool');
+    const resiCfg = cfg.proxy?.residential || {};
+    res.json({ ok: true, ...residentialPool.summary(resiCfg), usage: residentialPool.getUsage() });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String((err && err.message) || err) });
+  }
+});
+
+app.get('/api/proxy/list', (_req, res) => {
+  try {
+    const cfg = readConfigFromDisk();
+    const geo = readProxyGeoMap();
+    const seenHostPorts = new Set();
+    const proxies = recorderProxyCandidates(cfg).map(p => {
+      const hp = hostPortOf(p);
+      const g = geo[hp] || {};
+      return {
+        hostPort: hp,
+        cc: g.cc || '',
+        city: g.city || '',
+        ms: typeof g.ms === 'number' ? g.ms : null,
+        offerOk: g.offerOk === undefined ? null : g.offerOk,
+      };
+    }).filter(p => (seenHostPorts.has(p.hostPort) ? false : (seenHostPorts.add(p.hostPort), true)));
+    res.json({ ok: true, proxies, geoUpdatedAt: (() => {
+      try {
+        const raw = fs.readFileSync(path.join(__dirname, '..', 'data', 'proxy-geo.json'), 'utf8');
+        return JSON.parse(raw).updatedAt || null;
+      } catch {
+        return null;
+      }
+    })() });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'קריאת רשימת הפרוקסים נכשלה.' });
+  }
+});
+
 app.post('/api/recorder/start', async (req, res) => {
   if (activeProcess) {
     return res.status(409).json({ error: 'כבר פועלת הרצת סשנים כעת. עצור קודם את ההרצה לפני פתיחת ההקלטה.' });
@@ -1300,47 +1426,95 @@ app.post('/api/recorder/start', async (req, res) => {
     const targetUrl = typeof req.body?.targetUrl === 'string' && req.body.targetUrl.trim()
       ? req.body.targetUrl.trim()
       : cfg.targetUrl;
-    const proxyMode = ['us', 'direct'].includes(req.body?.proxyMode) ? req.body.proxyMode : 'us';
+    const rawMode = String(req.body?.proxyMode || 'auto').trim();
+    const proxyMode = rawMode.toLowerCase();
+    // Country pin for the metered pool: Webshare targets a country with a `-<cc>` username suffix,
+    // so the recording can exit from the US/UK/DE without buying anything extra.
+    const wantedCountry = String(req.body?.proxyCountry || '').trim().toLowerCase().replace(/[^a-z]/g, '');
+    const geoMap = readProxyGeoMap();
     let proxyUrl = '';
-    if (proxyMode === 'us') {
-      const fromCfg = Array.isArray(cfg.proxyList) ? cfg.proxyList : [];
-      const fromFileRaw = readProxiesTxt();
-      const fromFile = Array.isArray(fromFileRaw) ? fromFileRaw : [];
-      const rawList = Array.from(new Set([...fromCfg, ...fromFile].map(s => String(s || '').trim()).filter(Boolean)));
-      const selected = await selectProxiesForCountries(rawList, {
-        preferredCountries: ['US'],
-        countryFilterEnabled: true,
-        fallbackToAnyIfEmpty: false,
-      });
-      const usListAll = Array.isArray(selected.proxies) ? selected.proxies : [];
-      const usList = usListAll.filter(p => !lastRecorderProxyUrl || p !== lastRecorderProxyUrl || usListAll.length <= 1);
-      proxyUrl = usList.length ? usList[Math.floor(Math.random() * usList.length)] : '';
-      if (!proxyUrl) {
+    let proxyCountry = 'DIRECT';
+    if (proxyMode !== 'direct') {
+      const candidates = recorderProxyCandidates(cfg);
+      if (!candidates.length) {
         return res.status(400).json({
-          error: 'לא נמצא פרוקסי מארה״ב (US) ב-proxies.txt או בהגדרות. הוסף פרוקסי US או בחר "ישיר מהמחשב (ישראל)".',
+          error: 'לא נמצאו פרוקסים בהגדרות (proxy.servers / proxies.txt). הוסף פרוקסים או בחר "ישיר מהמחשב (ישראל)".',
         });
+      }
+      // Residential first — Cloudflare/Turnstile and link-shortener WAFs reject datacenter ASNs
+      // before the page even loads, so the recorder must leave through the metered pool while it
+      // has budget; the static/datacenter list is only the fallback.
+      const resiCfg = cfg.proxy?.residential || {};
+      const resiPool = resiCfg.enabled === false || residentialPool.isExhausted(resiCfg)
+        ? []
+        : residentialPool.getServers(resiCfg);
+      const resiCountryPool = wantedCountry ? residentialPool.listForCountry(wantedCountry) : [];
+      const resiCandidates = resiCountryPool.length ? resiCountryPool : resiPool;
+      if (resiCandidates.length && (proxyMode === 'us' || proxyMode === 'auto')) {
+        const rotatedResi = resiCandidates.filter(p => !lastRecorderProxyUrl || p !== lastRecorderProxyUrl || resiCandidates.length <= 1);
+        proxyUrl = rotatedResi[Math.floor(Math.random() * rotatedResi.length)] || resiCandidates[0];
+      } else if (wantedCountry && (proxyMode === 'us' || proxyMode === 'auto')) {
+        return res.status(400).json({
+          error: `אין פרוקסי רזידנציאלי למדינה ${wantedCountry.toUpperCase()} — נסה מדינה אחרת או "אקראי — כל המדינות".`,
+        });
+      } else if (proxyMode === 'us' || proxyMode === 'auto') {
+        const pool = proxyMode === 'us'
+          ? candidates.filter(p => (geoMap[hostPortOf(p)] || {}).cc === 'US')
+          : candidates;
+        const basePool = pool.length ? pool : candidates;
+        // מעדיפים פרוקסים שידוע שמקבלים את דף ההצעה (offerOk=true), ואז מסובבים
+        const offerOkPool = basePool.filter(p => (geoMap[hostPortOf(p)] || {}).offerOk === true);
+        const usable = offerOkPool.length ? offerOkPool : basePool;
+        const rotated = usable.filter(p => !lastRecorderProxyUrl || p !== lastRecorderProxyUrl || usable.length <= 1);
+        proxyUrl = rotated[Math.floor(Math.random() * rotated.length)] || '';
+        if (!proxyUrl) {
+          return res.status(400).json({
+            error: proxyMode === 'us'
+              ? 'לא נמצא פרוקסי מארה״ב (US) ברשימה. בחר מדינה אחרת מהרשימה או "ישיר מהמחשב (ישראל)".'
+              : 'לא נמצא פרוקסי זמין ברשימה. בחר "ישיר מהמחשב (ישראל)".',
+          });
+        }
+      } else {
+        // בחירה ידנית: proxyMode מכיל "host:port"
+        const match = candidates.find(p => hostPortOf(p).toLowerCase() === proxyMode);
+        if (!match) {
+          return res.status(400).json({
+            error: `הפרוקסי ${rawMode} לא נמצא ברשימה הנוכחית. רענן את הרשימה במסך ההקלטה ונסה שוב.`,
+          });
+        }
+        proxyUrl = match;
+      }
+      proxyCountry = (geoMap[hostPortOf(proxyUrl)] || {}).cc || 'AUTO';
+    }
+    let locPair = proxyUrl ? (RECORDER_LOCALE_BY_CC[proxyCountry] || RECORDER_LOCALE_BY_CC.US) : ['', ''];
+    if (proxyUrl && !RECORDER_LOCALE_BY_CC[proxyCountry]) {
+    }
+    if (proxyUrl && !RECORDER_LOCALE_BY_CC[proxyCountry]) {
+      // Every sticky residential session shares one host:port, so the static geo table cannot say
+      // where the exit is. Ask the proxy itself — a locale/timezone that contradicts the exit IP
+      // is a bot signal on its own.
+      const geo = await resolveNetworkGeo(proxyUrl, 3000).catch(() => null);
+      if (geo && geo.countryCode) {
+        proxyCountry = geo.countryCode;
+        locPair = [geo.locale || locPair[0], geo.timezoneId || locPair[1]];
       }
     }
     const recorder = await startJourneyRecorder({
       targetUrl,
       proxyUrl,
-      locale: proxyUrl ? 'en-US' : '',
-      timezoneId: proxyUrl ? 'America/New_York' : '',
+      locale: proxyUrl ? locPair[0] : '',
+      timezoneId: proxyUrl ? locPair[1] : '',
+      browserEngine: cfg.browserEngine,
+      // The recorder is deliberately independent of the runner-wide stealthMode: heavy injection
+      // there produced a browser whose fingerprint contradicted itself. Opt in explicitly if needed.
+      stealthMode: process.env.WTG_RECORDER_STEALTH === 'maximum' ? 'maximum' : 'standard',
       // מצב מוק: לפתוח דפדפן אמיתי עם הפרוקסי (IP אמריקאי) בלי להקליט צעדים בפועל
       mock: Boolean(req.body?.mock),
       onUpdate: st => broadcastEvent('recorder_update', st),
     });
     if (proxyUrl) lastRecorderProxyUrl = proxyUrl;
-    const proxyHost = (() => {
-      try {
-        const u = new URL(proxyUrl);
-        // לעולם לא לחשוף credentials — רק מארח ופורט
-        return `${u.hostname}${u.port ? `:${u.port}` : ''}`;
-      } catch {
-        return proxyUrl ? '' : 'DIRECT';
-      }
-    })();
-    res.json({ ok: true, recorder, proxyCountry: proxyUrl ? 'US' : 'DIRECT', proxyHost, mock: Boolean(req.body?.mock) });
+    const proxyHost = proxyUrl ? hostPortOf(proxyUrl) : 'DIRECT';
+    res.json({ ok: true, recorder, proxyCountry, proxyHost, proxyCountryRequested: wantedCountry || null, mock: Boolean(req.body?.mock) });
   } catch (err) {
     const status = err?.code === 'NON_INTERACTIVE_DESKTOP' ? 409 : 400;
     const desktop = await getDesktopSessionInfo().catch(() => null);
@@ -1367,9 +1541,11 @@ app.post('/api/recorder/focus', async (_req, res) => {
   }
 });
 
-app.get('/api/run/status', (_req, res) => {
-  res.json({ status: runState, logs: logHistory, latestFrame, visitDetails });
-});
+function getRunStatus() {
+  return { ...redactData({ status: runState, logs: logHistory, visitDetails }), latestFrame };
+}
+
+app.get('/api/run/status', (_req, res) => res.json(getRunStatus()));
 
 const aiCommanderState = {
   history: Array.isArray(persistedSession?.aiHistory)
@@ -1757,7 +1933,7 @@ app.post('/api/ai/chat', async (req, res) => {
       : cfg.ai?.provider;
 
     aiCommanderState.lastUserChatAt = Date.now();
-    aiCommanderState.history.push({ role: 'user', content: message, ts: new Date().toISOString() });
+    aiCommanderState.history.push({ role: 'user', content: redactText(message), ts: new Date().toISOString() });
     if (aiCommanderState.history.length > 30) aiCommanderState.history.shift();
 
     const result = await askFleetCommander({
@@ -1778,7 +1954,7 @@ app.post('/api/ai/chat', async (req, res) => {
 
     const entry = {
       role: 'assistant',
-      content: result.reply,
+      content: redactText(result.reply),
       directives: result.directives || [],
       applied,
       provider: result.provider || 'local-advisor',
@@ -1805,6 +1981,8 @@ const streamState = {
 };
 
 function launchRunnerWave(cfg, { isContinuationWave = false, isAutoResume = false, overrideVisitCount = null } = {}) {
+  registerStepSecrets(cfg.taskSteps);
+  const waveStartedAt = Date.now();
   if (streamState.autoRecoveryTimer) {
     clearTimeout(streamState.autoRecoveryTimer);
     streamState.autoRecoveryTimer = null;
@@ -1876,7 +2054,7 @@ function launchRunnerWave(cfg, { isContinuationWave = false, isAutoResume = fals
           newSessions: resumeOffsets.newSessions + (Number(d.newSessions) || 0),
         });
       } else {
-        Object.assign(runState, msg.data);
+        Object.assign(runState, redactData(msg.data));
       }
       runState.streamMode = streamState.active;
       runState.streamWave = streamState.waveNumber;
@@ -1895,9 +2073,10 @@ function launchRunnerWave(cfg, { isContinuationWave = false, isAutoResume = fals
       }
       broadcastEvent('live_frame', d);
     } else if (msg?.type === 'visit_detail' && msg.data) {
-      visitDetails.unshift(msg.data);
+      const detail = redactData(msg.data);
+      visitDetails.unshift(detail);
       if (visitDetails.length > 100) visitDetails.pop();
-      broadcastEvent('visit_detail', msg.data);
+      broadcastEvent('visit_detail', detail);
     }
   });
 
@@ -1929,6 +2108,11 @@ function launchRunnerWave(cfg, { isContinuationWave = false, isAutoResume = fals
     if (aiCommanderState.autoTimer) {
       clearInterval(aiCommanderState.autoTimer);
       aiCommanderState.autoTimer = null;
+    }
+    for (const inbox of readRunInboxes()) {
+      if (inbox.createdAt >= waveStartedAt) {
+        runInboxSummary.set(inbox.inbox_id, { inbox_id: inbox.inbox_id, address: maskEmail(inbox.address) });
+      }
     }
     broadcastEvent('profiles_updated', { profiles: listSavedProfiles(PROFILES_DIR) });
 
@@ -2002,6 +2186,7 @@ function launchRunnerWave(cfg, { isContinuationWave = false, isAutoResume = fals
       config: cfg,
       logs: runLogsSnapshot.length ? runLogsSnapshot : logHistory.slice(-200),
       visitDetails: visitDetailsSnapshot,
+      inboxes: [...runInboxSummary.values()],
     })
       .then(reportMeta => {
         const dlTarget = reportMeta.pdfFile || reportMeta.htmlFile;
@@ -2080,7 +2265,7 @@ function launchRunnerWave(cfg, { isContinuationWave = false, isAutoResume = fals
         const item = {
           role: 'assistant',
           auto: true,
-          content: resReview.reply,
+          content: redactText(resReview.reply),
           directives: resReview.directives || [],
           applied,
           provider: resReview.provider || 'local-advisor',
@@ -2205,10 +2390,7 @@ app.get('/api/events', async (req, res) => {
   res.flushHeaders();
 
   res.write(`event: init\ndata: ${JSON.stringify({
-    status: runState,
-    logs: logHistory,
-    latestFrame,
-    visitDetails,
+    ...getRunStatus(),
     demoEvents,
     profiles: listSavedProfiles(PROFILES_DIR),
     system: getSystemInfo(),

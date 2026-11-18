@@ -62,6 +62,7 @@ function buildRrwebPageRecorderScript(rrwebUmd) {
           media: 800,
           input: 'last',
         },
+        maskAllInputs: true,
         slimDOMOptions: {
           script: true,
           comment: true,

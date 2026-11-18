@@ -1,10 +1,14 @@
-﻿node_modules/
+node_modules/
 session-profiles/
 storage/
 proxies.txt
 *.secret.json
 *native-pilot*.json
 .env*
+# the template ships on purpose, the filled-in file never does
+!.env.example
+# local scratch scripts and probes - never published
+scratch/
 *.log
 
 proxies-fallback.txt
@@ -23,7 +27,25 @@ license.key
 # personal / frozen systems - never publish
 sideOps/
 tools/google-workspace-account/
-site-profiles/tools-citedcart.json
+/site-profiles/*
+!/site-profiles/analytics-utm-and-buttons-qa.json
+!/site-profiles/blank-human-starter-template.json
+!/site-profiles/content-adsense-reading.json
+!/site-profiles/human-deep-reader-blog.json
+!/site-profiles/landing-forms-qa.json
+!/site-profiles/mobile-thumb-scroller.json
+!/site-profiles/multi-page-funnel-template.json
+!/site-profiles/qa-fingerprint-audit.json
+!/site-profiles/returning-visitor-session.json
 
 
 start-side-ops.bat
+
+# residential proxy credentials + metered usage counter - never publish
+data/proxies-residential.txt
+data/proxies-residential.json
+data/residential-usage.json
+data/proxy-scores.json
+data/recorder-storage-state.json
+data/proxies-datacenter.json
+data/proxy-geo.json

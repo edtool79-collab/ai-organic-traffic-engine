@@ -1,9 +1,17 @@
 const fs = require('fs');
 const path = require('path');
 const { execFile } = require('child_process');
-const { chromium } = require('playwright');
+const {
+  getLauncher,
+  getChromiumStealthArgs,
+  applyMaximumStealth,
+  generateDeviceFingerprint,
+  getNativeChromeUserAgent,
+} = require('./fingerprintManager');
 const { isDisallowedPrivateHost } = require('./pageMapper');
 const { toPlaywrightProxy } = require('./proxyManager');
+const { isSecretField, redactText } = require('./redaction');
+const { detectChallenge } = require('./challengeDetector');
 
 let cachedFinderBrowserScript = null;
 function getFinderBrowserScript() {
@@ -368,10 +376,17 @@ function buildRecorderInitScript() {
     }
 
     function cleanLabel(el) {
-      const txt = (el.innerText || el.value || el.getAttribute('aria-label') || el.getAttribute('placeholder') || el.getAttribute('title') || '')
+      const txt = (el.innerText || el.getAttribute('aria-label') || el.getAttribute('placeholder') || el.getAttribute('title') || '')
         .trim()
         .replace(/\\s+/g, ' ');
       return txt.length > 48 ? txt.slice(0, 47) + '…' : txt;
+    }
+
+    function captureField(el) {
+      const descriptor = [el.type, el.name, el.id, el.autocomplete, el.getAttribute('aria-label'), el.placeholder].join(' ');
+      const otp = /one-time-code|otp|verification[-_ ]?code|(?:^|[\\s_-])(?:code|pin)(?:$|[\\s_-])/i.test(descriptor);
+      const secret = otp || /password|passwd|pwd|passcode|secret|token|api[-_ ]?key/i.test(descriptor);
+      return { secret, value: otp ? '{{OTP}}' : (secret ? '' : String(el.value ?? '')) };
     }
 
     function emit(evt) {
@@ -490,8 +505,7 @@ function buildRecorderInitScript() {
       emit({
         kind: tag === 'select' ? 'select' : 'fill',
         selector,
-        value: String(el.value ?? ''),
-        text: cleanLabel(el) || el.getAttribute('name') || el.id || '',
+        ...captureField(el),
       });
     }, true);
 
@@ -509,8 +523,7 @@ function buildRecorderInitScript() {
       emit({
         kind: 'fill_and_enter',
         selector,
-        value: String(el.value ?? ''),
-        text: cleanLabel(el) || el.getAttribute('name') || el.id || '',
+        ...captureField(el),
       });
     }, true);
 
@@ -527,7 +540,18 @@ function buildRecorderInitScript() {
   })();`;
 }
 
-async function startJourneyRecorder({ targetUrl, proxyUrl = '', locale = '', timezoneId = '', onUpdate = null, mock = false }) {
+async function startJourneyRecorder({
+  targetUrl,
+  proxyUrl = '',
+  locale = '',
+  timezoneId = '',
+  onUpdate = null,
+  mock = false,
+  browserEngine = 'chromium',
+  // Real Chrome + a residential IP already carries the right signals; heavy JS injection only adds
+  // values that contradict the real engine. 'standard' keeps a real browser real.
+  stealthMode = 'standard',
+}) {
   if (activeSession) {
     const stillAlive = Boolean(activeSession.browser && activeSession.browser.isConnected && activeSession.browser.isConnected());
     if (stillAlive) {
@@ -567,11 +591,49 @@ async function startJourneyRecorder({ targetUrl, proxyUrl = '', locale = '', tim
   const startOrigin = startUrlObj.origin;
 
   const pwProxy = proxyUrl ? toPlaywrightProxy(proxyUrl) : null;
-  const browser = await chromium.launch({
+
+  // ── Hardened launch (same stack as a real visit) ───────────────────────────
+  // The recorder used to open bundled Chromium through plain Playwright: no stealth args, no
+  // installed-Chrome channel, no UA fix, and — worst of all — a datacenter exit IP. Those are
+  // exactly the signals Cloudflare/Turnstile and link-shortener WAFs score first, so every
+  // recording ended on a robot challenge. It now launches the same engine/stealth profile the
+  // visit runner uses, so a recording is challenged as rarely as a real visit.
+  const engine = ['camoufox', 'patchright', 'chromium'].includes(browserEngine) ? browserEngine : 'chromium';
+  const chromiumLike = engine === 'chromium' || engine === 'patchright';
+  const launcher = getLauncher(engine);
+  // Camoufox (Firefox) refuses the Chromium-only per-context proxy placeholder, so it gets the
+  // proxy on the context instead of at launch. Chromium/patchright keep it at launch.
+  const launchProxy = chromiumLike ? pwProxy : null;
+  const preferRealChrome = chromiumLike && process.env.WTG_BROWSER_CHANNEL !== 'bundle';
+  const launchRecorderBrowser = async opts => {
+    try {
+      return await launcher.launch(opts);
+    } catch (err) {
+      if (opts.channel) {
+        console.log('[Recorder] ערוץ Chrome המותקן לא זמין — חוזר ל-Chromium המצורף.');
+        const { channel, ...rest } = opts;
+        return launcher.launch(rest);
+      }
+      throw err;
+    }
+  };
+  const launchOpts = {
     headless: false,
-    ...(pwProxy ? { proxy: pwProxy } : {}),
-    args: ['--no-first-run', '--no-default-browser-check', '--start-maximized', '--wtg-recorder-window'],
-  });
+    ...(chromiumLike
+      ? {
+        args: [
+          // GPU off turns WebGL into a software renderer — a fingerprint mismatch on a real machine,
+          // and Turnstile reads WebGL. The recorder keeps the real GPU stack.
+          ...getChromiumStealthArgs(false, { stealthMode, proxied: Boolean(pwProxy) })
+            .filter(a => !/^--disable-gpu$|^--disable-software-rasterizer$/.test(a)),
+          '--start-maximized',
+          '--wtg-recorder-window',
+        ],
+      }
+      : {}),
+    ...(launchProxy ? { proxy: launchProxy } : {}),
+  };
+  const browser = await launchRecorderBrowser({ ...launchOpts, ...(preferRealChrome ? { channel: 'chrome' } : {}) });
   const browserPid = browser.process?.()?.pid || null;
 
   const pageTabIds = new WeakMap();
@@ -607,6 +669,7 @@ async function startJourneyRecorder({ targetUrl, proxyUrl = '', locale = '', tim
     currentUrl: normalizedStartUrl,
     stepCount: 0,
     steps: [],
+    challenge: null,
     error: null,
   };
 
@@ -633,19 +696,111 @@ async function startJourneyRecorder({ targetUrl, proxyUrl = '', locale = '', tim
   };
 
   try {
+    // The UA must describe the binary that actually started: the launch may fall back from
+    // installed Chrome to the bundled Chromium, and reporting the wrong build is a leak of its own.
+    let recorderUserAgent;
+    if (chromiumLike) {
+      const baseUa = getNativeChromeUserAgent(true);
+      let major = '';
+      try {
+        const match = String(browser.version() || '').match(/^(\d+)/);
+        major = match ? match[1] : '';
+      } catch {}
+      recorderUserAgent = major ? baseUa.replace(/Chrome\/\d+\.\d+\.\d+\.\d+/, `Chrome/${major}.0.0.0`) : baseUa;
+    }
+
+    // Returning-visitor cookies: a first-ever browser with zero cookies is itself a bot signal on
+    // link shorteners and ad networks, so the recording profile persists between sessions.
+    const storageStatePath = path.join(__dirname, '..', 'data', 'recorder-storage-state.json');
+    // Cloudflare clearance cookies are bound to the exit IP and to the browser that earned them.
+    // Replaying them from a different residential session makes Cloudflare treat the visitor as a
+    // suspicious returning client, so they are never persisted with the rest of the profile.
+    const CLOUDFLARE_COOKIE = /^(cf_clearance|__cf_bm|cf_chl_|__cfruid|_cfuvid)/i;
+    let storageStateOpt = null;
+    if (fs.existsSync(storageStatePath)) {
+      try {
+        const parsed = JSON.parse(fs.readFileSync(storageStatePath, 'utf8'));
+        if (parsed && typeof parsed === 'object') {
+          parsed.cookies = (Array.isArray(parsed.cookies) ? parsed.cookies : []).filter(c => !CLOUDFLARE_COOKIE.test(String(c?.name || '')));
+          storageStateOpt = parsed;
+        }
+      } catch {}
+    }
+
     const context = await browser.newContext({
       viewport: null,
       ignoreHTTPSErrors: false,
       ...(locale ? { locale } : {}),
       ...(timezoneId ? { timezoneId } : {}),
+      ...(recorderUserAgent ? { userAgent: recorderUserAgent } : {}),
+      ...(engine === 'camoufox' && pwProxy ? { proxy: pwProxy } : {}),
+      ...(storageStateOpt ? { storageState: storageStateOpt } : {}),
     });
     session.context = context;
+
+    session.saveStorageState = async () => {
+      if (!session.context || typeof session.context.storageState !== 'function') return;
+      try {
+        const state = await Promise.race([
+          session.context.storageState(),
+          new Promise(r => setTimeout(r, 1200)),
+        ]);
+        if (!state || typeof state !== 'object') return;
+        const cookies = (Array.isArray(state.cookies) ? state.cookies : []).filter(c => !CLOUDFLARE_COOKIE.test(String(c?.name || '')));
+        fs.writeFileSync(storageStatePath, JSON.stringify({ cookies, origins: state.origins || [] }), 'utf8');
+      } catch {}
+    };
+
+    // Challenge awareness for the operator. The recorder is human-driven, so the only useful
+    // signal is "a bot check is on screen right now" — it says nothing about success, and it never
+    // clicks or solves anything on its own.
+    let challengeTimer = null;
+    session.stopChallengeWatch = () => {
+      if (challengeTimer) { clearInterval(challengeTimer); challengeTimer = null; }
+    };
+    const lastStateChallenge = () => {
+      const pages = context.pages();
+      return pages.length ? pages[pages.length - 1] : null;
+    };
+    challengeTimer = setInterval(async () => {
+      if (activeSession !== session || session.stopping || lastState.challenge) return;
+      const target = lastStateChallenge();
+      if (!target) return;
+      try {
+        const found = await detectChallenge(target);
+        if (found.detected && activeSession === session) {
+          lastState.challenge = { ...found, pageUrl: target.url(), at: new Date().toISOString() };
+          emitUpdate();
+        }
+      } catch {}
+    }, 4000);
+    if (challengeTimer.unref) challengeTimer.unref();
+
+    const desktopSpec = generateDeviceFingerprint(engine === 'camoufox' ? 'desktopFirefox' : 'desktopChrome').spec;
+    if (engine !== 'camoufox') {
+      if (stealthMode === 'maximum') {
+        await applyMaximumStealth(context, {
+          spec: desktopSpec,
+          proxied: Boolean(pwProxy),
+          seed: Math.floor(Math.random() * 100000),
+          viewport: null,
+        }).catch(() => {});
+      } else {
+        await context.addInitScript(() => {
+          try {
+            if (navigator.webdriver) {
+              Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false, configurable: true });
+            }
+          } catch {}
+        }).catch(() => {});
+      }
+    }
 
     if (session.mock) {
       // Mock/mini mode (fix from operator request): open the browser for real (proxy IP + locale),
       // skip all journey recording bindings — no click/nav capture, only a screen MOCK in the mini UI.
       lastState.stepCount = 0;
-      const finalizeOnCloseMock = () => {
+      const finalizeOnCloseMock = async () => {
         if (activeSession !== session || session.stopping) return;
         session.stopping = true;
         activeSession = null;
@@ -653,6 +808,8 @@ async function startJourneyRecorder({ targetUrl, proxyUrl = '', locale = '', tim
         lastState.status = 'completed';
         lastState.finishedAt = new Date().toISOString();
         emitUpdate();
+        if (typeof session.stopChallengeWatch === 'function') session.stopChallengeWatch();
+        if (typeof session.saveStorageState === 'function') await session.saveStorageState();
         browser.close().catch(() => {});
       };
       browser.on('disconnected', finalizeOnCloseMock);
@@ -686,6 +843,8 @@ async function startJourneyRecorder({ targetUrl, proxyUrl = '', locale = '', tim
       const isExtraTab = tabId > 0;
       const now = Date.now();
       lastState.currentUrl = evtUrl;
+      // A new document means any challenge we flagged belongs to the previous page.
+      lastState.challenge = null;
 
       if (evt.kind === 'page_arrival') {
         const navType = evt.navType || 'navigate';
@@ -833,24 +992,28 @@ async function startJourneyRecorder({ targetUrl, proxyUrl = '', locale = '', tim
         return;
       }
 
+      const secretInput = evt.secret === true || isSecretField(evt.selector, evt.text);
+      const fieldValue = secretInput && evt.value !== '{{OTP}}' ? '' : evt.value;
+
       if (evt.kind === 'fill' || evt.kind === 'select') {
         ensureSameTabContext();
         session.hadUserActionOnTab.add(tabId);
         const last = lastState.steps[lastState.steps.length - 1];
         if (last && last.type === evt.kind && last.selector === evt.selector && last.tab === tabId && last._pageUrl === evtUrl) {
-          last.value = evt.value;
+          last.value = fieldValue;
+          if (secretInput) last.secret = true;
           last._recordedAt = now;
           emitUpdate();
           return;
         }
-        const desc = evt.text ? ` (${evt.text})` : '';
         pushStep({
           type: evt.kind,
           tab: tabId,
           selector: evt.selector,
-          value: evt.value,
+          value: fieldValue,
+          ...(secretInput ? { secret: true } : {}),
           assertKind: 'text_contains',
-          label: evt.kind === 'select' ? `בחירה ב-${evt.selector}${desc}` : `הקלדה בשדה ${evt.selector}${desc}`,
+          label: redactText(evt.kind + ' ' + evt.selector),
           ...(isExtraTab ? { optional: true } : {}),
           _pageUrl: evtUrl,
           _recordedAt: now,
@@ -861,12 +1024,13 @@ async function startJourneyRecorder({ targetUrl, proxyUrl = '', locale = '', tim
       if (evt.kind === 'fill_and_enter') {
         ensureSameTabContext();
         const last = lastState.steps[lastState.steps.length - 1];
-        if (!(last && last.type === 'fill' && last.selector === evt.selector && last.tab === tabId && last.value === evt.value)) {
+        if (!(last && last.type === 'fill' && last.selector === evt.selector && last.tab === tabId && last.value === fieldValue)) {
           pushStep({
             type: 'fill',
             tab: tabId,
             selector: evt.selector,
-            value: evt.value,
+            value: fieldValue,
+            ...(secretInput ? { secret: true } : {}),
             assertKind: 'text_contains',
             label: `הקלדה בשדה ${evt.selector}`,
             ...(isExtraTab ? { optional: true } : {}),
@@ -909,7 +1073,7 @@ async function startJourneyRecorder({ targetUrl, proxyUrl = '', locale = '', tim
 
     await context.addInitScript(buildRecorderInitScript());
 
-    const finalizeOnClose = () => {
+    const finalizeOnClose = async () => {
       if (activeSession !== session || session.stopping) return;
       session.stopping = true;
       activeSession = null;
@@ -919,6 +1083,8 @@ async function startJourneyRecorder({ targetUrl, proxyUrl = '', locale = '', tim
       lastState.steps = stripInternalFields(lastState.steps);
       lastState.stepCount = lastState.steps.length;
       emitUpdate();
+      if (typeof session.stopChallengeWatch === 'function') session.stopChallengeWatch();
+      if (typeof session.saveStorageState === 'function') await session.saveStorageState();
       browser.close().catch(() => {});
     };
 
@@ -1044,6 +1210,10 @@ async function stopJourneyRecorder() {
   lastState.steps = stripInternalFields(lastState.steps);
   lastState.stepCount = lastState.steps.length;
 
+  if (typeof session.stopChallengeWatch === 'function') session.stopChallengeWatch();
+  if (typeof session.saveStorageState === 'function') {
+    await session.saveStorageState();
+  }
   await Promise.race([
     session.browser.close().catch(() => {}),
     new Promise(r => setTimeout(r, 4000)),
