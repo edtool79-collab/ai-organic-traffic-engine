@@ -191,11 +191,15 @@ function computeWavePacing({
     delayMultiplier = 1;
   }
 
-  const effectiveBaseDelay = Number(baseDelayMs) > 0 ? Number(baseDelayMs) : 350;
-  const recommendedDelayMs = Math.min(
-    30000,
-    Math.max(0, Math.round(jitterNumber(effectiveBaseDelay * delayMultiplier, 0.35, 0, 30000)))
-  );
+  const effectiveBaseDelay = Number(baseDelayMs) > 0
+    ? Number(baseDelayMs)
+    : (waveMode === 'burst' ? 0 : 350);
+  const recommendedDelayMs = effectiveBaseDelay <= 0
+    ? 0
+    : Math.min(
+      30000,
+      Math.max(0, Math.round(jitterNumber(effectiveBaseDelay * delayMultiplier, 0.35, 0, 30000)))
+    );
   const targetMaxConcurrency = Math.max(
     minConc,
     Math.min(maxConc, Math.round(minConc + (maxConc - minConc) * ratio))

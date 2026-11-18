@@ -1012,7 +1012,7 @@ async function run() {
     const pool = new AutoscaledPool({
       minConcurrency,
       maxConcurrency,
-      desiredConcurrency: Math.min(maxConcurrency, Math.max(minConcurrency, Math.min(3, maxConcurrency))),
+      desiredConcurrency: Math.min(maxConcurrency, Math.max(minConcurrency, Math.min(4, maxConcurrency))),
       autoscaleIntervalSecs: 2,
       loggingIntervalSecs: null,
       snapshotterOptions: {
@@ -1020,7 +1020,7 @@ async function run() {
         maxUsedMemoryRatio: 0.98,
       },
       systemStatusOptions: {
-        maxMemoryOverloadedRatio: 0.9,
+        maxMemoryOverloadedRatio: 0.95,
         maxCpuOverloadedRatio: 0.95,
       },
       isTaskReadyFunction: async () => {
@@ -1302,10 +1302,13 @@ async function run() {
         await syncPauseState();
       }
 
-      // Deterministic RAM Governor (Hysteresis: 70%-86% deadband, 90s cooldown, emergency brake >= 92%)
-      const usedMemPct = Math.round(((os.totalmem() - os.freemem()) / os.totalmem()) * 100);
+      // Progressive RAM Governor (free-MB + ratio aware, graceful step-down & recovery)
+      const totalMemBytes = os.totalmem();
+      const freeMemBytes = os.freemem();
+      const freeMemMb = Math.round(freeMemBytes / (1024 * 1024));
+      const usedMemPct = Math.round(((totalMemBytes - freeMemBytes) / totalMemBytes) * 100);
       const nowMs = Date.now();
-      if (usedMemPct >= 92 && stats.maxConcurrency > 1 && activePoolRef) {
+      if ((freeMemMb < 450 || usedMemPct >= 97) && stats.maxConcurrency > 1 && activePoolRef) {
         stats.minConcurrency = 1;
         stats.maxConcurrency = 1;
         activePoolRef.minConcurrency = 1;
@@ -1313,15 +1316,24 @@ async function run() {
         activePoolRef.desiredConcurrency = 1;
         runtimeState.resourceMode = 'ultra_lite';
         lastRamScaleAt = nowMs;
-        console.log(`[RAM Governor] עומס זיכרון קריטי (${usedMemPct}%) — בלם חירום: מקביליות 1 ומצב ultra_lite.`);
-      } else if (nowMs - lastRamScaleAt >= 90000 && activePoolRef) {
-        if (usedMemPct < 68 && stats.maxConcurrency < configuredMaxCap) {
+        console.log(`[RAM Governor] עומס זיכרון קריטי (${usedMemPct}%, פנוי ${freeMemMb}MB) — בלם חירום: מקביליות 1 ומצב ultra_lite.`);
+      } else if (nowMs - lastRamScaleAt >= 30000 && activePoolRef) {
+        if ((freeMemMb < 750 || usedMemPct >= 95) && stats.maxConcurrency > 1) {
+          const nextMax = Math.max(1, stats.maxConcurrency - 1);
+          stats.minConcurrency = Math.min(stats.minConcurrency, nextMax);
+          stats.maxConcurrency = nextMax;
+          activePoolRef.minConcurrency = stats.minConcurrency;
+          activePoolRef.maxConcurrency = nextMax;
+          activePoolRef.desiredConcurrency = Math.min(nextMax, activePoolRef.desiredConcurrency);
+          lastRamScaleAt = nowMs;
+          console.log(`[RAM Governor] לחץ זיכרון (${usedMemPct}%, פנוי ${freeMemMb}MB) — הפחתת מקביליות הדרגתית ל-${nextMax}.`);
+        } else if (freeMemMb >= 1000 && usedMemPct < 92 && stats.maxConcurrency < configuredMaxCap) {
           const nextMax = Math.min(configuredMaxCap, stats.maxConcurrency + 1);
           stats.maxConcurrency = nextMax;
           activePoolRef.maxConcurrency = nextMax;
           activePoolRef.desiredConcurrency = Math.min(nextMax, Math.max(stats.minConcurrency, activePoolRef.desiredConcurrency + 1));
           lastRamScaleAt = nowMs;
-          console.log(`[RAM Governor] זיכרון פנוי (${usedMemPct}%) — העלאה הדרגתית של מקביליות ל-${nextMax}.`);
+          console.log(`[RAM Governor] זיכרון פנוי (${usedMemPct}%, פנוי ${freeMemMb}MB) — העלאה הדרגתית של מקביליות ל-${nextMax}.`);
         }
       }
 

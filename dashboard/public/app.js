@@ -1884,23 +1884,27 @@ function wireActions() {
 
   document.querySelectorAll('.preset-scale-btn').forEach((btn) => {
     btn.onclick = () => {
-      const visits = Number(btn.dataset.visits) || 25;
+      const visits = Number(btn.dataset.visits) || 100;
       const minConc = Number(btn.dataset.min) || 2;
       const maxConc = Number(btn.dataset.max) || 6;
-      const ramMode = btn.dataset.ram || 'lite';
+      const ramMode = btn.dataset.ram || 'ultra_lite';
       state.config.visitCount = visits;
       state.config.minConcurrency = minConc;
       state.config.concurrency = maxConc;
       state.config.resourceMode = ramMode;
       state.config.stealthMode = 'maximum';
-      state.config.waveConfig = {
-        ...(state.config.waveConfig || {}),
+      state.config.headless = true;
+      state.config.interVisitDelayMs = visits >= 500
+        ? 0
+        : Math.min(Number(state.config.interVisitDelayMs ?? 0) || 0, 500);
+      delete state.config.waveConfig;
+      state.config.waves = {
+        ...(state.config.waves || {}),
         enabled: true,
-        pattern: 'natural_peaks',
-        childrenPerRecording: visits >= 500 ? 6 : 4,
+        mode: visits >= 1000 ? 'burst' : 'natural_peaks',
       };
       syncFormFromConfig();
-      showToast(`הוגדרה ריצת סקאלה של ${visits.toLocaleString('he-IL')} סשנים (מקביליות ${minConc}–${maxConc}, Headless ברקע, מצב זיכרון: ${ramMode}).`);
+      showToast(`הוגדרה ריצת סקאלה של ${visits.toLocaleString('he-IL')} סשנים (מקביליות ${minConc}–${maxConc}, השהיה ${state.config.interVisitDelayMs}ms, Headless ברקע, מצב זיכרון: ${ramMode}).`);
     };
   });
 
