@@ -1,8 +1,28 @@
-# Web Traffic Generation & Browser QA Suite
+<div align="center">
+  <img src="docs/img/logo.png" alt="Traffic Engine Logo" width="88" />
+  <h1>Traffic Engine — Web Traffic Generation &amp; Browser QA Studio</h1>
+  <p>
+    <strong>Self-hosted multi-engine Playwright &amp; Crawlee browser automation, flow verification, and observability suite</strong><br/>
+    Local Express Dashboard (<code>http://127.0.0.1:4310</code>) &bull; Live <code>rrweb</code> Preview &bull; Proxy Tier &amp; Metering Controls &bull; Optional Live-Inbox OTP Verification &bull; AI Fleet Orchestration
+  </p>
+  <p>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-10b981.svg" alt="MIT License" /></a>
+    <img src="https://img.shields.io/badge/Node.js-LTS-3b82f6.svg" alt="Node.js LTS" />
+    <img src="https://img.shields.io/badge/Engines-Playwright%20%7C%20Patchright%20%7C%20Camoufox-38bdf8.svg" alt="Supported Engines" />
+  </p>
+</div>
 
-Self-hosted multi-engine Playwright & Crawlee browser automation, flow verification, and observability suite with a local Express dashboard (`http://127.0.0.1:4310`), live `rrweb` preview, proxy health/metering controls, optional HirePulse live-inbox OTP/link verification, and AI-assisted orchestration.
+<p align="center">
+  <img src="docs/img/hero-banner.png" alt="Traffic Engine 4-Layer Architecture Banner" width="100%" />
+</p>
+
+## Dashboard &amp; Reporting Preview
 
 ![Dashboard overview on the built-in demo site](docs/img/dashboard-overview.png)
+
+| Live Runner Logs | AI-Summarized PDF Report |
+| :---: | :---: |
+| ![Live run log](docs/img/live-run-log.png) | ![Generated PDF report](docs/img/generated-pdf-report.png) |
 
 ## Capabilities at a Glance
 
@@ -16,8 +36,6 @@ Self-hosted multi-engine Playwright & Crawlee browser automation, flow verificat
 | **Live Inbox & Email Sweeps** | Integrates with the HirePulse inbox API (`src/emailInboxClient.js`) to create temporary inboxes per visit, inject addresses (`fill_email`), retrieve OTP codes or confirmation links (`fill_otp`), and run post-visit confirmation sweeps (`emailSweepPasses` / `emailSweepDelayMs`). |
 | **Diagnostics & Safety Gates** | Includes read-only target preflight classification (`open`, `cf_interstitial`, `site_tick`, `dead`, `unknown` via `tools/preflight-target.js`) and read-only CAPTCHA/challenge widget detection (`challengeDetector.js` — detection and reporting only, never solves challenges). Ad-safety switches control overlay dismissal, pop-under cleanup, element exclusion (`avoidAdClicks`), and origin-scoped telemetry headers. |
 | **Redaction, Live Stream & Reports** | Masks passwords, OTP tokens, inbox addresses, and proxy credentials before logs, telemetry, or step metadata (`src/redaction.js`). Streams live SSE status and `rrweb` browser frames to the dashboard and writes run state plus HTML/PDF reports (`reports/`). |
-
-[Live run log](docs/img/live-run-log.png) · [Generated PDF report page](docs/img/generated-pdf-report.png)
 
 ---
 
