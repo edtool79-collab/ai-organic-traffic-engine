@@ -594,7 +594,7 @@ const STEP_HANDLERS = {
       let sourceHost = engine.id;
       try { sourceHost = new URL(ctx.serpUrl).hostname.replace(/^www\./i, ''); } catch {}
       ctx.searchEngine = sourceHost;
-      return `מקור הגעה אורגני/חברתי (${sourceHost}): "${query}" → מפנה אל היעד`;
+      return `Organic/social referrer (${sourceHost}): "${query}" → routing to target`;
     }
 
     let navigated = false;

@@ -768,20 +768,6 @@ function buildChildJourney({
       if (!g) return false;
       try { return new URL(g.value, targetUrl).hostname !== new URL(targetUrl).hostname; } catch { return false; }
     })();
-<<<<<<< HEAD
-    if (firstNavIsExternal || isConverter) {
-      childSteps.unshift({
-        type: 'search_entry',
-        selector: '',
-        value: '',
-        query: '',
-        label: 'Organic search entry (authentic referrer attribution)',
-        optional: true,
-        tab: 0,
-      });
-      mutated = true;
-    }
-=======
     childSteps.unshift({
       type: 'search_entry',
       selector: '',
@@ -789,12 +775,11 @@ function buildChildJourney({
       query: '',
       mode: refModeNorm,
       fastHeaderOnly: !firstNavIsExternal,
-      label: 'כניסה אורגנית ממנוע חיפוש / רשת חברתית (Referer אמיתי ל-GA4)',
+      label: 'Organic search / social entry (authentic GA4 Referer)',
       optional: true,
       tab: 0,
     });
     mutated = true;
->>>>>>> main
   }
 
   // ── Deeper AI involvement ────────────────────────────────────────────────────
