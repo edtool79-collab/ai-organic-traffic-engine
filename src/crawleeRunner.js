@@ -371,6 +371,7 @@ async function executeVisitWorkload({
   precomputedChildPlan = null,
   geoInfo = null,
   avoidEngines = [],
+  lifecycle = null,
 }) {
   const {
     targetUrl,
@@ -459,6 +460,7 @@ async function executeVisitWorkload({
       geoInfo,
       identityInfo: waveSummary?.identity || null,
       avoidEngines,
+      lifecycle,
     });
     combined = { ...combined, ...scenRes, waveSummary };
   }
@@ -973,6 +975,9 @@ async function run() {
     lastErrorSample: '',
     lastSkippedSelector: '',
     proxyTransferBytes: 0,
+    ga4VerifiedVisits: 0,
+    ga4EventsFired: 0,
+    lastGa4Source: '',
     returningSessions: 0,
     newSessions: 0,
     loadTimesMs: [],
@@ -1496,8 +1501,28 @@ async function run() {
             deviceKey: pickDeviceKeyForEngine(deviceWeights, cfg.browserEngine || 'chromium'),
           });
 
+          let sessionGa4Verified = false;
           onRespSize = async req => {
             try {
+              const reqUrl = String(req.url() || '');
+              if (/(?:google-analytics\.com|analytics\.google\.com)\/g\/collect|clarity\.ms\/collect|plausible\.io\/api\/event|posthog\.com\/e/i.test(reqUrl)) {
+                stats.ga4EventsFired = (stats.ga4EventsFired || 0) + 1;
+                if (!sessionGa4Verified) {
+                  sessionGa4Verified = true;
+                  stats.ga4VerifiedVisits = (stats.ga4VerifiedVisits || 0) + 1;
+                  try {
+                    const u = new URL(reqUrl);
+                    const evName = u.searchParams.get('en') || 'page_view';
+                    const drRaw = u.searchParams.get('dr') || '';
+                    let drHost = '';
+                    if (drRaw) {
+                      try { drHost = new URL(drRaw).hostname.replace(/^www\./i, ''); } catch { drHost = drRaw.slice(0, 30); }
+                    }
+                    if (drHost) stats.lastGa4Source = drHost;
+                    console.log(`[GA4 Verified ✅ | ביקור #${i + 1}] אומת שידור חי ל-Google Analytics (${evName}${drHost ? ' | מקור: ' + drHost : ''}) [סה״כ אומתו: ${stats.ga4VerifiedVisits}]`);
+                  } catch {}
+                }
+              }
               const resp = await req.response().catch(() => null);
               if (resp && resp.headers?.()['x-wtg-cache'] === '1') return;
               const s = await req.sizes();
@@ -1538,6 +1563,7 @@ async function run() {
             precomputedChildPlan,
             geoInfo: geo,
             avoidEngines,
+            lifecycle: sessionSlot?.lifecycle || null,
           });
 
           stats.completed++;
@@ -1578,9 +1604,11 @@ async function run() {
             await sleep(Math.max(0, Number(attributionCfg.closeSettleMs) || 2800)).catch(() => {});
           }
 
+          const lcInfo = sessionSlot?.lifecycle ? ` · ${sessionSlot.lifecycle.labelHe}` : '';
+          const ga4Info = sessionGa4Verified ? ', GA4:✓' : '';
           const sessionTag = sessionSlot
-            ? `, session: ${sessionHandle.isReturning ? 'returning' : 'new'}(#${sessionSlot.slot})`
-            : '';
+            ? `, session: ${sessionHandle.isReturning ? 'returning' : 'new'}(#${sessionSlot.slot}${lcInfo})${ga4Info}`
+            : ga4Info;
           const resolvedCountry = geo?.countryCode || (selectedProxyUrl ? proxyCountryByUrl[selectedProxyUrl] : null) || null;
           const geoTag = geo?.countryCode
             ? `, geo: ${geo.countryCode}(${geo.locale}/${geo.timezoneId})`
@@ -1840,6 +1868,20 @@ async function run() {
         adSafety.closePopunders,
         msg => console.log(`[${i + 1}] ${msg}`)
       );
+      let modeBGa4Verified = false;
+      const onModeBReq = req => {
+        try {
+          const reqUrl = String(req.url() || '');
+          if (/(?:google-analytics\.com|analytics\.google\.com)\/g\/collect|clarity\.ms\/collect|plausible\.io\/api\/event|posthog\.com\/e/i.test(reqUrl)) {
+            stats.ga4EventsFired = (stats.ga4EventsFired || 0) + 1;
+            if (!modeBGa4Verified) {
+              modeBGa4Verified = true;
+              stats.ga4VerifiedVisits = (stats.ga4VerifiedVisits || 0) + 1;
+            }
+          }
+        } catch {}
+      };
+      page.on('requestfinished', onModeBReq);
 
       try {
         const ctxObj = page.context();
@@ -1896,6 +1938,7 @@ async function run() {
         logVisitOutcome(i, persona, request.userData.deviceKey, cfg.browserEngine || 'chromium', res, sessionTag, proxyTag);
         proxyPool.reportSuccess();
       } finally {
+        page.off('requestfinished', onModeBReq);
         stopPopunderShield();
         emitTelemetry(crawler.autoscaledPool?.systemStatus?.getCurrentStatus?.());
       }

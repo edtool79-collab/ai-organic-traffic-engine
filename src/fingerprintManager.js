@@ -1208,6 +1208,9 @@ function listSavedProfiles(profilesDir) {
         cookiesCount,
         originsCount,
         visitsCount: meta.visitsCount || 1,
+        lifecycleStage: meta.lifecycleStage || 'day1_discovery',
+        lifecycleLabelHe: meta.lifecycleLabelHe || 'יום 1: גילוי ראשוני',
+        dwellMultiplier: meta.dwellMultiplier || 1.0,
         updatedAt: stat.mtime.toISOString(),
       });
     } else if (ent.isFile() && ent.name.endsWith('.json')) {
@@ -1349,6 +1352,16 @@ async function openSessionContext({
           }
         } catch {}
       }
+      const visitNum = (meta?.visitsCount || 0) + 1;
+      const lifecycleStage = visitNum === 1
+        ? 'day1_discovery'
+        : (visitNum === 2 ? 'day2_consideration' : (visitNum === 3 ? 'day3_conversion' : 'loyal_advocate'));
+      const lifecycleLabelHe = visitNum === 1
+        ? 'יום 1: גילוי ראשוני'
+        : (visitNum === 2
+          ? 'יום 2: התעניינות והשוואה'
+          : (visitNum === 3 ? 'יום 3: בשלות והמרה' : `משתמש נאמן קבוע (ביקור #${visitNum})`));
+      const dwellMultiplier = visitNum === 1 ? 1.0 : (visitNum === 2 ? 1.25 : 1.45);
       const nextMeta = {
         deviceKey,
         engine: launchEngine,
@@ -1358,8 +1371,18 @@ async function openSessionContext({
         timezoneId: timezoneId || meta?.timezoneId || null,
         fpSchemaV2: 3,
         fpBundle: fp,
-        visitsCount: (meta?.visitsCount || 0) + 1,
+        visitsCount: visitNum,
+        firstSeenAt: meta?.firstSeenAt || new Date().toISOString(),
+        lifecycleStage,
+        lifecycleLabelHe,
+        dwellMultiplier,
         updatedAt: new Date().toISOString(),
+      };
+      sessionSlot.lifecycle = {
+        visitNum,
+        stage: lifecycleStage,
+        labelHe: lifecycleLabelHe,
+        dwellMultiplier,
       };
       fs.writeFileSync(sessionSlot.metaPath, JSON.stringify(nextMeta), 'utf8');
     }

@@ -10,6 +10,7 @@ const {
   humanType,
   smoothScrollTo,
   humanBrowsePage,
+  performBiometricReadingPass,
   getErgonomicTargetPoint,
   randomBetween,
   sleep,
@@ -652,6 +653,50 @@ const STEP_HANDLERS = {
           }
         }
       } catch {}
+
+      // Upgrade 1: Real SERP Click-Through — if our target domain appears in the organic results
+      // (on page 1 or page 2), scroll to it and click it directly from the search results page.
+      if (!ctx.engineChallenged && ctx.targetUrl) {
+        try {
+          const targetHost = new URL(ctx.targetUrl).hostname.replace(/^www\./i, '').toLowerCase();
+          for (let serpPage = 0; serpPage < 2; serpPage++) {
+            const serpMatchHref = await page.evaluate((hostNeedle) => {
+              const anchors = Array.from(document.querySelectorAll('a[href]'));
+              for (const a of anchors) {
+                const h = a.getAttribute('href') || '';
+                if (!h || h.startsWith('#') || /google\.|bing\.|duckduckgo\.|yahoo\.|brave\.|ecosia\./i.test(h)) continue;
+                if (h.toLowerCase().includes(hostNeedle)) {
+                  const r = a.getBoundingClientRect();
+                  if (r.width > 20 && r.height > 10) return h;
+                }
+              }
+              return '';
+            }, targetHost).catch(() => '');
+            if (serpMatchHref) {
+              const serpLoc = page.locator(`a[href*="${targetHost}"]`).first();
+              if ((await serpLoc.count().catch(() => 0)) > 0) {
+                await serpLoc.scrollIntoViewIfNeeded().catch(() => {});
+                await sleep(350 + Math.round(Math.random() * 450));
+                await serpLoc.click({ timeout: 5000 }).catch(() => {});
+                await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
+                ctx.serpClickedThrough = true;
+                ctx.pagesVisited++;
+                return `חיפוש אורגני ב-${engine.id}: "${query}" → נמצא ונלחץ קישור אורגני ב-SERP (עמוד ${serpPage + 1}) אל ${targetHost}!`;
+              }
+            }
+            if (serpPage === 0) {
+              const nextBtn = page.locator('a#pnnext, a.sb_pagN, a[aria-label="Next page"], button:has-text("More results")').first();
+              if ((await nextBtn.count().catch(() => 0)) > 0 && (await nextBtn.isVisible().catch(() => false))) {
+                await nextBtn.click({ timeout: 4000 }).catch(() => {});
+                await page.waitForLoadState('domcontentloaded', { timeout: 12000 }).catch(() => {});
+                await sleep(650 + Math.round(Math.random() * 550));
+              } else {
+                break;
+              }
+            }
+          }
+        } catch {}
+      }
     }
 
     // Even if the engine UI failed (captcha, blocked proxy), the referrer must still be a real
@@ -866,6 +911,18 @@ const STEP_HANDLERS = {
   async goto(page, step, ctx) {
     const dest = resolveTargetUrl(ctx.targetUrl, step.value || step.selector || '/');
     const started = Date.now();
+    if (ctx.serpClickedThrough) {
+      ctx.serpClickedThrough = false;
+      try {
+        if (new URL(page.url()).origin === new URL(dest).origin) {
+          ctx.initialRefererConsumed = true;
+          ctx.lastStatus = 200;
+          ctx.visitedUrls.push({ path: step.value || '/', url: page.url(), status: 200, loadMs: Date.now() - started });
+          await injectSnippet(page, ctx.parsedSnippet);
+          return `נחת ישירות מקליק אורגני בתוצאות החיפוש (SERP Click-Through) אל ${page.url()}`;
+        }
+      } catch {}
+    }
     // Cold deep-links into shortener domains are the #1 source of 403 in this funnel.
     const warmNote = await warmUpShortener(page, dest, ctx).catch(() => '');
     const gotoOpts = { waitUntil: 'domcontentloaded', timeout: 25000 };
@@ -1373,7 +1430,8 @@ const STEP_HANDLERS = {
   },
 
   async read_article(page, step, ctx) {
-    const totalMs = withHumanJitter(Number(step.value) || 8500, 1500, 45000, 0.22);
+    const mult = Number(ctx.lifecycle?.dwellMultiplier || 1.0);
+    const totalMs = withHumanJitter(Math.round((Number(step.value) || 8500) * mult), 1500, 45000, 0.22);
     const started = Date.now();
     const maxY = await page.evaluate(() =>
       Math.max(0, Math.max(document.body.scrollHeight, document.documentElement.scrollHeight) - window.innerHeight)
@@ -1381,6 +1439,7 @@ const STEP_HANDLERS = {
 
     const checkpoints = [0.22, 0.45, 0.68, 0.55, 0.85];
     const perStopWait = Math.max(300, Math.floor((totalMs - 1000) / checkpoints.length));
+    let lastPos = { x: 240, y: 240 };
     for (let k = 0; k < checkpoints.length; k++) {
       if (Date.now() - started >= totalMs) break;
       const y = Math.floor(maxY * checkpoints[k] * randomBetween(0.92, 1.04));
@@ -1388,17 +1447,18 @@ const STEP_HANDLERS = {
       if (k === 1 && ctx.adSafety?.dismissOverlays) {
         await dismissBlockingOverlays(page, msg => ctx.onStep && ctx.onStep(msg)).catch(() => 0);
       }
-      await moveMouse(
-        page.mouse,
-        { x: 220 + (k * 45) % 300, y: 240 + (k * 35) % 200 },
-        { x: 340 + (k * 70) % 360, y: 290 + (k * 40) % 180 },
-        8
-      ).catch(() => {});
+      if (k === 1 || k === 3) {
+        lastPos = await performBiometricReadingPass(page, lastPos).catch(() => lastPos);
+      } else {
+        const nextPos = { x: 340 + (k * 70) % 360, y: 290 + (k * 40) % 180 };
+        await moveMouse(page.mouse, lastPos, nextPos, 8).catch(() => {});
+        lastPos = nextPos;
+      }
       await sleep(Math.min(perStopWait, Math.max(250, totalMs - (Date.now() - started))));
     }
     const remaining = totalMs - (Date.now() - started);
     if (remaining > 150) await sleep(remaining);
-    return `קריאת מאמר אנושית (${checkpoints.length} עצירות גלילה, ${Math.round((Date.now() - started) / 100) / 10}s, ללא לחיצה על מודעות)`;
+    return `קריאת מאמר ביומטרית (${checkpoints.length} עצירות גלילה, ${Math.round((Date.now() - started) / 100) / 10}s, ללא לחיצה על מודעות)`;
   },
 
   async hover(page, step, ctx) {
@@ -1421,9 +1481,125 @@ const STEP_HANDLERS = {
   },
 
   async human_browse(page, step, ctx) {
-    const budgetMs = withHumanJitter(Number(step.value) || 7000, 2000, 45000, 0.22);
+    const mult = Number(ctx.lifecycle?.dwellMultiplier || 1.0);
+    const baseMs = Math.round((Number(step.value) || 7000) * mult);
+    const budgetMs = withHumanJitter(baseMs, 2000, 45000, 0.22);
+    let toolNote = '';
+    try {
+      if (/\/(tool|tools|calculator|checker|generator|schema|audit|worksheet)/i.test(String(page.url() || ''))) {
+        const tRes = await STEP_HANDLERS.use_tool(page, { optional: true }, ctx).catch(() => '');
+        if (tRes && !tRes.includes('לא נמצאו')) toolNote = ` + ${tRes}`;
+      }
+    } catch {}
     const secs = await humanBrowsePage(page, budgetMs, ctx.adSafety, ctx.onStep);
-    return `גלישה אנושית חופשית בדף (גלילות, עכבר, ריחוף ובחירת טקסט — ${secs}s)`;
+    return `גלישה אנושית חופשית בדף (גלילות, קריאה ביומטרית ובחירת טקסט — ${secs}s)${toolNote}`;
+  },
+
+  /**
+   * Upgrade 3: Smart Interactive Tool Runner — detects interactive calculators, checkers,
+   * schema generators and text tools on the current page, fills realistic domain-appropriate
+   * inputs, triggers the tool action button, and interacts with the output.
+   */
+  async use_tool(page, step, ctx) {
+    if (!page || page.isClosed()) return 'הפעלת כלי: אין דף פעיל';
+    const currentUrl = String(page.url() || '').toLowerCase();
+    const toolResult = await page.evaluate((urlStr) => {
+      const setNativeValue = (el, val) => {
+        const proto = el.tagName === 'SELECT' ? window.HTMLSelectElement.prototype
+          : el.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype
+            : window.HTMLInputElement.prototype;
+        const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+        if (setter) setter.call(el, val); else el.value = val;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      };
+
+      const inputs = Array.from(document.querySelectorAll('main textarea, main input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]), article textarea, article input:not([type="hidden"]), .tool-card textarea, .tool-card input, form textarea, form input:not([type="hidden"])'));
+      let filledCount = 0;
+      for (const el of inputs.slice(0, 6)) {
+        const r = el.getBoundingClientRect();
+        if (r.width < 25 || r.height < 14) continue;
+        const hint = `${el.id || ''} ${el.name || ''} ${el.placeholder || ''} ${el.getAttribute('aria-label') || ''} ${urlStr}`.toLowerCase();
+        let val = '';
+        if (el.tagName === 'TEXTAREA') {
+          if (/robot/.test(hint)) {
+            val = 'User-agent: GPTBot\nAllow: /\nUser-agent: ClaudeBot\nAllow: /\nUser-agent: Googlebot\nAllow: /\nSitemap: https://store.example.com/sitemap.xml';
+          } else if (/policy|return|refund|shipping/.test(hint)) {
+            val = 'We offer a 30-day hassle-free return and refund policy on all unused items in original packaging. Free return shipping label provided for US and EU orders. Orders ship within 24–48 business hours.';
+          } else if (/copy|desc|product/.test(hint)) {
+            val = 'Engineered for studio precision: wireless over-ear ANC headphones with 40-hour battery life, custom 45mm titanium drivers, USB-C lossless audio, and a 2-year manufacturer warranty.';
+          } else {
+            val = 'https://store.example.com/products/studio-anc-headphones?utm_source=google&utm_medium=organic';
+          }
+        } else if (/price|cost|amount/.test(hint)) {
+          val = '189.00';
+        } else if (/sku|mpn/.test(hint)) {
+          val = 'ANC-PRO-2026';
+        } else if (/gtin|upc|ean|barcode/.test(hint)) {
+          val = '00842776109422';
+        } else if (/brand|vendor/.test(hint)) {
+          val = 'AudioCraft Labs';
+        } else if (/currency/.test(hint)) {
+          val = 'USD';
+        } else if (/url|link|domain|site/.test(hint)) {
+          val = 'https://store.example.com/products/studio-anc-headphones?fbclid=IwAR12345';
+        } else if (/name|title/.test(hint)) {
+          val = 'Studio ANC Wireless Headphones Pro';
+        } else {
+          val = 'Ecommerce Product Catalog Audit 2026';
+        }
+        try {
+          setNativeValue(el, val);
+          filledCount++;
+        } catch {}
+      }
+
+      const checkboxes = Array.from(document.querySelectorAll('main input[type="checkbox"], .checklist input[type="checkbox"]'));
+      let checkedCount = 0;
+      for (const cb of checkboxes.slice(0, 4)) {
+        const r = cb.getBoundingClientRect();
+        if (r.width >= 10 && r.height >= 10 && !cb.checked) {
+          try { cb.click(); checkedCount++; } catch {}
+        }
+      }
+
+      const btns = Array.from(document.querySelectorAll('#lc-clean, #pf-build, #pe-gen, main button, article button, form button[type="submit"], .tool-btn'));
+      let clickedLabel = '';
+      for (const b of btns) {
+        if (b.hasAttribute('data-analytics-allow') || b.hasAttribute('data-analytics-decline') || b.disabled) continue;
+        const txt = (b.innerText || b.value || '').trim();
+        if (/^(reset|clear|נקה|איפוס)$/i.test(txt)) continue;
+        const r = b.getBoundingClientRect();
+        if (r.width >= 24 && r.height >= 18) {
+          try {
+            b.click();
+            clickedLabel = txt.slice(0, 32) || b.id || 'button';
+            break;
+          } catch {}
+        }
+      }
+      return { filledCount, checkedCount, clickedLabel };
+    }, currentUrl).catch(() => ({ filledCount: 0, checkedCount: 0, clickedLabel: '' }));
+
+    if (!toolResult.filledCount && !toolResult.checkedCount && !toolResult.clickedLabel) {
+      return 'הפעלת כלי: לא נמצאו שדות כלי אינטראקטיביים בעמוד הנוכחי';
+    }
+    await sleep(650 + Math.round(Math.random() * 550));
+    const copiedOutput = await page.evaluate(() => {
+      const copyBtns = Array.from(document.querySelectorAll('#lc-copy, [data-copy], button.copy-btn, button'));
+      for (const b of copyBtns) {
+        if (b.disabled) continue;
+        const txt = (b.innerText || b.getAttribute('aria-label') || '').trim();
+        if (/copy|העתק/i.test(txt)) {
+          const r = b.getBoundingClientRect();
+          if (r.width >= 20 && r.height >= 14) {
+            try { b.click(); return txt.slice(0, 28); } catch {}
+          }
+        }
+      }
+      return '';
+    }).catch(() => '');
+    return `הופעל כלי אינטראקטיבי בעמוד (${toolResult.filledCount} שדות הוזנו${toolResult.checkedCount ? `, ${toolResult.checkedCount} תיבות סומנו` : ''}${toolResult.clickedLabel ? `, נלחץ "${toolResult.clickedLabel}"` : ''}${copiedOutput ? `, הועתקה תוצאה ("${copiedOutput}")` : ''})`;
   },
 
   async scroll_to(page, step) {
@@ -1593,6 +1769,7 @@ async function executeTaskSteps({
   geoInfo = null,
   identityInfo = null,
   avoidEngines = [],
+  lifecycle = null,
 }) {
   registerStepSecrets(steps);
   const parsedSnippet = parseSnippet(snippet);
@@ -1611,6 +1788,7 @@ async function executeTaskSteps({
     visitIndex,
     geo: geoInfo || null,
     identity: identityInfo || null,
+    lifecycle: lifecycle || null,
     serpUrl: '',
     searchQuery: '',
     searchEngine: '',
@@ -1849,7 +2027,7 @@ async function executeTaskSteps({
         }
       }
 
-      if (['goto', 'click', 'go_back', 'close_tab', 'fill', 'fill_email', 'fill_otp', 'select', 'hover', 'scroll', 'scroll_to', 'read_article', 'human_browse', 'scan_products', 'ai_explore', 'search_entry', 'ai_form_guard', 'ai_route_repair', 'dismiss_overlays', 'audit_ads', 'screenshot'].includes(step.type)) {
+      if (['goto', 'click', 'go_back', 'close_tab', 'fill', 'fill_email', 'fill_otp', 'select', 'hover', 'scroll', 'scroll_to', 'read_article', 'human_browse', 'use_tool', 'scan_products', 'ai_explore', 'search_entry', 'ai_form_guard', 'ai_route_repair', 'dismiss_overlays', 'audit_ads', 'screenshot'].includes(step.type)) {
         const framePage = ctx.tabs.get(ctx.activeTabId) && !ctx.tabs.get(ctx.activeTabId).isClosed()
           ? ctx.tabs.get(ctx.activeTabId)
           : page;

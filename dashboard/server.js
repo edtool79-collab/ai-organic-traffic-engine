@@ -327,7 +327,7 @@ function validateAndNormalizeConfig(input) {
   const concurrency = clampInt(input.concurrency, 1, maxAllowedConcurrency, 3);
   const minConcurrency = clampInt(input.minConcurrency, 1, concurrency, 1);
   const snippet = (typeof input.snippet === 'string' && input.snippet.trim()) ? input.snippet.trim() : null;
-  const validStepTypes = new Set(['goto', 'click', 'go_back', 'close_tab', 'fill', 'fill_email', 'fill_otp', 'select', 'press', 'hover', 'scroll', 'scroll_to', 'read_article', 'human_browse', 'scan_products', 'ai_explore', 'ai_route_repair', 'ai_form_guard', 'search_entry', 'wait', 'dismiss_overlays', 'audit_ads', 'assert', 'screenshot']);
+  const validStepTypes = new Set(['goto', 'click', 'go_back', 'close_tab', 'fill', 'fill_email', 'fill_otp', 'select', 'press', 'hover', 'scroll', 'scroll_to', 'read_article', 'human_browse', 'use_tool', 'scan_products', 'ai_explore', 'ai_route_repair', 'ai_form_guard', 'search_entry', 'wait', 'dismiss_overlays', 'audit_ads', 'assert', 'screenshot']);
   const taskSteps = Array.isArray(input.taskSteps)
     ? input.taskSteps
         .filter(s => s && typeof s === 'object' && validStepTypes.has(s.type))
@@ -590,6 +590,9 @@ let runState = {
   errorsTotal: 0,
   returningSessions: 0,
   newSessions: 0,
+  ga4VerifiedVisits: 0,
+  ga4EventsFired: 0,
+  lastGa4Source: '',
   avgLoadMs: null,
   currentConcurrency: 0,
   desiredConcurrency: 0,
@@ -665,6 +668,9 @@ function resetRunStats(cfg) {
     aiSavedTokens: 0,
     returningSessions: 0,
     newSessions: 0,
+    ga4VerifiedVisits: 0,
+    ga4EventsFired: 0,
+    lastGa4Source: '',
     avgLoadMs: null,
     currentConcurrency: 0,
     desiredConcurrency: cfg.minConcurrency || 1,
@@ -2330,6 +2336,204 @@ app.post('/api/ai/onboard-site', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: err.message || 'התאמת האתר האוטומטית נכשלה.' });
+  }
+});
+
+// Upgrade 7: Competitor & Target Funnel Intelligence Cloner
+app.post('/api/ai/clone-funnel', async (req, res) => {
+  try {
+    const cfg = readConfigFromDisk();
+    const rawUrl = typeof req.body?.targetUrl === 'string' && req.body.targetUrl.trim()
+      ? req.body.targetUrl.trim()
+      : cfg.targetUrl;
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(rawUrl);
+    } catch {
+      return res.status(400).json({ error: 'כתובת ה-URL לניתוח ושיבוט אינה תקינה.' });
+    }
+    const baseOrigin = parsedUrl.origin;
+    let html = '';
+    let rootStatus = 0;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 9000);
+    try {
+      const resp = await fetch(parsedUrl.toString(), { signal: ctrl.signal, redirect: 'follow' });
+      rootStatus = resp.status;
+      html = await resp.text();
+    } finally {
+      clearTimeout(timer);
+    }
+
+    const detectedPixels = [];
+    if (/googletagmanager\.com\/gtag\/js|G-[A-Z0-9]{6,12}|google-analytics\.com/i.test(html)) detectedPixels.push('Google Analytics 4 (GA4)');
+    if (/googletagmanager\.com\/gtm\.js|GTM-[A-Z0-9]{4,10}/i.test(html)) detectedPixels.push('Google Tag Manager (GTM)');
+    if (/googlesyndication\.com|adsbygoogle/i.test(html)) detectedPixels.push('Google AdSense');
+    if (/connect\.facebook\.net|fbq\s*\(/i.test(html)) detectedPixels.push('Meta / Facebook Pixel');
+    if (/analytics\.tiktok\.com|ttq\./i.test(html)) detectedPixels.push('TikTok Pixel');
+    if (/clarity\.ms\/tag/i.test(html)) detectedPixels.push('Microsoft Clarity Heatmap');
+    if (/static\.hotjar\.com/i.test(html)) detectedPixels.push('Hotjar Session Recording');
+    if (/plausible\.io|posthog\.com/i.test(html)) detectedPixels.push('Plausible / PostHog Analytics');
+    if (/challenges\.cloudflare\.com|turnstile/i.test(html)) detectedPixels.push('Cloudflare Turnstile / WAF');
+
+    const titleM = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    const siteTitle = titleM && titleM[1]
+      ? titleM[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 90)
+      : parsedUrl.hostname;
+
+    const internalPages = new Set(['/']);
+    const toolPages = [];
+    const guidePages = [];
+    const outboundDomains = new Set();
+    const hrefRegex = /href\s*=\s*["']([^"'#]+)["']/gi;
+    let m;
+    while ((m = hrefRegex.exec(html)) !== null) {
+      try {
+        const u = new URL(m[1], parsedUrl.toString());
+        if (/\.(css|js|png|jpg|jpeg|svg|webp|ico|woff2?|xml|json|pdf)$/i.test(u.pathname)) continue;
+        if (u.origin === baseOrigin) {
+          const rel = u.pathname || '/';
+          internalPages.add(rel);
+          if (/\/(tool|tools|app|calculator|checker|generator|schema|audit|worksheet|product)/i.test(rel) && !toolPages.includes(rel)) {
+            toolPages.push(rel);
+          } else if (/\/(guide|guides|blog|article|docs|post|learn)/i.test(rel) && !guidePages.includes(rel)) {
+            guidePages.push(rel);
+          }
+        } else if (/^https?:$/i.test(u.protocol)) {
+          outboundDomains.add(u.hostname);
+        }
+      } catch {}
+    }
+
+    const formsCount = (html.match(/<form\b/gi) || []).length;
+    const inputsCount = (html.match(/<(input|textarea|select)\b/gi) || []).length;
+    const buttonsCount = (html.match(/<button\b/gi) || []).length;
+
+    const primaryTool = toolPages[0] || [...internalPages][1] || '/';
+    const secondaryTool = toolPages[1] || guidePages[0] || [...internalPages][2] || '/';
+    const primaryGuide = guidePages[0] || [...internalPages][1] || '/';
+
+    const clonedSteps = [
+      { type: 'goto', selector: '', value: '/', referer: 'google', assertKind: 'text_contains', label: `כניסה אורגנית לדף הנחיתה (${parsedUrl.hostname})` },
+      { type: 'scroll', selector: '', value: '55', assertKind: 'text_contains', label: 'סריקה ויזואלית של אזור ה-Hero והכפתורים' },
+      ...(primaryTool !== '/' ? [
+        { type: 'click', selector: `a[href="${primaryTool}"]`, value: '', assertKind: 'text_contains', label: `מעבר לכלי/משפך מרכזי (${primaryTool})` },
+      ] : []),
+      { type: 'use_tool', selector: '', value: '1', assertKind: 'text_contains', label: 'הזנת נתונים חכמה והפעלת הכלי/המחשבון בעמוד' },
+      { type: 'ai_explore', selector: '', value: '2', assertKind: 'text_contains', label: 'אינטראקציה אוטונומית של מוח ה-AI עם תוצאות הכלי' },
+      { type: 'human_browse', selector: '', value: '5000', assertKind: 'text_contains', label: 'קריאה ביומטרית, תנועות עכבר על שורות הטקסט וסימון משפט' },
+      ...(primaryGuide !== '/' && primaryGuide !== primaryTool ? [
+        { type: 'goto', selector: '', value: primaryGuide, assertKind: 'text_contains', label: `מעבר למדריך תוכן (${primaryGuide})` },
+        { type: 'read_article', selector: '', value: '7000', assertKind: 'text_contains', label: 'קריאת מאמר מדורגת להעמקת זמן שהייה ב-GA4' },
+      ] : []),
+      ...(secondaryTool !== '/' && secondaryTool !== primaryTool && secondaryTool !== primaryGuide ? [
+        { type: 'goto', selector: '', value: secondaryTool, assertKind: 'text_contains', label: `בדיקת כלי שני במשפך (${secondaryTool})` },
+        { type: 'use_tool', selector: '', value: '1', assertKind: 'text_contains', label: 'הפעלת כלי שני במשפך' },
+      ] : []),
+    ];
+
+    const reportHe = [
+      `🕵️ **דוח מודיעין ושיבוט משפך עבור ${siteTitle} (${parsedUrl.origin}):**`,
+      `• **פיקסלים ומערכות ניטור שזוהו (${detectedPixels.length}):** ${detectedPixels.length ? detectedPixels.join(' | ') : 'לא זוהו פיקסלים חיצוניים גלויים ב-HTML הראשי'}`,
+      `• **מבנה עמודים ומשפך:** ${internalPages.size} עמודים פנימיים (${toolPages.length} עמודי כלים/אפליקציות, ${guidePages.length} מדריכים/מאמרים, ${outboundDomains.size} דומיינים חיצוניים).`,
+      `• **רכיבי אינטראקציה בדף הבית:** ${formsCount} טפסים, ${inputsCount} שדות קלט, ${buttonsCount} כפתורים.`,
+      `• **תסריט משובט (${clonedSteps.length} צעדים):** נבנה ושויך אוטומטית (כולל כניסה אורגנית, הפעלת כלים חכמה \`use_tool\`, קריאה ביומטרית ומוח AI)!`,
+    ].join('\n');
+
+    let updatedConfig = cfg;
+    if (req.body?.applyToConfig !== false) {
+      updatedConfig = validateAndNormalizeConfig({
+        ...cfg,
+        targetUrl: parsedUrl.toString().replace(/\/$/, ''),
+        pages: [...internalPages].slice(0, 25),
+        taskMode: 'hybrid',
+        referrerMode: 'mixed',
+        taskSteps: clonedSteps,
+      });
+      writeConfigToDisk(updatedConfig);
+      if (activeProcess) {
+        try { activeProcess.send({ type: 'update_runtime_config', config: updatedConfig }); } catch {}
+      }
+      broadcastEvent('config_updated', { config: updatedConfig });
+    }
+
+    res.json({
+      ok: true,
+      rootStatus,
+      siteTitle,
+      detectedPixels,
+      funnelStats: {
+        internalPagesCount: internalPages.size,
+        toolPages,
+        guidePages,
+        formsCount,
+        inputsCount,
+        buttonsCount,
+        outboundDomains: [...outboundDomains].slice(0, 10),
+      },
+      clonedSteps,
+      reportHe,
+      config: updatedConfig,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'ניתוח ושיבוט המשפך נכשל.' });
+  }
+});
+
+// Upgrade 6: Distributed Cloud / Remote Worker Swarm Dispatcher
+app.post('/api/swarm/dispatch', async (req, res) => {
+  try {
+    const cfg = readConfigFromDisk();
+    const rawNodes = Array.isArray(req.body?.nodes) ? req.body.nodes : [];
+    const nodes = rawNodes
+      .map(n => (typeof n === 'string' ? n.trim() : String(n?.url || '').trim()))
+      .filter(u => /^https?:\/\//i.test(u))
+      .map(u => u.replace(/\/+$/, ''));
+    if (!nodes.length) {
+      return res.status(400).json({ error: 'הזן לפחות כתובת שרת Worker מרוחק אחד (למשל http://vps-ip:4310).' });
+    }
+    const totalVisits = Math.max(1, parseInt(String(req.body?.totalVisits || cfg.visitCount || 1000), 10) || 1000);
+    const includeLocal = req.body?.includeLocal !== false;
+    const totalWorkers = nodes.length + (includeLocal ? 1 : 0);
+    const visitsPerWorker = Math.max(1, Math.ceil(totalVisits / totalWorkers));
+
+    const nodeResults = await Promise.all(nodes.map(async (nodeUrl) => {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 6000);
+      try {
+        const workerCfg = { ...cfg, visitCount: visitsPerWorker };
+        const putResp = await fetch(`${nodeUrl}/api/config`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(workerCfg),
+          signal: ctrl.signal,
+        });
+        if (!putResp.ok) throw new Error(`PUT /api/config HTTP ${putResp.status}`);
+        const startResp = await fetch(`${nodeUrl}/api/run/start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ streamMode: Boolean(req.body?.streamMode) }),
+          signal: ctrl.signal,
+        });
+        const startData = await startResp.json().catch(() => ({}));
+        return { url: nodeUrl, ok: startResp.ok, visitsAssigned: visitsPerWorker, status: startData.status?.status || 'dispatched' };
+      } catch (err) {
+        return { url: nodeUrl, ok: false, visitsAssigned: 0, error: err.message || 'Unreachable' };
+      } finally {
+        clearTimeout(timer);
+      }
+    }));
+
+    res.json({
+      ok: true,
+      totalVisits,
+      visitsPerWorker,
+      dispatchedNodes: nodeResults.filter(n => n.ok).length,
+      totalNodes: nodes.length,
+      nodeResults,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'שיגור הנחיל המבוזר נכשל.' });
   }
 });
 

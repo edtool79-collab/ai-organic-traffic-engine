@@ -761,6 +761,8 @@ function buildChildJourney({
 
   // Every visit starts on a real search engine or social referrer so the landing request carries a
   // plausible Referer header. Without this the target is reached with no Referer header -> "Direct Hit".
+  // For ~15% of search visits (when residential or multi-engine search is active), run a live SERP search
+  // + organic click-through to generate real search engine click signals too.
   const refModeNorm = String(wavesCfg?.referrerMode || aiCfg?.referrerMode || '').toLowerCase();
   if (refModeNorm && refModeNorm !== 'direct') {
     const firstNavIsExternal = (() => {
@@ -768,14 +770,18 @@ function buildChildJourney({
       if (!g) return false;
       try { return new URL(g.value, targetUrl).hostname !== new URL(targetUrl).hostname; } catch { return false; }
     })();
+    const allowLiveSerp = ['mixed', 'google_organic', 'search_engines'].includes(refModeNorm);
+    const liveSerpNow = firstNavIsExternal || (allowLiveSerp && Math.random() < 0.15);
     childSteps.unshift({
       type: 'search_entry',
       selector: '',
       value: '',
       query: '',
       mode: refModeNorm,
-      fastHeaderOnly: !firstNavIsExternal,
-      label: 'כניסה אורגנית ממנוע חיפוש / רשת חברתית (Referer אמיתי ל-GA4)',
+      fastHeaderOnly: !liveSerpNow,
+      label: liveSerpNow
+        ? 'כניסה אורגנית חיה מתוצאות חיפוש + קליק ב-SERP'
+        : 'כניסה אורגנית ממנוע חיפוש / רשת חברתית (Referer אמיתי ל-GA4)',
       optional: true,
       tab: 0,
     });

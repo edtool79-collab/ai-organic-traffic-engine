@@ -166,6 +166,7 @@
                 <span>בנה גם תסריט צעדים חדש לאתר</span>
               </label>
               <button type="button" class="primary" id="btn-onboard-site">✨ סרוק אתר והתאם הגדרות אוטומטית עם ה-AI</button>
+              <button type="button" class="small" id="btn-clone-funnel" title="מזהה פיקסלים (GA4/Clarity/Meta), ממפה כלים וטפסים ובונה תסריט משובט אוטומטית">🕵️ נתח פיקסלים ושבט משפך אתר</button>
             </div>
             <div id="onboard-ai-result" class="advice-box" style="display:none; white-space:pre-line; line-height:1.55;"></div>
           </div>
@@ -187,6 +188,21 @@
               <button type="button" class="small danger" id="btn-clear-targets">נקה יעדים נוספים</button>
             </div>
             <div id="targets-list" class="pages-list"></div>
+          </div>
+
+          <div class="recorder-box" id="cloud-swarm-box" style="margin-top:12px;">
+            <div class="section-title" style="margin-bottom:8px;">
+              <span>🌐 נחיל ענן מבוזר (Distributed Cloud Swarm) ואימות GA4 בזמן אמת</span>
+              <span class="badge completed" id="ga4-live-verified-badge">📊 אומתו ב-GA4 בזמן אמת: 0 ביקורים (0 אירועים)</span>
+            </div>
+            <p class="hint" style="margin-bottom:8px;">
+              חבר שרתי VPS / מכונות מרוחקות שמריצות את הדאשבורד (<code>http://vps-ip:4310</code>) כדי לפזר אלפי דפדפנים במקביל בלי להעמיס על ה-RAM במחשב שלך. בנוסף, המונה למעלה מאמת בזמן אמת כמה חבילות <code>google-analytics.com/g/collect</code> נשלחו בפועל מהדפדפנים!
+            </p>
+            <div class="inline-row" style="gap:8px; flex-wrap:wrap;">
+              <input id="swarm-nodes-input" type="text" class="ltr" placeholder="http://vps1.example.com:4310, http://vps2.example.com:4310" style="flex:1; min-width:260px;" />
+              <button type="button" class="small primary" id="btn-dispatch-swarm">🌐 שגר נחיל מבוזר לכל השרתים</button>
+            </div>
+            <div id="swarm-dispatch-result" class="advice-box" style="display:none; margin-top:8px;"></div>
           </div>
 
           <hr style="border:0;border-top:1px solid var(--border);margin:18px 0;" />
@@ -325,6 +341,7 @@
               <button type="button" class="small" data-qtype="hover" data-qsel="nav a" data-qval="800" data-qlbl="ריחוף עכבר אנושי על ניווט">+ ריחוף עכבר אנושי (Hover)</button>
               <button type="button" class="small" data-qtype="read_article" data-qsel="" data-qval="8500" data-qlbl="קריאת תוכן אנושית (8.5s)">+ קריאת מאמר אנושית (AdSense Safe)</button>
               <button type="button" class="small" data-qtype="human_browse" data-qsel="" data-qval="7000" data-qlbl="גלישה אנושית חופשית בדף (7s)">+ התנהגות גלישה אנושית בדף (Human Browse)</button>
+              <button type="button" class="small" data-qtype="use_tool" data-qsel="" data-qval="1" data-qlbl="הפעלת כלי/מחשבון אינטראקטיבי בעמוד (Smart Tool Runner)">🛠️ + הפעל כלי אינטראקטיבי (Smart Tool)</button>
               <button type="button" class="small" data-qtype="scan_products" data-qsel="" data-qval="2" data-qlbl="סריקת מוצרים / קישורים אנושית">+ סריקת מוצרים / קישורים</button>
               <button type="button" class="small" data-qtype="ai_explore" data-qsel="" data-qval="2" data-qlbl="גלישה ואינטראקציה חכמה (AI Brain)">+ סוכן AI אוטונומי</button>
               <button type="button" class="small" data-qtype="fill_email" data-qsel="input[type='email'], input[name*='email' i], input[id*='email' i]" data-qval="" data-qlbl="הזנת אימייל סוכן חי (HirePulse Inbox)">📧 + הזן אימייל סוכן חי</button>

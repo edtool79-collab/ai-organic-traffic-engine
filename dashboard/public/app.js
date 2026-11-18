@@ -58,6 +58,7 @@ const STEP_TYPE_META = {
   scroll_to:        { label: 'גלול לאלמנט ללא לחיצה (Scroll To)', selectorHint: 'aside.ad-slot-box[data-ad-position="in_content_mid"]', valueHint: '(ללא צורך בערך)' },
   read_article:     { label: 'קריאת מאמר אנושית (AdSense Safe)', selectorHint: '(אוטומטי — השאר ריק)', valueHint: '8500 (זמן קריאה במילישניות)' },
   human_browse:     { label: 'גלישה אנושית חופשית בדף (Human Browse)', selectorHint: '(אוטומטי — השאר ריק)', valueHint: '7000 (משך גלישה במילישניות)' },
+  use_tool:         { label: '🛠️ הפעלת כלי/מחשבון אינטראקטיבי (Smart Tool)', selectorHint: '(אוטומטי — השאר ריק)', valueHint: '1' },
   scan_products:    { label: 'סריקת מוצרים / קישורים אנושית (Scan Products)', selectorHint: '(אופציונלי — בורר אזור מוצרים)', valueHint: '2 (כמות מוצרים לפתיחה)' },
   search_entry:     { label: 'חיפוש אורגני טרום-כניסה (Search Entry)', selectorHint: '(אוטומטי — השאר ריק)', valueHint: '(אופציונלי — שאילתת חיפוש)' },
   ai_explore:       { label: 'סוכן AI אוטונומי (Ollama Cloud Brain)', selectorHint: '(אוטומטי — השאר ריק)', valueHint: '2 (כמות פעולות AI בדף)' },
@@ -1263,7 +1264,7 @@ function renderProfiles(profiles) {
     return;
   }
   el.textContent = `שמורים בדיסק ${state.profiles.length} פרופילים: ` +
-    state.profiles.map(p => `${p.name} (${p.deviceKey}, ${p.cookiesCount} cookies)`).join(' • ');
+    state.profiles.map(p => `${p.name} (${p.deviceKey}, ${p.cookiesCount} cookies, ביקורים: ${p.visitsCount || 1}${p.lifecycleLabelHe ? ' · ' + p.lifecycleLabelHe : ''})`).join(' • ');
 }
 
 function renderRunStatus(st) {
@@ -1300,6 +1301,13 @@ function renderRunStatus(st) {
   $('kpi-avg-load').textContent = st.avgLoadMs != null ? `${st.avgLoadMs} ms` : '—';
   $('kpi-errors-sub').textContent = `שגיאות JS/קונסולה: ${st.errorsTotal || 0}`;
   $('kpi-sessions').textContent = `${st.returningSessions || 0} / ${st.newSessions || 0}`;
+
+  if ($('ga4-live-verified-badge')) {
+    const gv = Number(st.ga4VerifiedVisits || 0);
+    const ge = Number(st.ga4EventsFired || 0);
+    const srcNote = st.lastGa4Source ? ` • מקור אחרון: ${st.lastGa4Source}` : '';
+    $('ga4-live-verified-badge').textContent = `📊 אומתו ב-GA4 בזמן אמת: ${gv} ביקורים (${ge} אירועים)${srcNote}`;
+  }
 
   $('progress-label').textContent = `התקדמות הרצה: ${pct}%`;
   $('progress-target').textContent = st.targetUrl ? st.targetUrl : '';
@@ -1902,6 +1910,93 @@ function wireActions() {
       } finally {
         btn.disabled = false;
         btn.textContent = '✨ סרוק אתר והתאם הגדרות אוטומטית עם ה-AI';
+      }
+    };
+  }
+
+  if ($('btn-clone-funnel')) {
+    $('btn-clone-funnel').onclick = async () => {
+      collectSimpleFieldsToConfig();
+      const targetUrl = $('targetUrl')?.value.trim() || state.config?.targetUrl;
+      if (!targetUrl) {
+        showToast('הזן קודם כתובת אתר ב-targetUrl.', true);
+        return;
+      }
+      const btn = $('btn-clone-funnel');
+      const resBox = $('onboard-ai-result');
+      btn.disabled = true;
+      btn.textContent = '🕵️ מנתח פיקסלים ומשבט משפך...';
+      if (resBox) {
+        resBox.style.display = 'block';
+        resBox.textContent = 'סורק פיקסלים, כלי אינטראקציה, טפסים ומשפכי תנועה באתר...';
+      }
+      try {
+        const res = await api('/api/ai/clone-funnel', {
+          method: 'POST',
+          body: JSON.stringify({ targetUrl, applyToConfig: true }),
+        });
+        if (res && res.config) {
+          state.config = res.config;
+          syncFormFromConfig();
+          renderJsonPreview();
+        }
+        if (resBox && res.reportHe) {
+          resBox.style.display = 'block';
+          resBox.textContent = res.reportHe;
+        }
+        showToast(`🕵️ משפך האתר שועתק (${(res.clonedSteps || []).length} צעדים, ${(res.detectedPixels || []).length} פיקסלים זוהו)!`);
+      } catch (err) {
+        if (resBox) {
+          resBox.style.display = 'block';
+          resBox.textContent = 'שגיאה בשיבוט המשפך: ' + err.message;
+        }
+        showToast('שיבוט המשפך נכשל: ' + err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🕵️ נתח פיקסלים ושבט משפך אתר';
+      }
+    };
+  }
+
+  if ($('btn-dispatch-swarm')) {
+    $('btn-dispatch-swarm').onclick = async () => {
+      collectSimpleFieldsToConfig();
+      const rawNodes = $('swarm-nodes-input')?.value || '';
+      const nodes = rawNodes.split(/[\s,;]+/).map(s => s.trim()).filter(s => /^https?:\/\//i.test(s));
+      const resBox = $('swarm-dispatch-result');
+      if (!nodes.length) {
+        showToast('הזן לפחות כתובת שרת Worker אחת תקינה (למשל http://vps-ip:4310).', true);
+        return;
+      }
+      const btn = $('btn-dispatch-swarm');
+      btn.disabled = true;
+      btn.textContent = '🌐 משגר לשרתי ה-VPS...';
+      try {
+        const res = await api('/api/swarm/dispatch', {
+          method: 'POST',
+          body: JSON.stringify({
+            nodes,
+            totalVisits: Number($('visitCount')?.value) || state.config?.visitCount || 1000,
+            includeLocal: true,
+          }),
+        });
+        const lines = (res.nodeResults || []).map(n =>
+          n.ok ? `✅ ${n.url} — ${n.visitsAssigned} ביקורים שוגרו (${n.status})` : `❌ ${n.url} — ${n.error}`
+        );
+        if (resBox) {
+          resBox.style.display = 'block';
+          resBox.textContent = `שוגר נחיל מבוזר (${res.dispatchedNodes}/${res.totalNodes} שרתים זמינים | ${res.visitsPerWorker} ביקורים לכל שרת):\n` + lines.join('\n');
+        }
+        showToast(`🌐 נשלחו משימות ל-${res.dispatchedNodes}/${res.totalNodes} שרתי נחיל!`);
+      } catch (err) {
+        if (resBox) {
+          resBox.style.display = 'block';
+          resBox.textContent = 'שגיאה בשיגור הנחיל: ' + err.message;
+        }
+        showToast('שיגור הנחיל נכשל: ' + err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🌐 שגר נחיל מבוזר לכל השרתים';
       }
     };
   }
