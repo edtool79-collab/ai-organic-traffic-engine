@@ -1706,6 +1706,14 @@ function deepMergeConfigPatch(target, patch, depth = 0) {
       target[k] = v;
     }
   }
+  if (depth === 0) {
+    if (typeof patch.referrerMode === 'string') {
+      if (!target.waves || typeof target.waves !== 'object') target.waves = {};
+      target.waves.referrerMode = patch.referrerMode;
+    } else if (typeof patch.waves?.referrerMode === 'string') {
+      target.referrerMode = patch.waves.referrerMode;
+    }
+  }
   return target;
 }
 
