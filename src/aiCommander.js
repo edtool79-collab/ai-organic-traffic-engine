@@ -1344,7 +1344,7 @@ async function askFleetCommander({
   history = [],
   model,
   provider,
-  maxTokens = 1800,
+  maxTokens = 2800,
   isAutoCheck = false,
 } = {}) {
   registerStepSecrets(config.taskSteps);
@@ -1518,12 +1518,31 @@ async function askFleetCommander({
       model: chosenModel,
       messages,
       temperature: 0.3,
-      maxTokens: Number(maxTokens) || 1500,
-      timeoutMs: 22000,
+      maxTokens: Number(maxTokens) || 2800,
+      timeoutMs: 25000,
     });
 
     recordTokenUsage(resp.usage, resp.model);
     const parsedReply = parseCommanderReply(resp.content || '');
+    if (!isAutoCheck && parsedReply.directives.length === 0 && parsedReply.reply) {
+      const combinedText = `${message || ''} ${parsedReply.reply}`;
+      const patch = {};
+      if (/חיפוש אורגני|מקור הגעה|קידום.*בגוגל|google_organic|תנועה אורגנית|יוטיוב|פייסבוק/i.test(combinedText) && config.referrerMode === 'direct') {
+        patch.referrerMode = 'mixed';
+        patch.waves = { ...(config.waves || {}), enabled: true, referrerMode: 'mixed', mode: 'natural_peaks', extraPageChance: 75, scanProductsChance: 85 };
+        if ((config.pageMinMs || 3000) < 4000) patch.pageMinMs = 4500;
+        if ((config.firstPagePriority || 60) > 45) patch.firstPagePriority = 40;
+      }
+      const floorM = String(message || '').match(/(?:אל תוריד.*מתחת ל|רצפה.*היא)\s*-?\s*(\d+)/);
+      if (floorM) {
+        const floorVal = Math.max(1, Math.min(32, parseInt(floorM[1], 10) || 6));
+        patch.minConcurrency = floorVal;
+        patch.concurrency = Math.max(floorVal, Number(config.concurrency) || floorVal);
+      }
+      if (Object.keys(patch).length > 0) {
+        parsedReply.directives.push({ type: 'update_config', patch });
+      }
+    }
 
     return {
       reply: parsedReply.reply || 'Monitoring directive received by AI Fleet Commander.',

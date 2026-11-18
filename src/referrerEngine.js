@@ -56,17 +56,39 @@ const QUERY_PATTERNS = [
 ];
 
 const SOCIAL_REFERRERS = [
-  { host: 'www.youtube.com', path: '/results', q: true, weight: 5 },
-  { host: 'www.youtube.com', path: '/watch', q: false, weight: 3 },
+  { host: 'www.youtube.com', path: '/results', q: true, qParam: 'search_query', weight: 5 },
+  { host: 'www.youtube.com', path: '/watch', q: false, weight: 4 },
+  { host: 'l.facebook.com', path: '/', q: false, weight: 4 },
+  { host: 'www.facebook.com', path: '/search/posts', q: true, weight: 3 },
   { host: 'www.reddit.com', path: '/search', q: true, weight: 4 },
-  { host: 'old.reddit.com', path: '/r/beermoney', q: false, weight: 2 },
-  { host: 'news.ycombinator.com', path: '/item', q: false, weight: 2 },
-  { host: 'www.facebook.com', path: '/search/posts', q: true, weight: 2 },
+  { host: 'old.reddit.com', path: '/r/seo', q: false, weight: 2 },
+  { host: 't.co', path: '/', q: false, weight: 3 },
   { host: 'x.com', path: '/search', q: true, weight: 2 },
+  { host: 'www.linkedin.com', path: '/feed', q: false, weight: 2 },
+  { host: 'l.instagram.com', path: '/', q: false, weight: 2 },
   { host: 'www.pinterest.com', path: '/search/pins', q: true, weight: 2 },
-  { host: 'www.linkedin.com', path: '/feed', q: false, weight: 1 },
+  { host: 'www.tiktok.com', path: '/search', q: true, weight: 2 },
+  { host: 'news.ycombinator.com', path: '/item', q: false, weight: 2 },
   { host: 'www.quora.com', path: '/search', q: true, weight: 1 },
-  { host: 'www.tiktok.com', path: '/search', q: true, weight: 1 },
+];
+
+const SITE_QUERY_PATTERNS = [
+  '{brand} {topic}',
+  'best {topic} online',
+  'free {topic} tool',
+  '{topic} checker guide',
+  'how to audit {topic}',
+  '{brand} tools and guides',
+];
+
+const SITE_TOPICS_BY_HINT = [
+  'ecommerce product schema generator',
+  'ai robots.txt checker',
+  'gtin sku mpn ecommerce guide',
+  'storefront seo visibility audit',
+  'international product pages seo',
+  'merchant policy and copy checker',
+  'search console product indexing guide',
 ];
 
 // Weighted search engine mix. DuckDuckGo and Bing are first in the *flow* because they rarely
@@ -116,6 +138,21 @@ function describeOffer({ title = '', targetUrl = '' } = {}) {
 }
 
 function buildQuery({ title = '', targetUrl = '' } = {}) {
+  const combined = `${title} ${targetUrl}`.toLowerCase();
+  const isRewardOffer = /cash\s*app|cashapp|paypal|amazon|walmart|target|gift\s*card|giveaway|reward/.test(combined);
+  if (!isRewardOffer && targetUrl) {
+    try {
+      const u = new URL(targetUrl);
+      const hostParts = u.hostname.replace(/^www\./i, '').split('.');
+      const domainBrand = hostParts.length >= 2 ? hostParts[hostParts.length - 2] : hostParts[0];
+      const pathWords = u.pathname.replace(/[\/\-_]+/g, ' ').trim();
+      const topic = pathWords.length >= 4
+        ? pathWords
+        : SITE_TOPICS_BY_HINT[Math.floor(Math.random() * SITE_TOPICS_BY_HINT.length)];
+      const tpl = SITE_QUERY_PATTERNS[Math.floor(Math.random() * SITE_QUERY_PATTERNS.length)];
+      return tpl.replace(/\{brand\}/g, domainBrand || 'tools').replace(/\{topic\}/g, topic).replace(/\s+/g, ' ').trim();
+    } catch {}
+  }
   const { brand, amount, reward } = describeOffer({ title, targetUrl });
   const tpl = QUERY_PATTERNS[Math.floor(Math.random() * QUERY_PATTERNS.length)];
   const raw = tpl
@@ -175,7 +212,8 @@ function pickReferrer({ geo = null, title = '', targetUrl = '', mode = 'search_e
 
   if (normalized === 'social') {
     const s = pickWeighted(SOCIAL_REFERRERS);
-    const q = s.q ? `?q=${encodeURIComponent(buildQuery({ title, targetUrl }))}` : '';
+    const paramName = s.qParam || 'q';
+    const q = s.q ? `?${paramName}=${encodeURIComponent(buildQuery({ title, targetUrl }))}` : '';
     return { url: `https://${s.host}${s.path}${q}`, kind: 'social' };
   }
 
@@ -186,19 +224,21 @@ function pickReferrer({ geo = null, title = '', targetUrl = '', mode = 'search_e
       return { url: buildSerpUrl(engine.id, buildQuery({ title, targetUrl }), cc), kind: 'search' };
     }
     const s = pickWeighted(SOCIAL_REFERRERS);
-    const q = s.q ? `?q=${encodeURIComponent(buildQuery({ title, targetUrl }))}` : '';
+    const paramName = s.qParam || 'q';
+    const q = s.q ? `?${paramName}=${encodeURIComponent(buildQuery({ title, targetUrl }))}` : '';
     return { url: `https://${s.host}${s.path}${q}`, kind: 'social' };
   }
 
   // Default: search-dominated mix with a small direct tail, so the source split looks organic.
   const roll = Math.random();
-  if (roll < 0.76) {
+  if (roll < 0.72) {
     const engine = pickSearchEngine();
     return { url: buildSerpUrl(engine.id, buildQuery({ title, targetUrl }), cc), kind: 'search' };
   }
   if (roll < 0.94) {
     const s = pickWeighted(SOCIAL_REFERRERS);
-    const q = s.q ? `?q=${encodeURIComponent(buildQuery({ title, targetUrl }))}` : '';
+    const paramName = s.qParam || 'q';
+    const q = s.q ? `?${paramName}=${encodeURIComponent(buildQuery({ title, targetUrl }))}` : '';
     return { url: `https://${s.host}${s.path}${q}`, kind: 'social' };
   }
   return { url: '', kind: 'direct' };

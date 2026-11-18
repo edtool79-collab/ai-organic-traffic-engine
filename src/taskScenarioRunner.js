@@ -32,7 +32,7 @@ function resolveChatModel(step, ctx, fallback = 'deepseek-v4.1-flash') {
   if (alt && !isDecisionModel(alt)) return alt;
   return fallback;
 }
-const { pickSearchEngine, searchEngineProfile, buildQuery, buildSerpUrl } = require('./referrerEngine');
+const { pickSearchEngine, searchEngineProfile, buildQuery, buildSerpUrl, pickReferrer } = require('./referrerEngine');
 const { redactText, registerSecret, maskEmail, isSecretField, safeStepLabel, registerStepSecrets } = require('./redaction');
 const {
   createEmailInbox,
@@ -578,6 +578,25 @@ const STEP_HANDLERS = {
       targetUrl: ctx.targetUrl,
     });
 
+    if (step.fastHeaderOnly) {
+      const picked = pickReferrer({
+        geo,
+        title: ctx.parsedSnippet?.title || '',
+        targetUrl: ctx.targetUrl,
+        mode: step.mode || 'mixed',
+      });
+      if (picked && picked.url) {
+        ctx.serpUrl = picked.url;
+      } else {
+        ctx.serpUrl = buildSerpUrl(engine.id, query, geo?.countryCode || geo?.cc || 'US');
+      }
+      ctx.searchQuery = query;
+      let sourceHost = engine.id;
+      try { sourceHost = new URL(ctx.serpUrl).hostname.replace(/^www\./i, ''); } catch {}
+      ctx.searchEngine = sourceHost;
+      return `מקור הגעה אורגני/חברתי (${sourceHost}): "${query}" → מפנה אל היעד`;
+    }
+
     let navigated = false;
     try {
       // Short leash: the warm-up is optional. A captcha/slow engine must not eat the visit budget.
@@ -855,9 +874,7 @@ const STEP_HANDLERS = {
     const currentUrl = String(page.url() || '');
     const hasRealCurrentPage = /^https?:\/\//i.test(currentUrl) && !/^about:blank/i.test(currentUrl);
     if (step.referer === 'google') {
-      gotoOpts.referer = (ctx.initialReferer && /google\./i.test(ctx.initialReferer))
-        ? ctx.initialReferer
-        : 'https://www.google.com/';
+      gotoOpts.referer = ctx.serpUrl || ctx.initialReferer || 'https://www.google.com/';
       ctx.initialRefererConsumed = true;
     } else if (step.referer === 'serp' && ctx.serpUrl) {
       gotoOpts.referer = ctx.serpUrl;
