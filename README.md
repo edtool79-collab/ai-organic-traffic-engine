@@ -1,6 +1,6 @@
 <div align="center">
   <img src="docs/img/logo.png" alt="Traffic Engine Logo" width="88" />
-  <h1>Traffic Engine — Automated Web Traffic &amp; Organic Search Simulator</h1>
+  <h1>Traffic Engine AI — Autonomous Organic Web Traffic, Geo Proxy &amp; Conversion Studio</h1>
   <p>
     <strong>Self-hosted multi-engine Playwright &amp; Crawlee traffic engine with real-time live browser preview, organic search &amp; social referrers, geo-targeted proxies, and AI fleet orchestration</strong><br/>
     Local Express Dashboard (<code>http://127.0.0.1:4310</code>) &bull; Watch Every Session Live (<code>rrweb</code> + Screenshots) &bull; Organic Search &amp; Social Traffic &bull; 19-Country Proxy Routing &bull; Live-Inbox Signups &amp; Conversions
