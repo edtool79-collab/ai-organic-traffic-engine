@@ -133,7 +133,10 @@ function readDatacenterList() {
 
 function resolveProxies(cfg) {
   if (!cfg.proxy?.enabled) return [];
-  if (isLoopbackUrl(cfg.targetUrl)) {
+  const effectiveTargetUrls = Array.isArray(cfg.targets) && cfg.targets.filter(t => t && t.url).length
+    ? cfg.targets.filter(t => t && t.url).map(t => String(t.url))
+    : [cfg.targetUrl];
+  if (effectiveTargetUrls.every(isLoopbackUrl)) {
     console.log(`[Proxy] יעד מקומי (${cfg.targetUrl}) אינו עובר דרך Proxy מרוחק — מדלג על רוטציית פרוקסי לריצה זו.`);
     return [];
   }
@@ -563,6 +566,7 @@ async function run() {
     workerPct: Number(cfg.ai?.workerPct ?? 0),
     commanderDirective: cfg.ai?.commanderDirective || '',
     allSquadsModel: String(cfg.ai?.allSquadsModel || '').trim(),
+    recoveryModel: String(cfg.ai?.recoveryModel || '').trim(),
     formAssist: cfg.ai?.formAssist !== false,
     routeRepair: cfg.ai?.routeRepair !== false,
   };
@@ -739,7 +743,8 @@ async function run() {
   }
   // Per-offer proxy memory: a proxy blocked on one offer keeps its turn on the others, and only
   // the (proxy, offer) pair that actually got blocked is cooled down for a while.
-  const offerDomain = proxyScore.hostOf(targetUrl);
+  const primaryExternalTarget = targets.find(t => !isLoopbackUrl(t.url));
+  const offerDomain = proxyScore.hostOf(primaryExternalTarget ? primaryExternalTarget.url : targetUrl);
   if (proxyUrls.length > 1 && offerDomain) {
     const ranked = proxyScore.rankProxies(proxyUrls, offerDomain);
     proxyUrls = ranked.ordered;
@@ -964,6 +969,13 @@ async function run() {
 
   // ── Mode A: Crawlee AutoscaledPool + Multi-Engine + FingerprintSuite + Persistent Contexts ──
   if (engineMode === 'crawlee_autoscaled') {
+    plan.forEach(targetIdx => {
+      const t = targets[targetIdx] || targets[0];
+      bumpTargetStat(stats, t.url, 'planned');
+    });
+    if (isMultiTarget) {
+      targets.forEach(t => console.log(`[Targets] ${t.url} — ${t.visitCount} ביקורים | עמודים: ${t.pages.join(', ')}`));
+    }
     let nextVisitIndex = 0;
     let inFlight = 0;
     let nextSlotStartAt = 0;
@@ -998,11 +1010,20 @@ async function run() {
         const i = nextVisitIndex++;
         inFlight++;
 
+        const targetIdx = plan[i] ?? 0;
+        const target = targets[targetIdx] || targets[0];
+        const visitTargetUrl = target.url;
+        const visitPages = normalizePages(target.pages);
+        const targetOfferDomain = proxyScore.hostOf(visitTargetUrl) || offerDomain;
+        const visitCfgVars = isMultiTarget
+          ? { ...cfgVars, targetUrl: visitTargetUrl, pages: visitPages }
+          : cfgVars;
         const persona = randomChoice(personas);
         let retried = false;
         while (true) {
+        const visitIsLoopback = isLoopbackUrl(visitTargetUrl);
         let selectedProxyUrl = null;
-        if (proxyConfiguration) {
+        if (proxyConfiguration && !visitIsLoopback) {
           selectedProxyUrl = proxyMode === 'random'
             ? randomChoice(proxyUrls)
             : await proxyConfiguration.newUrl(retried ? `visit-${i}-retry2` : `visit-${i}`);
@@ -1014,7 +1035,7 @@ async function run() {
         const referrerPick = pickReferrer({
           geo,
           title: typeof snippet === 'string' ? snippet.slice(0, 120) : '',
-          targetUrl,
+          targetUrl: visitTargetUrl,
           mode: referrerMode,
         });
         const referrer = referrerPick.url;
@@ -1025,6 +1046,7 @@ async function run() {
           ...sessionCfg,
           countryCode: geo?.countryCode || null,
           locale: geo?.locale || null,
+          prefix: isMultiTarget ? `t${targetIdx}_` : '',
         });
 
         let sessionHandle = null;
@@ -1061,13 +1083,13 @@ async function run() {
           const precomputedChildPlan = (taskMode === 'scenario' || taskMode === 'hybrid') && taskSteps.length > 0
             ? buildChildJourney({
                 baseSteps: taskSteps,
-                pages,
+                pages: visitPages,
                 wavesCfg,
                 visitIndex: i,
                 totalPlanned: visitCount,
                 persona,
                 aiCfg: aiConfig,
-                targetUrl,
+                targetUrl: visitTargetUrl,
                 runtimeState,
               })
             : null;
@@ -1112,7 +1134,7 @@ async function run() {
           });
 
           if (Object.keys(originExtraHeaders).length) {
-            await applyOriginScopedHeaders(sessionHandle.context, targetUrl, originExtraHeaders);
+            await applyOriginScopedHeaders(sessionHandle.context, visitTargetUrl, originExtraHeaders);
           }
           stopPopunderShield = installPopunderShield(
             sessionHandle.context,
@@ -1127,7 +1149,7 @@ async function run() {
 
           const result = await executeVisitWorkload({
             page: sessionHandle.page,
-            cfgVars,
+            cfgVars: visitCfgVars,
             persona,
             visitIndex: i,
             initialReferer: sessionHandle.referrer || referrer,
@@ -1138,6 +1160,7 @@ async function run() {
 
           stats.completed++;
           stats.succeeded++;
+          bumpTargetStat(stats, visitTargetUrl, 'succeeded');
           stats.errorsTotal += result.pageErrors;
           stats.loadTimesMs.push(result.loadMs);
           if (result.loadMs > 3000) stats.slowVisitsCount++;
@@ -1152,7 +1175,7 @@ async function run() {
             if (lastSkip?.label) stats.lastSkippedSelector = String(lastSkip.label).slice(0, 90);
           }
           stats.proxyTransferBytes += sessionTransferBytes;
-          if (residentialActive && sessionTransferBytes > 0) {
+          if (residentialActive && selectedProxyUrl && residentialPool.isResidentialUrl(selectedProxyUrl) && sessionTransferBytes > 0) {
             // Playwright reports body+header bytes per request, which understates what the provider
             // bills (TLS handshakes, retries). Charging a 15% overhead keeps the budget honest.
             const overheadRaw = Number(cfg.proxy?.residential?.overheadFactor);
@@ -1185,7 +1208,7 @@ async function run() {
           const proxyTag = selectedProxyUrl ? `, proxy: ${maskProxyLabel(selectedProxyUrl)}${geoTag}${kbTag}${refTag}` : `${geoTag}${kbTag}${refTag}`;
           logVisitOutcome(i, persona, sessionHandle.deviceLabel, sessionHandle.engine, { ...result, skippedSteps: skippedInVisit.length }, sessionTag, proxyTag, { country: resolvedCountry });
           proxyPool.reportSuccess();
-          proxyScore.reportOutcome({ domain: offerDomain, proxyUrl: selectedProxyUrl, outcome: 'ok' });
+          proxyScore.reportOutcome({ domain: targetOfferDomain, proxyUrl: selectedProxyUrl, outcome: 'ok' });
           if (result?.engineChallenged) {
             const engineDomain = result.engineChallenged === 'google' ? 'google.com' : `${result.engineChallenged}.com`;
             proxyScore.reportOutcome({
@@ -1211,15 +1234,15 @@ async function run() {
               inFlight++;
               continue;
             }
-            if (sessionSlot && !sessionHandle) releaseProfileSlot(sessionSlot);
             const visitOutcome = classifyVisitFailure(errMsg);
             proxyScore.reportOutcome({
-              domain: offerDomain,
+              domain: targetOfferDomain,
               proxyUrl: selectedProxyUrl,
               outcome: visitOutcome,
               note: errMsg.slice(0, 90),
             });
             logVisitFailure(i, persona, err, stats);
+            bumpTargetStat(stats, visitTargetUrl, 'failed');
             proxyPool.reportFailure(err);
           } finally {
             totalTransferBytes += sessionTransferBytes;
@@ -1227,6 +1250,7 @@ async function run() {
             if (stopPopunderShield) stopPopunderShield();
             if (sessionHandle?.page && onRespSize) sessionHandle.page.off('requestfinished', onRespSize);
             if (sessionHandle) await sessionHandle.close().catch(() => {});
+            else if (sessionSlot) releaseProfileSlot(sessionSlot);
             inFlight--;
             emitTelemetry(pool.systemStatus?.getCurrentStatus?.());
           }

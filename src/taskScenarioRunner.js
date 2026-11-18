@@ -674,16 +674,21 @@ const STEP_HANDLERS = {
         el.dispatchEvent(new Event('change', { bubbles: true }));
         el.dispatchEvent(new Event('blur', { bubbles: true }));
       };
-      const pick = (hint) => {
+      const pick = (el, hint) => {
         const h = String(hint || '').toLowerCase();
-        if (/first/.test(h)) return id.first;
-        if (/last|surname/.test(h)) return id.last;
-        if (/mail/.test(h)) return id.email;
-        if (/address|street/.test(h)) return id.street;
-        if (/city|town/.test(h)) return id.city;
-        if (/zip|postal/.test(h)) return id.zip;
-        if (/state|province/.test(h)) return id.state;
-        if (/phone|tel|mobile/.test(h)) return id.phone;
+        // Never map a free-text <textarea> (e.g. "Tell us more") to phone/name unless explicitly named address.
+        if (el.tagName === 'TEXTAREA' && !/\b(address|street)\b/i.test(`${el.id || ''} ${el.name || ''}`)) {
+          return '';
+        }
+        const elType = String(el.getAttribute('type') || '').toLowerCase();
+        if (/\b(first|fname)\b|first[_-]?name/.test(h)) return id.first;
+        if (/\b(last|lname|surname)\b|last[_-]?name/.test(h)) return id.last;
+        if (elType === 'email' || /\b(e?mail)\b/.test(h)) return id.email;
+        if (/\b(address|street)\b|street[_-]?address/.test(h)) return id.street;
+        if (/\b(city|town)\b/.test(h)) return id.city;
+        if (/\b(zip|postal|postcode)\b/.test(h)) return id.zip;
+        if (/\b(state|province|region)\b/.test(h)) return id.state;
+        if (elType === 'tel' || /\b(phone|tel|telephone|mobile|cell)\b/.test(h)) return id.phone;
         return '';
       };
       const out = [];
@@ -698,7 +703,7 @@ const STEP_HANDLERS = {
         const current = String(el.value || '').trim();
         if (current && !/^(select|choose|-{0,2}select.{0,6}-{0,2})$/i.test(current)) continue;
         const hint = `${el.id || ''} ${el.getAttribute('name') || ''} ${el.getAttribute('placeholder') || ''} ${el.getAttribute('aria-label') || ''}`;
-        const value = pick(hint);
+        const value = pick(el, hint);
         if (!value) { out.push({ selector: el.id ? `#${el.id}` : '', hint: hint.trim().slice(0, 40), filled: '' }); continue; }
         try {
           setVal(el, value);
@@ -721,15 +726,14 @@ const STEP_HANDLERS = {
 
     const filledNow = filled.filter(f => f.filled);
     const unknown = filled.filter(f => !f.filled && f.selector);
-    if (process.env.TRAFFIC_DEBUG_GUARD) {
-      console.error(`[guard] url=${page.url()} fields=${filled.length} filled=${filledNow.length} unknown=${unknown.length} model=${resolveChatModel(step, ctx)}`);
-    }
 
     // Only spend an API call when the deterministic pass could not map a field.
     let aiNote = '';
     if (unknown.length && ctx.aiConfig?.enabled !== false) {
       try {
         const dom = await captureCompactDomForAi(page, Boolean(ctx.avoidAdClicks), { sameOriginOnly: false });
+        const filledSelectors = new Set(filledNow.map(f => f.selector).filter(Boolean));
+        const unmappedInputs = (dom.inputs || []).filter(i => !filledSelectors.has(i.selector));
         const res = await callAiChat({
           provider: ctx.aiConfig?.provider || 'auto',
           role: 'worker',
@@ -738,10 +742,10 @@ const STEP_HANDLERS = {
           maxTokens: 160,
           timeoutMs: 20000,
           messages: [
-            { role: 'system', content: 'You complete signup forms. Reply ONLY JSON: {"fills":[{"selector":"#id","value":"..."}]}' },
+            { role: 'system', content: 'You complete signup forms. Fill ONLY the listed unmapped fields. Reply ONLY JSON: {"fills":[{"selector":"#id","value":"..."}]}' },
             {
               role: 'user',
-              content: `Unmapped fields: ${unknown.map(u => u.hint).join(' | ').slice(0, 300)}\nInputs: ${JSON.stringify(dom.inputs).slice(0, 700)}\nIdentity: ${JSON.stringify({ first: identity.first, last: identity.last, email: emailValue, street: identity.street, city: identity.city, state: identity.state, zip: identity.zip, phone: identity.phone })}`,
+              content: `Unmapped fields: ${unknown.map(u => u.hint).join(' | ').slice(0, 300)}\nInputs: ${JSON.stringify(unmappedInputs.length ? unmappedInputs : dom.inputs).slice(0, 700)}\nIdentity: ${JSON.stringify({ first: identity.first, last: identity.last, email: emailValue, street: identity.street, city: identity.city, state: identity.state, zip: identity.zip, phone: identity.phone })}`,
             },
           ],
         });
@@ -749,15 +753,20 @@ const STEP_HANDLERS = {
         const match = String(text).match(/\{[\s\S]*\}/);
         if (match) {
           const parsed = JSON.parse(match[0]);
+          let appliedAi = 0;
           for (const f of (parsed.fills || []).slice(0, 6)) {
             if (!f || !f.selector || f.value == null) continue;
-            const loc = page.locator(String(f.selector)).first();
+            const sel = String(f.selector);
+            if (filledSelectors.has(sel)) continue;
+            const loc = page.locator(sel).first();
             if ((await loc.count().catch(() => 0)) > 0) {
               await loc.fill(String(f.value)).catch(() => {});
-              filledNow.push({ selector: String(f.selector), filled: String(f.value) });
+              filledSelectors.add(sel);
+              filledNow.push({ selector: sel, filled: String(f.value) });
+              appliedAi += 1;
             }
           }
-          if ((parsed.fills || []).length) aiNote = ` + ${parsed.fills.length} שדות שהושלמו ע"י AI`;
+          if (appliedAi) aiNote = ` + ${appliedAi} שדות שהושלמו ע"י AI`;
         }
       } catch (err) {
         aiNote = ` (AI Form Guard לא זמין: ${String(err?.message || err).slice(0, 60)})`;

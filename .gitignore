@@ -49,3 +49,4 @@ data/proxy-scores.json
 data/recorder-storage-state.json
 data/proxies-datacenter.json
 data/proxy-geo.json
+data/ai-models.json

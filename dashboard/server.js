@@ -113,6 +113,13 @@ const DEFAULT_CONFIG = {
     fallbackToAnyIfEmpty: true,
     preferredCountries: ['US', 'GB', 'CA', 'AU', 'DE'],
     servers: [],
+    fallbackServers: [],
+    residential: {
+      enabled: false,
+      byteBudgetMb: 800,
+      country: '',
+      overheadFactor: 1.15,
+    },
   },
   browserEngine: 'chromium',
   stealthMode: 'maximum',
@@ -137,6 +144,7 @@ const DEFAULT_CONFIG = {
     workerModel: 'deepseek-v4.1-flash',
     workerPct: 0,
     allSquadsModel: '',
+    recoveryModel: '',
     formAssist: true,
     routeRepair: true,
     commanderDirective: '',
@@ -152,6 +160,13 @@ const DEFAULT_CONFIG = {
     closePopunders: true,
     skipTelemetryHeader: false,
   },
+  targets: [],
+  attribution: {
+    lockerDwellMs: 9500,
+    closeSettleMs: 2800,
+  },
+  emailSweepPasses: 4,
+  emailSweepDelayMs: 30000,
 };
 
 const { TIER1_DEFAULT_COUNTRIES, COUNTRY_CATALOG, normalizeCountryCode } = require('../src/proxyManager');
@@ -213,6 +228,42 @@ function normalizeHourStr(val, fallback) {
   return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
 }
 
+function normalizeProxyList(rawList) {
+  const out = [];
+  for (const item of Array.isArray(rawList) ? rawList : []) {
+    const line = typeof item === 'string' ? item.trim() : (typeof item?.server === 'string' ? item.server.trim() : '');
+    if (!line || line.startsWith('#')) continue;
+    const normalized = normalizeProxyLine(line);
+    if (normalized) out.push(normalized);
+  }
+  return out;
+}
+
+function normalizeTargets(rawTargets, fallbackPages) {
+  if (!Array.isArray(rawTargets)) return [];
+  const out = [];
+  for (const t of rawTargets.slice(0, 50)) {
+    if (!t || typeof t !== 'object') continue;
+    const rawUrl = typeof t.url === 'string' ? t.url.trim() : '';
+    if (!rawUrl) continue;
+    try {
+      const parsed = new URL(rawUrl);
+      if (!['http:', 'https:'].includes(parsed.protocol)) continue;
+    } catch {
+      continue;
+    }
+    const cleanUrl = rawUrl.replace(/\/+$/, '');
+    const tPages = Array.isArray(t.pages) && t.pages.length ? normalizePages(t.pages) : [...fallbackPages];
+    const vc = t.visitCount != null ? clampInt(t.visitCount, 0, 100000, 0) : 0;
+    out.push({
+      url: cleanUrl,
+      pages: tPages,
+      ...(vc > 0 ? { visitCount: vc } : {}),
+    });
+  }
+  return out;
+}
+
 function validateAndNormalizeConfig(input) {
   if (!input || typeof input !== 'object') {
     throw new Error('גוף הבקשה חייב להיות אובייקט JSON תקין.');
@@ -264,19 +315,13 @@ function validateAndNormalizeConfig(input) {
     };
   });
 
-  const rawServers = Array.isArray(input.proxy?.servers) ? input.proxy.servers : [];
-  const proxyServers = [];
-  for (const item of rawServers) {
-    const line = typeof item === 'string' ? item.trim() : (typeof item?.server === 'string' ? item.server.trim() : '');
-    if (!line || line.startsWith('#')) continue;
-    const normalized = normalizeProxyLine(line);
-    if (normalized) proxyServers.push(normalized);
-  }
+  const proxyServers = normalizeProxyList(input.proxy?.servers);
+  const fallbackServers = normalizeProxyList(input.proxy?.fallbackServers);
 
   const concurrency = clampInt(input.concurrency, 1, 32, 3);
   const minConcurrency = clampInt(input.minConcurrency, 1, concurrency, 1);
   const snippet = (typeof input.snippet === 'string' && input.snippet.trim()) ? input.snippet.trim() : null;
-  const validStepTypes = new Set(['goto', 'click', 'go_back', 'close_tab', 'fill', 'fill_email', 'fill_otp', 'select', 'press', 'hover', 'scroll', 'scroll_to', 'read_article', 'human_browse', 'scan_products', 'ai_explore', 'wait', 'dismiss_overlays', 'audit_ads', 'assert', 'screenshot']);
+  const validStepTypes = new Set(['goto', 'click', 'go_back', 'close_tab', 'fill', 'fill_email', 'fill_otp', 'select', 'press', 'hover', 'scroll', 'scroll_to', 'read_article', 'human_browse', 'scan_products', 'ai_explore', 'ai_route_repair', 'ai_form_guard', 'search_entry', 'wait', 'dismiss_overlays', 'audit_ads', 'assert', 'screenshot']);
   const taskSteps = Array.isArray(input.taskSteps)
     ? input.taskSteps
         .filter(s => s && typeof s === 'object' && validStepTypes.has(s.type))
@@ -299,15 +344,19 @@ function validateAndNormalizeConfig(input) {
           ...(s.optional ? { optional: true } : {}),
           ...(typeof s.referer === 'string' && s.referer.trim() ? { referer: s.referer.trim() } : {}),
           ...(s.followExternal ? { followExternal: true } : {}),
+          ...(typeof s.workerModel === 'string' && s.workerModel.trim() ? { workerModel: s.workerModel.trim().slice(0, 80) } : {}),
+          ...(typeof s.query === 'string' && s.query.trim() ? { query: s.query.trim().slice(0, 200) } : {}),
           ...(Number(s.staySamePageChance) > 0
             ? { staySamePageChance: Math.min(1, Math.max(0, Number(s.staySamePageChance))) }
             : {}),
         }))
     : [];
 
+  const pages = normalizePages(input.pages);
   return {
     targetUrl,
-    pages: normalizePages(input.pages),
+    pages,
+    targets: normalizeTargets(input.targets, pages),
     visitCount: clampInt(input.visitCount, 1, 100000, 3),
     minConcurrency,
     concurrency,
@@ -345,6 +394,7 @@ function validateAndNormalizeConfig(input) {
         return arr;
       })(),
       servers: proxyServers,
+      fallbackServers,
       residential: {
         enabled: input.proxy?.residential?.enabled !== false,
         byteBudgetMb: clampInt(input.proxy?.residential?.byteBudgetMb, 50, 5000, 800),
@@ -394,9 +444,11 @@ function validateAndNormalizeConfig(input) {
       workerPct: clampInt(input.ai?.workerPct, 0, 100, 0),
       allSquadsModel: typeof input.ai?.allSquadsModel === 'string'
         ? input.ai.allSquadsModel.trim().slice(0, 80)
-        // The dashboard has no input for this key yet; an unrelated save must not wipe the
-        // "every squad uses DeepSeek" override that the operator set in config.json.
+        // Preserve any operator setting from disk when omitted by older UI callers.
         : String(readConfigFromDisk().ai?.allSquadsModel || '').slice(0, 80),
+      recoveryModel: typeof input.ai?.recoveryModel === 'string'
+        ? input.ai.recoveryModel.trim().slice(0, 80)
+        : String(readConfigFromDisk().ai?.recoveryModel || '').slice(0, 80),
       formAssist: input.ai?.formAssist !== false,
       routeRepair: input.ai?.routeRepair !== false,
       commanderDirective: typeof input.ai?.commanderDirective === 'string'
@@ -414,6 +466,12 @@ function validateAndNormalizeConfig(input) {
       closePopunders: input.adSafety?.closePopunders !== false,
       skipTelemetryHeader: Boolean(input.adSafety?.skipTelemetryHeader),
     },
+    attribution: {
+      lockerDwellMs: clampInt(input.attribution?.lockerDwellMs, 0, 120000, 9500),
+      closeSettleMs: clampInt(input.attribution?.closeSettleMs, 0, 60000, 2800),
+    },
+    emailSweepPasses: clampInt(input.emailSweepPasses, 0, 20, 4),
+    emailSweepDelayMs: clampInt(input.emailSweepDelayMs, 1000, 180000, 30000),
   };
 }
 
@@ -434,11 +492,21 @@ function readConfigFromDisk() {
     schedule: { ...DEFAULT_CONFIG.schedule, ...(raw.schedule || {}) },
     devices: { ...DEFAULT_CONFIG.devices, ...(raw.devices || {}) },
     personas: Array.isArray(raw.personas) && raw.personas.length ? raw.personas : DEFAULT_CONFIG.personas,
-    proxy: { ...DEFAULT_CONFIG.proxy, ...(raw.proxy || {}), servers: mergedProxies },
+    proxy: {
+      ...DEFAULT_CONFIG.proxy,
+      ...(raw.proxy || {}),
+      servers: mergedProxies,
+      fallbackServers: Array.isArray(raw.proxy?.fallbackServers) ? raw.proxy.fallbackServers : DEFAULT_CONFIG.proxy.fallbackServers,
+      residential: { ...DEFAULT_CONFIG.proxy.residential, ...(raw.proxy?.residential || {}) },
+    },
     waves: { ...DEFAULT_CONFIG.waves, ...(raw.waves || {}) },
     ai: { ...DEFAULT_CONFIG.ai, ...(raw.ai || {}) },
     sessionPersistence: { ...DEFAULT_CONFIG.sessionPersistence, ...(raw.sessionPersistence || {}) },
     adSafety: { ...DEFAULT_CONFIG.adSafety, ...(raw.adSafety || {}) },
+    targets: Array.isArray(raw.targets) ? raw.targets : DEFAULT_CONFIG.targets,
+    attribution: { ...DEFAULT_CONFIG.attribution, ...(raw.attribution || {}) },
+    emailSweepPasses: raw.emailSweepPasses ?? DEFAULT_CONFIG.emailSweepPasses,
+    emailSweepDelayMs: raw.emailSweepDelayMs ?? DEFAULT_CONFIG.emailSweepDelayMs,
   };
 }
 
@@ -1069,6 +1137,8 @@ app.post('/api/site-profiles/:id/load', (req, res) => {
           provider: currentCfg.ai.provider || profile.config?.ai?.provider || 'auto',
           commanderModel: currentCfg.ai.commanderModel || profile.config?.ai?.commanderModel || 'glm-5.3-flash',
           workerModel: currentCfg.ai.workerModel || profile.config?.ai?.workerModel || 'deepseek-v4.1-flash',
+          allSquadsModel: currentCfg.ai.allSquadsModel ?? profile.config?.ai?.allSquadsModel ?? '',
+          recoveryModel: currentCfg.ai.recoveryModel ?? profile.config?.ai?.recoveryModel ?? '',
           workerPct: Number.isFinite(Number(currentCfg.ai.workerPct)) ? currentCfg.ai.workerPct : (profile.config?.ai?.workerPct ?? 60),
           commanderDirective: (profile.config?.ai?.commanderDirective && profile.config.ai.commanderDirective.trim())
             ? profile.config.ai.commanderDirective

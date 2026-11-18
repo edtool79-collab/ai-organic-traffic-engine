@@ -62,6 +62,7 @@ function rememberModelTransport(model, transport, note = '') {
 
 function preferredTransport(model) {
   const key = String(model || '').trim().toLowerCase();
+  if (isDecisionModel(key)) return 'systemone';
   const known = loadModelMemory()[key];
   if (known && OLLAMA_TRANSPORTS.includes(known.transport)) return known.transport;
   if (unsupportedChatModels.has(key)) return 'generate';
@@ -874,7 +875,8 @@ async function runAiExploreStep(page, step = {}, ctx = {}) {
         maxClicks: 14,
         maxInputs: 8,
         timeoutMs: 12000,
-        emailPlaceholder: ctx.sessionInbox?.address || ctx.sessionInbox?.email || '',
+        emailPlaceholder: ctx.sessionInbox?.address || ctx.sessionInbox?.email || ctx.identity?.email || '',
+        identity: ctx.identity || null,
       });
       if (!pick) throw new Error('decision model returned no usable option');
       pageState = pick.pageState;
@@ -979,6 +981,24 @@ const PAGE_STATE_CRITERIA = {
   error: 'The page is a browser error, a server error, or a dead end.',
 };
 
+function candidateFillValue(inputItem, emailPlaceholder = '', identity = null) {
+  const type = String(inputItem?.type || 'text').toLowerCase();
+  const hint = `${inputItem?.placeholder || ''} ${inputItem?.selector || ''}`.toLowerCase();
+  if (type === 'email' || /\b(e?mail)\b/.test(hint)) {
+    return String(emailPlaceholder || identity?.email || '').trim();
+  }
+  if (identity && typeof identity === 'object') {
+    if (/\b(first|fname)\b|first[_-]?name/.test(hint)) return String(identity.first || '').trim();
+    if (/\b(last|lname|surname)\b|last[_-]?name/.test(hint)) return String(identity.last || '').trim();
+    if (/\b(address|street)\b/.test(hint)) return String(identity.street || '').trim();
+    if (/\b(city|town)\b/.test(hint)) return String(identity.city || '').trim();
+    if (/\b(zip|postal|postcode)\b/.test(hint)) return String(identity.zip || '').trim();
+    if (/\b(state|province|region)\b/.test(hint)) return String(identity.state || '').trim();
+    if (type === 'tel' || /\b(phone|tel|telephone|mobile|cell)\b/.test(hint)) return String(identity.phone || '').trim();
+  }
+  return '';
+}
+
 /**
  * One decision round-trip over the compact DOM. It can classify the page and pick the next action in
  * the same call, which is why it costs one 200-token request instead of a chat completion.
@@ -994,17 +1014,23 @@ async function askActionChoice({
   maxInputs = 8,
   timeoutMs = 12000,
   emailPlaceholder = '',
+  identity = null,
 }) {
   const criteria = {};
   const clickables = (dom.clickables || []).slice(0, maxClicks);
   const inputs = (dom.inputs || []).slice(0, maxInputs);
+  const fillableInputs = [];
   clickables.forEach(c => {
     criteria[`click:${c.id}`] = `Click the element labelled "${String(c.text || 'unnamed').slice(0, 60)}".`;
   });
   inputs.forEach(i => {
+    // Only offer inputs we actually have a sensible non-empty value for; clef chooses IDs only.
+    const val = candidateFillValue(i, emailPlaceholder, identity);
+    if (!val) return;
+    fillableInputs.push({ item: i, val });
     const kind = i.type || 'text';
     const ph = i.placeholder ? ` with placeholder "${String(i.placeholder).slice(0, 40)}"` : '';
-    const useEmail = kind === 'email' && emailPlaceholder ? ' using the session email' : '';
+    const useEmail = kind === 'email' || /\b(e?mail)\b/i.test(`${i.placeholder || ''} ${i.selector || ''}`) ? ' using the session email' : '';
     criteria[`fill:${i.id}`] = `Type into the ${kind} field${ph}${useEmail}.`;
   });
   criteria.scroll = 'Scroll down when the next control is probably below the fold.';
@@ -1015,7 +1041,7 @@ async function askActionChoice({
     page: String(dom.title || '').slice(0, 120),
     url: String(dom.url || '').slice(0, 200),
     buttonsAndLinks: clickables.map(c => String(c.text || '').slice(0, 40)),
-    fields: inputs.map(i => ({ id: i.id, type: i.type || 'text' })),
+    fields: fillableInputs.map(({ item }) => ({ id: item.id, type: item.type || 'text' })),
     ...(contextNote ? { context: String(contextNote).slice(0, 160) } : {}),
   };
 
@@ -1053,6 +1079,7 @@ async function askActionChoice({
   let id;
   let selectorHint = '';
   let targetText = '';
+  let fillVal = '';
   if (kind === 'click' && Number.isInteger(numId)) {
     const item = clickables.find(c => c.id === numId);
     if (!item) return { ...base, act: 'none' };
@@ -1061,11 +1088,12 @@ async function askActionChoice({
     selectorHint = item.selector || '';
     targetText = item.text || '';
   } else if (kind === 'fill' && Number.isInteger(numId)) {
-    const item = inputs.find(i => i.id === numId);
-    if (!item) return { ...base, act: 'none' };
+    const matched = fillableInputs.find(({ item }) => item.id === numId);
+    if (!matched) return { ...base, act: 'none' };
     act = 'fill';
     id = numId;
-    selectorHint = item.selector || '';
+    fillVal = matched.val;
+    selectorHint = matched.item.selector || '';
   } else if (!picked || picked === 'none') {
     return { ...base, act: 'none' };
   } else if (picked !== 'scroll') {
@@ -1076,7 +1104,7 @@ async function askActionChoice({
     ...base,
     act,
     id,
-    val: act === 'fill' ? emailPlaceholder : '',
+    val: fillVal,
     selectorHint,
     targetText,
   };
@@ -1092,7 +1120,8 @@ async function askRecoveryDecision(model, dom, ctx = {}, failedHint = '') {
     dom,
     instructions: 'Which single action moves the form forward with the least risk?',
     contextNote: `Previous step failed: ${String(failedHint || '').slice(0, 80)}. Goal: move a signup / consent / checkout form one step forward.`,
-    emailPlaceholder: ctx.sessionInbox?.address || ctx.sessionInbox?.email || '',
+    emailPlaceholder: ctx.sessionInbox?.address || ctx.sessionInbox?.email || ctx.identity?.email || '',
+    identity: ctx.identity || null,
     timeoutMs: 12000,
   });
   if (!pick || pick.act === 'none') return null;
@@ -1162,9 +1191,7 @@ async function runAiSmartRecoveryStep(page, ctx = {}, failedHint = '') {
     if (isDecisionModel(recoveryModel)) {
       const pick = await askRecoveryDecision(recoveryModel, dom, ctx, failedHint);
       if (pick) parsed = { act: pick.act, id: pick.id, val: pick.val };
-    }
-
-    if (!parsed) {
+    } else {
       const resp = await callAiChat({
         provider: providerPref,
         role: 'recovery',
@@ -1321,7 +1348,8 @@ async function askFleetCommander({
   isAutoCheck = false,
 } = {}) {
   registerStepSecrets(config.taskSteps);
-  const chosenModel = model || config.ai?.commanderModel || DEFAULT_COMMANDER_MODEL;
+  let chosenModel = model || config.ai?.commanderModel || DEFAULT_COMMANDER_MODEL;
+  if (isDecisionModel(chosenModel)) chosenModel = DEFAULT_COMMANDER_MODEL;
   const providerPref = normalizeAiProvider(provider || config.ai?.provider || 'auto');
   const statusInfo = getOllamaStatusPublic();
   const hasCred = providerPref === 'ollama_cloud'
@@ -1421,6 +1449,11 @@ async function askFleetCommander({
       proxyMode: config.proxy?.mode,
       preferredCountries: config.proxy?.preferredCountries || [],
       proxyServersCount: Array.isArray(config.proxy?.servers) ? config.proxy.servers.length : 0,
+      proxyFallbackCount: Array.isArray(config.proxy?.fallbackServers) ? config.proxy.fallbackServers.length : 0,
+      targets: Array.isArray(config.targets) ? config.targets.map(t => ({ url: t.url, visitCount: t.visitCount })) : [],
+      attribution: config.attribution || null,
+      emailSweepPasses: config.emailSweepPasses ?? null,
+      emailSweepDelayMs: config.emailSweepDelayMs ?? null,
       ai: config.ai,
     },
     recentVisitsSample: (visitDetails || []).slice(0, 6).map(v => ({

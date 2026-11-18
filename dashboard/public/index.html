@@ -759,6 +759,10 @@
                 <label for="ai-all-squads-model">מודל אחד לכל ארבעת הצוותים (<code>allSquadsModel</code> — ריק = מודל נפרד לכל צוות)</label>
                 <input id="ai-all-squads-model" type="text" class="ltr" list="ai-cheap-models" placeholder="deepseek-v4.1-flash" />
               </div>
+              <div class="field">
+                <label for="ai-recovery-model">מודל התאוששות מתקלות (<code>recoveryModel</code> — ריק = לפי המפקד)</label>
+                <input id="ai-recovery-model" type="text" class="ltr" list="ai-cheap-models" placeholder="clef:27b" />
+              </div>
               <label class="switch-row" style="margin:0;padding:8px 10px;">
                 <span style="font-size:0.84rem;"><strong>מילוי חכם של שדות חסרים לפני כל שליחה</strong></span>
                 <input id="ai-form-assist" type="checkbox" />
@@ -768,6 +772,7 @@
                 <input id="ai-route-repair" type="checkbox" />
               </label>
               <datalist id="ai-cheap-models">
+                <option value="clef:27b">Ollama Cloud — Clef 27B (מודל החלטות מהיר, 0 טוקני פלט — מומלץ ל-Workers / Recovery)</option>
                 <option value="deepseek-v4.1-flash">Ollama Cloud — DeepSeek v4.1 Flash (0.8s, מהיר, חסכוני ומדויק לסוכנים)</option>
                 <option value="beam">Ollama Cloud — Beam (יעיל במיוחד בחיסכון טוקנים וכלים)</option>
                 <option value="minimax-m3.1-flash">Ollama Cloud — MiniMax M3.1 Flash (1.3s, מהיר למדריכים ותוכן)</option>

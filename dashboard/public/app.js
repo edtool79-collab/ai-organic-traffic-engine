@@ -58,7 +58,10 @@ const STEP_TYPE_META = {
   read_article:     { label: 'קריאת מאמר אנושית (AdSense Safe)', selectorHint: '(אוטומטי — השאר ריק)', valueHint: '8500 (זמן קריאה במילישניות)' },
   human_browse:     { label: 'גלישה אנושית חופשית בדף (Human Browse)', selectorHint: '(אוטומטי — השאר ריק)', valueHint: '7000 (משך גלישה במילישניות)' },
   scan_products:    { label: 'סריקת מוצרים / קישורים אנושית (Scan Products)', selectorHint: '(אופציונלי — בורר אזור מוצרים)', valueHint: '2 (כמות מוצרים לפתיחה)' },
+  search_entry:     { label: 'חיפוש אורגני טרום-כניסה (Search Entry)', selectorHint: '(אוטומטי — השאר ריק)', valueHint: '(אופציונלי — שאילתת חיפוש)' },
   ai_explore:       { label: 'סוכן AI אוטונומי (Ollama Cloud Brain)', selectorHint: '(אוטומטי — השאר ריק)', valueHint: '2 (כמות פעולות AI בדף)' },
+  ai_route_repair:  { label: 'תיקון מסלול AI (AI Route Repair)', selectorHint: '(אוטומטי — השאר ריק)', valueHint: 'הנחיית יעד להמשך הזרימה' },
+  ai_form_guard:    { label: 'שומר טפסים AI (AI Form Guard)', selectorHint: '(אוטומטי — השאר ריק)', valueHint: '1' },
   wait:             { label: 'המתן זמן או לאלמנט (Wait)', selectorHint: '(ריק להמתנת זמן, או CSS Selector)', valueHint: '2000 (מילישניות)' },
   dismiss_overlays: { label: 'סגור Overlays צפים (Dismiss Ads)', selectorHint: '(אוטומטי — השאר ריק)', valueHint: '(אוטומטי)' },
   audit_ads:        { label: 'ביקורת סלוטי מודעות (Audit Ads DOM)', selectorHint: '(אוטומטי — השאר ריק)', valueHint: '(אוטומטי)' },
@@ -154,6 +157,7 @@ $('browserEngine').value = cfg.browserEngine || 'chromium';
   if ($('ai-worker-model')) $('ai-worker-model').value = cfg.ai?.workerModel || 'deepseek-v4.1-flash';
   if ($('ai-worker-pct')) $('ai-worker-pct').value = cfg.ai?.workerPct ?? 0;
   if ($('ai-all-squads-model')) $('ai-all-squads-model').value = cfg.ai?.allSquadsModel || '';
+  if ($('ai-recovery-model')) $('ai-recovery-model').value = cfg.ai?.recoveryModel || '';
   if ($('ai-form-assist')) $('ai-form-assist').checked = cfg.ai?.formAssist !== false;
   if ($('ai-route-repair')) $('ai-route-repair').checked = cfg.ai?.routeRepair !== false;
   if ($('ai-directive-input')) $('ai-directive-input').value = cfg.ai?.commanderDirective || '';
@@ -203,6 +207,7 @@ cfg.browserEngine = $('browserEngine').value;
   cfg.snippet = rawSnippet ? rawSnippet : null;
 
   cfg.proxy = {
+    ...(cfg.proxy || {}),
     enabled: $('proxy-enabled').checked,
     mode: $('proxy-mode').value === 'random' ? 'random' : 'round_robin',
     countryFilterEnabled: $('proxy-country-filter') ? $('proxy-country-filter').checked : true,
@@ -234,6 +239,7 @@ cfg.browserEngine = $('browserEngine').value;
 
   if ($('ai-enabled')) {
     cfg.ai = {
+      ...(cfg.ai || {}),
       enabled: $('ai-enabled').checked,
       autoManage: $('ai-auto-manage') ? $('ai-auto-manage').checked : false,
       provider: $('ai-provider')?.value || 'auto',
@@ -241,6 +247,7 @@ cfg.browserEngine = $('browserEngine').value;
       workerModel: $('ai-worker-model')?.value.trim() || 'deepseek-v4.1-flash',
       workerPct: Math.min(100, Math.max(0, Number($('ai-worker-pct')?.value) || 0)),
       allSquadsModel: $('ai-all-squads-model')?.value.trim() || '',
+      recoveryModel: $('ai-recovery-model') ? $('ai-recovery-model').value.trim() : (cfg.ai?.recoveryModel || ''),
       formAssist: $('ai-form-assist') ? $('ai-form-assist').checked : true,
       routeRepair: $('ai-route-repair') ? $('ai-route-repair').checked : true,
       commanderDirective: $('ai-directive-input')?.value.trim() || '',
@@ -1550,7 +1557,7 @@ function wireActions() {
     'proxy-enabled', 'proxy-mode', 'proxy-country-filter', 'proxy-country-fallback', 'proxy-servers',
     'stealth-mode', 'resource-mode',
     'waves-enabled', 'waves-mode', 'waves-conversion-rate', 'referrer-mode', 'waves-mutation-rate', 'waves-scan-chance', 'waves-extra-page-chance', 'waves-max-products', 'waves-mutate-forms', 'waves-form-inputs',
-    'ai-enabled', 'ai-auto-manage', 'ai-provider', 'ai-commander-model', 'ai-worker-model', 'ai-all-squads-model', 'ai-form-assist', 'ai-route-repair', 'ai-worker-pct', 'ai-directive-input',
+    'ai-enabled', 'ai-auto-manage', 'ai-provider', 'ai-commander-model', 'ai-worker-model', 'ai-all-squads-model', 'ai-recovery-model', 'ai-form-assist', 'ai-route-repair', 'ai-worker-pct', 'ai-directive-input',
     'session-enabled', 'session-returning-rate', 'session-pool-size',
     'ad-avoid-clicks', 'ad-dismiss-overlays', 'ad-close-popunders', 'ad-skip-telemetry',
   ].forEach(id => {

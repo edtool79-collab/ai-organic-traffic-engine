@@ -1121,19 +1121,21 @@ const BROWSER_DATA_ROOT = path.join(
   'wtg-browser-profiles'
 );
 
-function acquireProfileSlot({ enabled, returningUserRate, profilePoolSize, profilesDir, countryCode = null, locale = null }) {
+function acquireProfileSlot({ enabled, returningUserRate, profilePoolSize, profilesDir, countryCode = null, locale = null, prefix = '' }) {
   if (!enabled) return null;
   fs.mkdirSync(profilesDir, { recursive: true });
   fs.mkdirSync(BROWSER_DATA_ROOT, { recursive: true });
   const poolSize = Math.max(1, parseInt(String(profilePoolSize ?? 10), 10) || 10);
   const rate = Math.min(1, Math.max(0, Number(returningUserRate ?? 50) / 100));
+  const cleanPrefix = String(prefix || '').replace(/[^a-zA-Z0-9_-]/g, '');
 
   const matchingExisting = [];
   const otherExisting = [];
   const empty = [];
   for (let slot = 1; slot <= poolSize; slot++) {
-    if (activeProfileSlots.has(slot)) continue;
-    const name = `persistent_${String(slot).padStart(2, '0')}`;
+    const slotKey = `${cleanPrefix}${slot}`;
+    if (activeProfileSlots.has(slotKey)) continue;
+    const name = `persistent_${cleanPrefix}${String(slot).padStart(2, '0')}`;
     const dir = path.join(profilesDir, name);
     const userDataDir = path.join(BROWSER_DATA_ROOT, name);
     const metaPath = path.join(dir, 'profile-meta.json');
@@ -1151,11 +1153,11 @@ function acquireProfileSlot({ enabled, returningUserRate, profilePoolSize, profi
           }
         } catch {}
       }
-      const entry = { slot, dir, userDataDir, metaPath, isReturning: geoMatches };
+      const entry = { slot, slotKey, dir, userDataDir, metaPath, isReturning: geoMatches };
       if (geoMatches) matchingExisting.push(entry);
       else otherExisting.push(entry);
     } else {
-      empty.push({ slot, dir, userDataDir, metaPath, isReturning: false });
+      empty.push({ slot, slotKey, dir, userDataDir, metaPath, isReturning: false });
     }
   }
 
@@ -1170,12 +1172,12 @@ function acquireProfileSlot({ enabled, returningUserRate, profilePoolSize, profi
     chosen = otherExisting[Math.floor(Math.random() * otherExisting.length)];
   }
 
-  if (chosen) activeProfileSlots.add(chosen.slot);
+  if (chosen) activeProfileSlots.add(chosen.slotKey ?? chosen.slot);
   return chosen;
 }
 
 function releaseProfileSlot(slotInfo) {
-  if (slotInfo) activeProfileSlots.delete(slotInfo.slot);
+  if (slotInfo) activeProfileSlots.delete(slotInfo.slotKey ?? slotInfo.slot);
 }
 
 function listSavedProfiles(profilesDir) {
