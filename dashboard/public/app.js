@@ -1914,6 +1914,72 @@ function wireActions() {
     };
   }
 
+  const submitOnboardReply = async () => {
+    const inputEl = $('onboard-user-notes');
+    const msg = inputEl?.value.trim() || '';
+    if (!msg) {
+      showToast('כתוב תשובה או הנחיה ל-AI בתיבה לפני השליחה.', true);
+      return;
+    }
+    const btn = $('btn-onboard-reply');
+    const resBox = $('onboard-ai-result');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '⏳ מעבד תשובה...';
+    }
+    const prevText = resBox && resBox.style.display !== 'none' ? resBox.textContent.trim() : '';
+    if (resBox) {
+      resBox.style.display = 'block';
+      resBox.textContent = (prevText ? prevText + '\n\n' : '') + `🗣️ אתה: ${msg}\n🤖 מעבד התאמה עם ה-AI...`;
+      resBox.scrollTop = resBox.scrollHeight;
+    }
+    try {
+      const res = await api('/api/ai/onboard-reply', {
+        method: 'POST',
+        body: JSON.stringify({
+          message: msg,
+          targetUrl: $('targetUrl')?.value.trim() || state.config?.targetUrl,
+          goal: $('onboard-goal')?.value || 'tools_clicks',
+          aiLevel: $('onboard-ai-level')?.value || 'full_autonomous',
+        }),
+      });
+      if (inputEl) inputEl.value = '';
+      if (res && res.config) {
+        state.config = res.config;
+        syncFormFromConfig();
+        renderJsonPreview();
+      }
+      if (resBox) {
+        const appliedNote = Array.isArray(res.applied) && res.applied.length ? `\n⚡ יושם: ${res.applied.join(', ')}` : '';
+        resBox.textContent = (prevText ? prevText + '\n\n' : '') + `🗣️ אתה: ${msg}\n🤖 AI (${res.model || 'commander'}): ${res.reply || 'ההנחיה יושמה בהצלחה.'}${appliedNote}`;
+        resBox.scrollTop = resBox.scrollHeight;
+      }
+      showToast('✅ התשובה נשלחה ל-AI ויושמה בהגדרות!');
+    } catch (err) {
+      if (resBox) {
+        resBox.textContent = (prevText ? prevText + '\n\n' : '') + `❌ שגיאה בשליחה: ${err.message}`;
+      }
+      showToast('שליחת התשובה נכשלה: ' + err.message, true);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '💬 שלח תשובה ל-AI';
+      }
+    }
+  };
+
+  if ($('btn-onboard-reply')) {
+    $('btn-onboard-reply').onclick = submitOnboardReply;
+  }
+  if ($('onboard-user-notes')) {
+    $('onboard-user-notes').addEventListener('keydown', ev => {
+      if (ev.key === 'Enter' && !ev.shiftKey) {
+        ev.preventDefault();
+        submitOnboardReply();
+      }
+    });
+  }
+
   if ($('btn-clone-funnel')) {
     $('btn-clone-funnel').onclick = async () => {
       collectSimpleFieldsToConfig();

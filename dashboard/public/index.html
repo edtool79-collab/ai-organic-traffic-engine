@@ -160,7 +160,8 @@
               </div>
             </div>
             <div class="inline-row" style="gap:8px; flex-wrap:wrap; margin-bottom:8px;">
-              <input id="onboard-user-notes" type="text" placeholder="תשובה לשאלות ה-AI או דגש מיוחד (למשל: התמקד ב-/tools/robots-checker ואל תצא לקישורים חיצוניים)..." style="flex:1; min-width:240px;" />
+              <input id="onboard-user-notes" type="text" placeholder="כתוב תשובה לשאלות ה-AI או הנחיה (למשל: התמקד ב-/tools/robots-checker) ולחץ Enter או שלח..." style="flex:1; min-width:240px;" />
+              <button type="button" class="small primary" id="btn-onboard-reply">💬 שלח תשובה ל-AI</button>
               <label style="display:flex; align-items:center; gap:6px; font-size:0.83rem; cursor:pointer;">
                 <input id="onboard-rebuild-steps" type="checkbox" />
                 <span>בנה גם תסריט צעדים חדש לאתר</span>
@@ -168,7 +169,7 @@
               <button type="button" class="primary" id="btn-onboard-site">✨ סרוק אתר והתאם הגדרות אוטומטית עם ה-AI</button>
               <button type="button" class="small" id="btn-clone-funnel" title="מזהה פיקסלים (GA4/Clarity/Meta), ממפה כלים וטפסים ובונה תסריט משובט אוטומטית">🕵️ נתח פיקסלים ושבט משפך אתר</button>
             </div>
-            <div id="onboard-ai-result" class="advice-box" style="display:none; white-space:pre-line; line-height:1.55;"></div>
+            <div id="onboard-ai-result" class="advice-box" style="display:none; white-space:pre-line; line-height:1.55; max-height:240px; overflow-y:auto;"></div>
           </div>
 
           <div class="recorder-box" id="multi-targets-box" style="margin-top:12px;">

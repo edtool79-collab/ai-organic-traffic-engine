@@ -1723,7 +1723,7 @@ function deepMergeConfigPatch(target, patch, depth = 0) {
   return target;
 }
 
-function applyFleetDirectives(directives = [], { isAutoCheck = false } = {}) {
+function applyFleetDirectives(directives = [], { isAutoCheck = false, allowConcurrencyChange = false } = {}) {
   const applied = [];
   let configChanged = false;
   let latestConfig = null;
@@ -1751,13 +1751,13 @@ function applyFleetDirectives(directives = [], { isAutoCheck = false } = {}) {
       broadcastEvent('status', runState);
       applied.push('resume');
     } else if (d.type === 'set_concurrency') {
+      if (isAutoCheck || !allowConcurrencyChange) {
+        appendLog('warn', `[AI Commander Guard] נחסם ניסיון AI לשנות מקביליות (${d.min ?? '?'}-${d.max ?? '?'}) — רק המפעיל קובע מקביליות!`);
+        continue;
+      }
       try {
-        const curDisk = readConfigFromDisk();
-        const dirText = String(curDisk.ai?.commanderDirective || '');
-        const floorMatch = dirText.match(/(?:רצפה[^0-9]{0,20}|מתחת ל-?)(\d+)/);
-        const lockedFloor = (isAutoCheck && floorMatch) ? clampInt(floorMatch[1], 1, 32, 1) : 1;
-        const nextMax = Math.max(lockedFloor, clampInt(d.max, 1, 32, runState.maxConcurrency || 3));
-        const nextMin = Math.max(lockedFloor, clampInt(d.min, 1, nextMax, runState.minConcurrency || 1));
+        const nextMax = clampInt(d.max, 1, 32, runState.maxConcurrency || 5);
+        const nextMin = clampInt(d.min, 1, nextMax, runState.minConcurrency || 5);
         updateSavedConfig(cur => {
           cur.minConcurrency = nextMin;
           cur.concurrency = nextMax;
@@ -1986,8 +1986,12 @@ function applyFleetDirectives(directives = [], { isAutoCheck = false } = {}) {
         // start, user complaint 2026-11-16) and could flip headless/proxio pool as well. The
         // landing target, watch mode and proxy pool are controlled from the dashboard/config only.
         const patch = { ...d.patch };
+        const protectedKeys = ['targetUrl', 'headless', 'proxy'];
+        if (isAutoCheck || !allowConcurrencyChange) {
+          protectedKeys.push('minConcurrency', 'concurrency', 'maxConcurrency');
+        }
         const blocked = [];
-        for (const k of ['targetUrl', 'headless', 'proxy']) {
+        for (const k of protectedKeys) {
           if (Object.prototype.hasOwnProperty.call(patch, k)) {
             blocked.push(k);
             delete patch[k];
@@ -2537,6 +2541,79 @@ app.post('/api/swarm/dispatch', async (req, res) => {
   }
 });
 
+app.post('/api/ai/onboard-reply', async (req, res) => {
+  try {
+    const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+    if (!message) return res.status(400).json({ error: 'כתוב תשובה או הנחיה ל-AI לפני השליחה.' });
+    const cfg = readConfigFromDisk();
+    const goal = String(req.body?.goal || 'tools_clicks').trim();
+    const aiLevel = String(req.body?.aiLevel || 'full_autonomous').trim();
+    const allowConcurrencyChange = /(?:מקביליות|מקביל|מגביליות|concurrency|minConcurrency|רצפה|לעלות ל|להוריד ל|קבע ל)/i.test(message);
+
+    const onboardPrompt = [
+      `תשובת המפעיל באשף התאמת האתר (${req.body?.targetUrl || cfg.targetUrl}) [מטרה: ${goal}, רמת AI: ${aiLevel}]:`,
+      message,
+      'התאם כעת את העמודים (pages), מצב ההפניה (referrerMode), התסריט (taskSteps / add_recording_step / replace_task_steps) וההנחיה לסוכנים (dispatch_directive) בהתאם לתשובת המפעיל, והסבר בקצרה בעברית מה יושם.',
+    ].join('\n');
+
+    const result = await askFleetCommander({
+      message: onboardPrompt,
+      runState,
+      config: cfg,
+      recentLogs: logHistory.slice(-16),
+      visitDetails,
+      history: aiCommanderState.history.slice(-6),
+      model: cfg.ai?.commanderModel,
+      provider: cfg.ai?.provider,
+      isAutoCheck: false,
+      allowConcurrencyChange,
+    });
+
+    const applied = applyFleetDirectives(result.directives, { isAutoCheck: false, allowConcurrencyChange });
+    if (!applied.some(a => a.startsWith('dispatch_directive') || a.startsWith('update_config'))) {
+      const updatedWithDir = validateAndNormalizeConfig({
+        ...readConfigFromDisk(),
+        ai: {
+          ...(readConfigFromDisk().ai || {}),
+          enabled: true,
+          commanderDirective: `${message}`.slice(0, 300),
+        },
+      });
+      writeConfigToDisk(updatedWithDir);
+      aiCommanderState.activeDirective = updatedWithDir.ai.commanderDirective;
+      if (activeProcess) {
+        try { activeProcess.send({ type: 'ai_directive', directive: updatedWithDir.ai.commanderDirective }); } catch {}
+      }
+      broadcastEvent('config_updated', { config: updatedWithDir });
+      applied.push('dispatch_directive(site-onboard)');
+    }
+
+    const latestCfg = readConfigFromDisk();
+    const feedItem = {
+      role: 'assistant',
+      content: redactText(result.reply || 'ההנחיה נשמרה ויושמה על סוכני האתר.'),
+      directives: result.directives || [],
+      applied,
+      model: result.model,
+      ts: new Date().toISOString(),
+    };
+    aiCommanderState.history.push({ role: 'user', content: redactText(message), ts: new Date().toISOString() });
+    aiCommanderState.history.push(feedItem);
+    if (aiCommanderState.history.length > 30) aiCommanderState.history.splice(0, aiCommanderState.history.length - 30);
+    broadcastEvent('ai_feed', feedItem);
+
+    res.json({
+      ok: true,
+      reply: feedItem.content,
+      applied,
+      model: result.model,
+      config: latestCfg,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'שליחת התשובה ל-AI נכשלה.' });
+  }
+});
+
 app.get('/api/ai/status', (_req, res) => {
   const cfg = readConfigFromDisk();
   res.json({
@@ -2575,6 +2652,7 @@ app.post('/api/ai/chat', async (req, res) => {
     aiCommanderState.lastUserChatAt = Date.now();
     aiCommanderState.history.push({ role: 'user', content: redactText(message), ts: new Date().toISOString() });
     if (aiCommanderState.history.length > 30) aiCommanderState.history.shift();
+    const allowConcurrencyChange = /(?:מקביליות|מקביל|מגביליות|concurrency|minConcurrency|רצפה|לעלות ל|להוריד ל|קבע ל)/i.test(message);
 
     const result = await askFleetCommander({
       message,
@@ -2586,10 +2664,11 @@ app.post('/api/ai/chat', async (req, res) => {
       model,
       provider,
       isAutoCheck: false,
+      allowConcurrencyChange,
     });
 
     const applied = req.body?.autoApply !== false
-      ? applyFleetDirectives(result.directives)
+      ? applyFleetDirectives(result.directives, { isAutoCheck: false, allowConcurrencyChange })
       : [];
 
     const entry = {
@@ -2878,14 +2957,13 @@ function launchRunnerWave(cfg, { isContinuationWave = false, isAutoResume = fals
       const curSkips = Number(runState.skippedStepsTotal || 0);
       const curSlow = Number(runState.slowVisitsCount || 0);
 
-      const ramAlert = Number(runState.memUsedPct || 0) >= 82;
       const failAlert = Number(runState.failed || 0) >= 1;
       const errorAlert = curErrors - lastReviewedErrors >= 2;
       const skipAlert = curSkips - lastReviewedSkips >= 4;
       const speedAlert = curSlow - lastReviewedSlow >= 2 || Number(runState.avgLoadMs || 0) >= 3200;
       const milestoneAlert = curCompleted > 0 && curCompleted - lastReviewedCompleted >= 5;
 
-      if (!ramAlert && !failAlert && !errorAlert && !skipAlert && !speedAlert && !milestoneAlert) return;
+      if (!failAlert && !errorAlert && !skipAlert && !speedAlert && !milestoneAlert) return;
 
       lastReviewTs = now;
       lastReviewedCompleted = curCompleted;
@@ -2895,7 +2973,7 @@ function launchRunnerWave(cfg, { isContinuationWave = false, isAutoResume = fals
 
       try {
         const resReview = await askFleetCommander({
-          message: 'סקור טלמטריה רחבה של הריצה: שגיאות JS/דפים, צעדים מדולגים או סלקטורים שבורים, מהירות טעינה, חיסכון פרוקסי ו-AI Cache, ועומס זיכרון. דווח תובנות קצרות בעברית וקבל החלטת איזון אם נדרש.',
+          message: 'סקור טלמטריה רחבה של הריצה: שגיאות JS/דפים, צעדים מדולגים או סלקטורים שבורים, מהירות טעינה, חיסכון פרוקסי ו-AI Cache ואיכות גלישה. חוק ברזל: לעולם אל תשנה, תוריד או תגביל את המקביליות (concurrency/minConcurrency) גם אם הזיכרון גבוה — המפעיל קובע בלעדית את המקביליות!',
           runState,
           config: readConfigFromDisk(),
           recentLogs: logHistory.slice(-24),
@@ -2903,8 +2981,9 @@ function launchRunnerWave(cfg, { isContinuationWave = false, isAutoResume = fals
           model: cfg.ai.commanderModel,
           provider: cfg.ai.provider,
           isAutoCheck: true,
+          allowConcurrencyChange: false,
         });
-        const applied = applyFleetDirectives(resReview.directives, { isAutoCheck: true });
+        const applied = applyFleetDirectives(resReview.directives, { isAutoCheck: true, allowConcurrencyChange: false });
         const item = {
           role: 'assistant',
           auto: true,

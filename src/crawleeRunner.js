@@ -1099,6 +1099,17 @@ async function run() {
       }
       if (nc.adSafety && typeof nc.adSafety === 'object') Object.assign(adSafety, nc.adSafety);
       if (nc.devices && typeof nc.devices === 'object') Object.assign(deviceWeights, nc.devices);
+      if (nc.minConcurrency != null || nc.concurrency != null) {
+        const upMax = Math.max(1, Math.min(32, Number(nc.concurrency ?? stats.maxConcurrency) || stats.maxConcurrency));
+        const upMin = Math.max(1, Math.min(upMax, Number(nc.minConcurrency ?? stats.minConcurrency) || stats.minConcurrency));
+        stats.minConcurrency = upMin;
+        stats.maxConcurrency = upMax;
+        if (activePoolRef) {
+          activePoolRef.minConcurrency = upMin;
+          activePoolRef.maxConcurrency = upMax;
+          activePoolRef.desiredConcurrency = Math.min(upMax, Math.max(upMin, activePoolRef.desiredConcurrency || upMin));
+        }
+      }
       console.log('[AI Commander] כל הגדרות הקונפיגורציה סונכרנו בשידור חי לצי.');
     } else if (msg.type === 'assign_squad_model' && typeof msg.model === 'string') {
       const targetSquad = ['alpha', 'bravo', 'charlie', 'delta', 'all'].includes(msg.squadId) ? msg.squadId : 'all';
@@ -1371,21 +1382,19 @@ async function run() {
     const pool = new AutoscaledPool({
       minConcurrency,
       maxConcurrency,
-      desiredConcurrency: Math.min(maxConcurrency, Math.max(minConcurrency, Math.min(6, maxConcurrency))),
+      desiredConcurrency: Math.max(minConcurrency, maxConcurrency),
       autoscaleIntervalSecs: wavesCfg?.mode === 'burst' ? 1 : 2,
       loggingIntervalSecs: null,
       snapshotterOptions: {
-        maxBlockedMillis: 250,
-        maxUsedMemoryRatio: 0.98,
+        maxBlockedMillis: 2500,
+        maxUsedMemoryRatio: 0.999,
       },
       systemStatusOptions: {
-        maxMemoryOverloadedRatio: 0.95,
-        maxCpuOverloadedRatio: 0.95,
+        maxMemoryOverloadedRatio: 0.999,
+        maxCpuOverloadedRatio: 0.999,
       },
       isTaskReadyFunction: async () => {
         if (aborted || userPaused || schedulePaused) return false;
-        const freeGbNow = os.freemem() / (1024 ** 3);
-        if (inFlight >= 2 && freeGbNow < 0.45) return false;
         return nextVisitIndex < visitCount;
       },
       isFinishedFunction: async () => {
@@ -1670,8 +1679,6 @@ async function run() {
     });
 
     activePoolRef = pool;
-    const configuredMaxCap = maxConcurrency;
-    let lastRamScaleAt = 0;
     const monitorTimer = setInterval(async () => {
       const within = isWithinActiveHours(schedule);
       if (schedule.enabled && !within && !schedulePaused) {
@@ -1684,38 +1691,14 @@ async function run() {
         await syncPauseState();
       }
 
-      // Progressive RAM Governor (free-MB + ratio aware, graceful step-down & recovery)
-      const totalMemBytes = os.totalmem();
-      const freeMemBytes = os.freemem();
-      const freeMemMb = Math.round(freeMemBytes / (1024 * 1024));
-      const usedMemPct = Math.round(((totalMemBytes - freeMemBytes) / totalMemBytes) * 100);
-      const nowMs = Date.now();
-      if ((freeMemMb < 450 || usedMemPct >= 97) && stats.maxConcurrency > 1 && activePoolRef) {
-        stats.minConcurrency = 1;
-        stats.maxConcurrency = 1;
-        activePoolRef.minConcurrency = 1;
-        activePoolRef.maxConcurrency = 1;
-        activePoolRef.desiredConcurrency = 1;
-        runtimeState.resourceMode = 'ultra_lite';
-        lastRamScaleAt = nowMs;
-        console.log(`[RAM Governor] עומס זיכרון קריטי (${usedMemPct}%, פנוי ${freeMemMb}MB) — בלם חירום: מקביליות 1 ומצב ultra_lite.`);
-      } else if (nowMs - lastRamScaleAt >= 30000 && activePoolRef) {
-        if ((freeMemMb < 750 || usedMemPct >= 95) && stats.maxConcurrency > 1) {
-          const nextMax = Math.max(1, stats.maxConcurrency - 1);
-          stats.minConcurrency = Math.min(stats.minConcurrency, nextMax);
-          stats.maxConcurrency = nextMax;
-          activePoolRef.minConcurrency = stats.minConcurrency;
-          activePoolRef.maxConcurrency = nextMax;
-          activePoolRef.desiredConcurrency = Math.min(nextMax, activePoolRef.desiredConcurrency);
-          lastRamScaleAt = nowMs;
-          console.log(`[RAM Governor] לחץ זיכרון (${usedMemPct}%, פנוי ${freeMemMb}MB) — הפחתת מקביליות הדרגתית ל-${nextMax}.`);
-        } else if (freeMemMb >= 1000 && usedMemPct < 92 && stats.maxConcurrency < configuredMaxCap) {
-          const nextMax = Math.min(configuredMaxCap, stats.maxConcurrency + 1);
-          stats.maxConcurrency = nextMax;
-          activePoolRef.maxConcurrency = nextMax;
-          activePoolRef.desiredConcurrency = Math.min(nextMax, Math.max(stats.minConcurrency, activePoolRef.desiredConcurrency + 1));
-          lastRamScaleAt = nowMs;
-          console.log(`[RAM Governor] זיכרון פנוי (${usedMemPct}%, פנוי ${freeMemMb}MB) — העלאה הדרגתית של מקביליות ל-${nextMax}.`);
+      // Operator Concurrency Sovereignty: never drop below operator minConcurrency due to RAM load
+      if (activePoolRef) {
+        activePoolRef.minConcurrency = stats.minConcurrency;
+        activePoolRef.maxConcurrency = stats.maxConcurrency;
+        if ((activePoolRef.desiredConcurrency || 0) < stats.minConcurrency) {
+          activePoolRef.desiredConcurrency = stats.maxConcurrency >= stats.minConcurrency
+            ? stats.minConcurrency
+            : stats.maxConcurrency;
         }
       }
 
@@ -1795,6 +1778,11 @@ async function run() {
   const crawler = new PlaywrightCrawler({
     minConcurrency,
     maxConcurrency,
+    autoscaledPoolOptions: {
+      desiredConcurrency: Math.max(minConcurrency, maxConcurrency),
+      snapshotterOptions: { maxBlockedMillis: 2500, maxUsedMemoryRatio: 0.999 },
+      systemStatusOptions: { maxMemoryOverloadedRatio: 0.999, maxCpuOverloadedRatio: 0.999 },
+    },
     maxRequestRetries: 0,
     requestHandlerTimeoutSecs: Math.ceil(sessionTimeoutMs / 1000) + 15,
     navigationTimeoutSecs: 25,

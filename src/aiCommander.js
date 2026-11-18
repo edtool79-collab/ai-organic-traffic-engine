@@ -1250,11 +1250,6 @@ function buildLocalCommanderFallback({ message, runState = {}, config = {} }) {
   const planned = runState.totalPlanned || config.visitCount || 0;
   const mem = runState.memUsedPct || 0;
 
-  if (mem >= 85 && runState.status === 'running') {
-    const safeConc = Math.max(1, Math.min(config.concurrency || 3, 2));
-    directives.push({ type: 'set_concurrency', min: 1, max: safeConc });
-    lines.push(`⚠️ זיהיתי עומס RAM גבוה (${mem}%), מומלץ להגביל מקביליות ל-${safeConc} או להפעיל מצב חיסכון RAM (lite).`);
-  }
   if (/pause|עצור זמנית|השהה/.test(lower) && runState.status === 'running') {
     directives.push({ type: 'pause' });
     lines.push('מבצע השהיה זמנית של צי הדפדפנים.');
@@ -1346,6 +1341,7 @@ async function askFleetCommander({
   provider,
   maxTokens = 2800,
   isAutoCheck = false,
+  allowConcurrencyChange = false,
 } = {}) {
   registerStepSecrets(config.taskSteps);
   let chosenModel = model || config.ai?.commanderModel || DEFAULT_COMMANDER_MODEL;
@@ -1477,20 +1473,22 @@ async function askFleetCommander({
     'מודלים זולים נוספים להקצאה: nemotron-3-nano:30b, nemotron-3-super, gemma4:31b, deepseek-v4.1-flash:1017 (אין להשתמש ב-clef:27b).',
     'כלל אמינות ברזל (אפס המצאות): הסתמך אך ורק על הנתונים האמיתיים ב-telemetrySummary (צעדי ההקלטה, הלוגים האחרונים, currentConfig והדיאגנוסטיקה).',
     'כלל שפה חשוב: דבר בעברית טבעית, ברורה, פשוטה וזורמת — כמו עוזר אנושי חכם שמדבר עם בעל המערכת! אסור לכתוב בתשובה שמות משתנים טכניים באנגלית מתוך הקוד (אל תכתוב avgLoadMs, hasEmailFlow, emptyTabNotes, popup-empty, workerPct, failFastTriggers, conversionRate, resourceMode). במקום זאת תרגם הכל לעברית פשוטה: "זמן טעינה ממוצע", "אחוז המרות", "טאב חיצוני ריק", "דילוג מהיר", "מצב חיסכון מקסימלי".',
+    'חוק ברזל של המפעיל לגבי מקביליות וזיכרון: לעולם אל תשנה, אל תוריד ואל תגביל מקביליות (minConcurrency / concurrency / maxConcurrency / set_concurrency) בשום מצב — גם אם הזיכרון גבוה! אל תתחשב בלחץ זיכרון RAM להורדת מקביליות ואל תמליץ להוריד מקביליות, אלא אם המפעיל עצמו ביקש מפורשות בהודעה הנוכחית מספר מקביליות מסוים.',
+    'יש לך סמכות מוגברת ומלאה על חוכמת הגלישה וההחלטות באתר: בחירת עמודים (pages), מקור תנועה (referrerMode), זמני שהייה והתאמת תסריט והנחיות סוכנים (dispatch_directive / add_recording_step / use_tool / set_exploration / set_delays).',
     'אם אין שלב מייל בהקלטה — אל תתלונן על "0 מיילים". אם resourceMode כבר מוגדר כ-ultra_lite לחיסכון בפרוקסי וב-RAM — אל תשנה אותו בחזרה ל-lite!',
     isAutoCheck
-      ? 'זו בדיקת מצב שוטפת: סכם בקצרה בעברית ברורה ונקייה (עד 140 מילים, שורה לכל נושא): תקלות/טאבים, מהירות, חיסכון בפרוקסי וב-AI, זיכרון פנוי, והחלטה מעשית.'
+      ? 'זו בדיקת מצב שוטפת: סכם בקצרה בעברית ברורה ונקייה (עד 140 מילים, שורה לכל נושא): תקלות/טאבים, מהירות, חיסכון בפרוקסי וב-AI, איכות גלישה באתר והחלטה חכמה לשיפור הגלישה (בלי לגעת במקביליות!).'
       : 'זו פנייה ישירה של המפעיל! ענה קודם ישירות, חכם וברור בעברית על מה ששאל או ביקש, הצע פתרונות יצירתיים ומעשיים לבעיה אם יש כזו, ובצע מיד כל שינוי/אופטימיזציה שביקש דרך COMMAND_JSON!',
     'כאשר יש לבצע פעולה או כשהמפעיל מבקש שינוי, הוסף בסוף התשובה בשורה נפרדת JSON מדויק בפורמט: COMMAND_JSON:{"directives":[...]} (אובייקט עם מפתח directives).',
-    'יש לך שליטה מלאה על כל המערכת! אתה יכול לשנות **כל ערך** בקונפיגורציה דרך update_config (patch חלקי על currentConfig — למשל devices, proxy, adSafety, sessionPersistence, schedule, stealthMode, referrerMode, pageMinMs, sessionTimeoutMs, keepBrowserOpenMs, interVisitDelayMs, firstPagePriority, pages, waves, ai, visitCount, concurrency, targetUrl):',
-    '{"type":"update_config","patch":{"devices":{"iphone14":50,"pixel7":30,"desktopChrome":20},"adSafety":{"avoidAdClicks":true},"sessionPersistence":{"returningUserRate":70},"referrerMode":"google_organic"}},',
+    'תוכל לשנות בקונפיגורציה דרך update_config (patch חלקי על currentConfig — למשל devices, adSafety, sessionPersistence, schedule, stealthMode, referrerMode, pageMinMs, sessionTimeoutMs, keepBrowserOpenMs, interVisitDelayMs, firstPagePriority, pages, waves, ai, visitCount' + (allowConcurrencyChange ? ', minConcurrency, concurrency' : '') + '):',
+    '{"type":"update_config","patch":{"devices":{"iphone14":50,"pixel7":30,"desktopChrome":20},"adSafety":{"avoidAdClicks":true},"sessionPersistence":{"returningUserRate":70},"referrerMode":"mixed"}},',
     'ובנוסף פקודות ייעודיות:',
-    '{"type":"set_visits","visits":100}, {"type":"start_run","visits":25,"conversionRate":100,"headless":false,"streamMode":false}, {"type":"stop_run"}, {"type":"pause"}, {"type":"resume"},',
-    '{"type":"set_concurrency","min":1,"max":3}, {"type":"set_conversion_rate","rate":100}, {"type":"set_worker_pct","pct":85},',
+    (allowConcurrencyChange ? '{"type":"set_concurrency","min":5,"max":8}, ' : '') + '{"type":"set_visits","visits":100}, {"type":"start_run","visits":25,"conversionRate":100,"headless":false,"streamMode":false}, {"type":"stop_run"}, {"type":"pause"}, {"type":"resume"},',
+    '{"type":"set_conversion_rate","rate":100}, {"type":"set_worker_pct","pct":100},',
     '{"type":"set_headless","headless":true}, {"type":"set_task_mode","mode":"scenario|hybrid|behavior"}, {"type":"set_stream_mode","enabled":true},',
     '{"type":"set_wave_mode","mode":"off|steady|ramp_up|natural_peaks|burst"}, {"type":"set_resource_mode","mode":"full|lite|ultra_lite"},',
-    '{"type":"set_exploration","extraPageChance":70,"scanProductsChance":80,"maxProducts":2}, {"type":"set_delays","interVisitDelayMs":1500},',
-    '{"type":"add_recording_step","afterTab":1,"step":{"type":"ai_explore|scan_products|human_browse|read_article|scroll|wait|goto|close_tab","tab":1,"value":"3","label":"תיאור הצעד"}},',
+    '{"type":"set_exploration","extraPageChance":75,"scanProductsChance":85,"maxProducts":2}, {"type":"set_delays","interVisitDelayMs":0},',
+    '{"type":"add_recording_step","afterTab":0,"step":{"type":"ai_explore|use_tool|scan_products|human_browse|read_article|scroll|wait|goto|close_tab","tab":0,"value":"2","label":"תיאור הצעד"}},',
     '{"type":"remove_recording_step","index":5}, {"type":"replace_task_steps","steps":[...]},',
     '{"type":"assign_squad_model","squadId":"alpha|bravo|charlie|delta|all","model":"beam|deepseek-v4.1-flash|minimax-m3.1-flash|gpt-oss:20b|nemotron-3-nano:30b|gemma4:31b"},',
     '{"type":"focus_countries","countries":["US","GB","CA","DE","AU"]}, {"type":"dispatch_directive","directive":"הוראה מעשית חיה לצוותים"}.',
@@ -1533,11 +1531,13 @@ async function askFleetCommander({
         if ((config.pageMinMs || 3000) < 4000) patch.pageMinMs = 4500;
         if ((config.firstPagePriority || 60) > 45) patch.firstPagePriority = 40;
       }
-      const floorM = String(message || '').match(/(?:אל תוריד.*מתחת ל|רצפה.*היא)\s*-?\s*(\d+)/);
-      if (floorM) {
-        const floorVal = Math.max(1, Math.min(32, parseInt(floorM[1], 10) || 6));
-        patch.minConcurrency = floorVal;
-        patch.concurrency = Math.max(floorVal, Number(config.concurrency) || floorVal);
+      if (allowConcurrencyChange) {
+        const floorM = String(message || '').match(/(?:אל תוריד.*מתחת ל|רצפה.*היא|קבע.*מקביליות.*?)\s*-?\s*(\d+)/);
+        if (floorM) {
+          const floorVal = Math.max(1, Math.min(32, parseInt(floorM[1], 10) || 5));
+          patch.minConcurrency = floorVal;
+          patch.concurrency = Math.max(floorVal, Number(config.concurrency) || floorVal);
+        }
       }
       if (Object.keys(patch).length > 0) {
         parsedReply.directives.push({ type: 'update_config', patch });
