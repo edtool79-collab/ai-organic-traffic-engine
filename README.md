@@ -135,6 +135,13 @@ Features without a configured key report themselves as `unconfigured` in the das
 * **Live Inboxes &amp; OTP Verification ([gethirepulse.xyz/credits](https://gethirepulse.xyz/credits)):** All core browser automation, recording, and QA features run 100% free with zero API keys. To unlock automated end-to-end signup &amp; OTP verification (`fill_email` / `fill_otp` steps and post-run confirmation sweeps), add your `HIREPULSE_EMAIL_API_KEY` from [gethirepulse.xyz/credits](https://gethirepulse.xyz/credits) to `.env.local`.
 * **Datacenter vs. Residential Proxies:** Use `proxy.tier = "datacenter"` for high-throughput internal QA (0MB residential usage), or `"residential"` with `proxy.residential.byteBudgetMb` to enforce a strict bandwidth cap with automatic datacenter fallback.
 
+### Integration &amp; Optimization Guides
+
+* [How to Use Webshare Proxies with Traffic Engine](docs/guides/webshare-proxies.md)
+* [How to Configure Decodo Proxies in Traffic Engine](docs/guides/decodo-proxies.md)
+* [How to Limit Residential Proxy Bandwidth in Playwright &amp; Crawlee](docs/guides/limit-residential-bandwidth.md)
+* [How to Run AI Browser Agents with a Fixed Budget](docs/guides/ai-agents-budget.md)
+
 ---
 
 ## Verification & Tests
