@@ -1,4 +1,6 @@
 const fs = require('fs');
+const http = require('http');
+const https = require('https');
 const path = require('path');
 const os = require('os');
 const {
@@ -46,6 +48,7 @@ const {
   readFallbackProxiesTxt,
   readDatacenterServers,
   createFailoverProxyPool,
+  createAgent,
   normalizeProxyLine,
   toPlaywrightProxy,
   createCrawleeProxyConfiguration,
@@ -71,6 +74,119 @@ const residentialPool = require('./residentialPool');
 const ROOT_DIR = path.resolve(__dirname, '..');
 const DEFAULT_CONFIG_PATH = path.join(ROOT_DIR, 'config.json');
 const PROFILES_DIR = path.join(ROOT_DIR, 'session-profiles');
+
+const HTTP_FAST_USER_AGENTS = [
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0',
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 18_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Mobile/15E148 Safari/604.1',
+  'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Mobile Safari/537.36',
+];
+
+function pushLoadTime(statsObj, loadMs) {
+  const val = Math.round(Number(loadMs) || 0);
+  statsObj.loadTimesMs.push(val);
+  if (statsObj.loadTimesMs.length > 1000) {
+    statsObj.loadTimesMs.shift();
+  }
+}
+
+function performHttpGetOnce(targetUrlStr, { agent = undefined, headers = {}, timeoutMs = 15000 } = {}) {
+  return new Promise((resolve, reject) => {
+    let parsed;
+    try {
+      parsed = new URL(targetUrlStr);
+    } catch (err) {
+      return reject(err);
+    }
+    const transport = parsed.protocol === 'https:' ? https : http;
+    let settled = false;
+    const finishErr = (err) => {
+      if (settled) return;
+      settled = true;
+      reject(err);
+    };
+    const req = transport.request(parsed, {
+      method: 'GET',
+      agent,
+      headers,
+      timeout: timeoutMs,
+    }, (res) => {
+      let bodyBytes = 0;
+      res.on('data', (chunk) => { bodyBytes += chunk.length; });
+      res.on('error', finishErr);
+      res.on('end', () => {
+        if (settled) return;
+        settled = true;
+        const headerBytes = Array.isArray(res.rawHeaders)
+          ? res.rawHeaders.reduce((acc, s) => acc + String(s || '').length + 2, 0)
+          : 0;
+        resolve({
+          status: res.statusCode || 0,
+          headers: res.headers || {},
+          bytesTransferred: bodyBytes + headerBytes,
+        });
+      });
+    });
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(Object.assign(new Error(`HTTP timeout after ${timeoutMs}ms`), { name: 'TimeoutError' }));
+    });
+    req.once('error', finishErr);
+    req.end();
+  });
+}
+
+async function executeHttpFastVisit(landingUrl, { baseUrl = '', pages = [], extraPageChance = 0, agent = undefined, headers = {}, timeoutMs = 15000 } = {}) {
+  const startedAt = Date.now();
+  const visitedUrls = [];
+  let totalBytes = 0;
+
+  const followGet = async (initialUrl, reqHeaders) => {
+    let currentUrl = initialUrl;
+    let lastRes = null;
+    for (let hop = 0; hop <= 3; hop += 1) {
+      const t0 = Date.now();
+      const res = await performHttpGetOnce(currentUrl, { agent, headers: reqHeaders, timeoutMs });
+      totalBytes += res.bytesTransferred;
+      lastRes = { status: res.status, loadMs: Date.now() - t0, url: currentUrl };
+      const loc = res.headers?.location;
+      if (res.status >= 300 && res.status < 400 && loc && hop < 3) {
+        currentUrl = new URL(String(loc), currentUrl).toString();
+        continue;
+      }
+      break;
+    }
+    return lastRes;
+  };
+
+  const first = await followGet(landingUrl, headers);
+  let pathname = '/';
+  try { pathname = new URL(first.url).pathname || '/'; } catch {}
+  visitedUrls.push({ path: pathname, url: first.url, status: first.status, loadMs: first.loadMs });
+
+  const originBase = baseUrl || landingUrl;
+  const otherPages = pages.filter((p) => {
+    try { return new URL(resolveTargetUrl(originBase, p)).toString() !== new URL(landingUrl).toString(); } catch { return false; }
+  });
+  if (otherPages.length && Math.random() * 100 < Number(extraPageChance || 0)) {
+    const subPath = randomChoice(otherPages);
+    const subUrl = resolveTargetUrl(originBase, subPath);
+    const sub = await followGet(subUrl, { ...headers, Referer: first.url }).catch(() => null);
+    if (sub) {
+      visitedUrls.push({ path: subPath, url: sub.url, status: sub.status, loadMs: sub.loadMs });
+    }
+  }
+
+  return {
+    status: first.status,
+    loadMs: Date.now() - startedAt,
+    pagesVisited: visitedUrls.length,
+    pageErrors: first.status >= 500 || first.status === 0 ? 1 : 0,
+    errorDetails: first.status >= 500 ? [`HTTP ${first.status}`] : [],
+    visitedUrls,
+    bytesTransferred: totalBytes,
+  };
+}
 
 /**
  * Turns a visit error message into one of the scoreboard outcomes. Only outcomes that really mean
@@ -253,6 +369,9 @@ async function executeVisitWorkload({
     if (runtimeState?.previewActive === false) return;
     sendIpc({ type: 'live_frame', data: frame });
   };
+  const liveOnFrame = (!runtimeState?.previewActive || (headless && visitCount >= 50 && (visitIndex % 10 !== 0)))
+    ? null
+    : onFrame;
   const onStep = msg => console.log(msg);
 
   let combined = {
@@ -311,7 +430,7 @@ async function executeVisitWorkload({
       aiConfig,
       aiDirective: runtimeState?.aiDirective || aiConfig?.commanderDirective || '',
       staySameOrigin: waveSummary?.isConverter === false,
-      onFrame,
+      onFrame: liveOnFrame,
       onStep,
       attribution: cfgVars.attribution,
       geoInfo,
@@ -337,7 +456,7 @@ async function executeVisitWorkload({
       initialLoadMs: combined.loadMs,
       initialReferer,
       adSafety,
-      onFrame,
+      onFrame: liveOnFrame,
       onStep,
     });
     combined = {
@@ -390,8 +509,8 @@ async function executeVisitWorkload({
 
   if (!headless && keepBrowserOpenMs > 0) {
     await sleep(keepBrowserOpenMs);
-  } else {
-    await sleep(900);
+  } else if (headless && wavesCfg?.mode !== 'burst' && keepBrowserOpenMs > 0 && visitCount < 100) {
+    await sleep(Math.min(250, keepBrowserOpenMs));
   }
   return combined;
 }
@@ -519,6 +638,18 @@ async function run() {
 
   const targetUrl = cfg.targetUrl.replace(/\/$/, '');
   const pages = normalizePages(cfg.pages);
+  if (process.env.WTG_DOCKER === '1') {
+    if (process.env.ENGINE_MODE && ['crawlee_autoscaled', 'crawlee_playwright', 'http_fast'].includes(process.env.ENGINE_MODE)) {
+      cfg.engineMode = process.env.ENGINE_MODE;
+    }
+    if (process.env.MIN_CONCURRENCY && Number(process.env.MIN_CONCURRENCY) >= 1) {
+      cfg.minConcurrency = Number(process.env.MIN_CONCURRENCY);
+    }
+    if (!process.env.VISIT_COUNT_OVERRIDE && process.env.VISIT_COUNT && Number(process.env.VISIT_COUNT) >= 1) {
+      cfg.visitCount = Number(process.env.VISIT_COUNT);
+    }
+  }
+  const engineMode = ['crawlee_playwright', 'http_fast'].includes(cfg.engineMode) ? cfg.engineMode : 'crawlee_autoscaled';
   const totalVisits = Math.max(1, parseInt(String(process.env.VISIT_COUNT_OVERRIDE ?? cfg.visitCount ?? 10), 10) || 10);
   // `targets` (optional) wins over `targetUrl`: each entry keeps its own pages, visit budget and
   // cookie jar, so two sites never share a session.
@@ -538,14 +669,14 @@ async function run() {
     : 'ultra_lite';
   let headless = cfg.headless !== false;
   const isMultiScaleRun = visitCount >= 3 || maxConcurrency >= 2;
-  if (isMultiScaleRun && resourceMode === 'full') {
+  if (engineMode !== 'http_fast' && isMultiScaleRun && resourceMode === 'full') {
     resourceMode = 'lite';
     try {
       cfg.resourceMode = 'lite';
       fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2), 'utf8');
     } catch {}
   }
-  if (!headless && (['lite', 'ultra_lite', 'browserless_cdp', 'lightpanda_cdp'].includes(resourceMode) || (isMultiScaleRun && process.env.FORCE_PHYSICAL_WINDOWS !== '1'))) {
+  if (engineMode !== 'http_fast' && !headless && (['lite', 'ultra_lite', 'browserless_cdp', 'lightpanda_cdp'].includes(resourceMode) || (isMultiScaleRun && process.env.FORCE_PHYSICAL_WINDOWS !== '1'))) {
     headless = true;
     try {
       cfg.headless = true;
@@ -554,7 +685,6 @@ async function run() {
     } catch {}
     console.log('[RAM & Background Mode] מצב חיסכון זיכרון פעיל — הדפדפנים רצים ברקע (Headless) ללא חלונות פיזיים, והתצוגה החיה משודרת למסך הדאשבורד!');
   }
-  const engineMode = cfg.engineMode === 'crawlee_playwright' ? 'crawlee_playwright' : 'crawlee_autoscaled';
   const personas = normalizePersonas(cfg.personas);
   const deviceWeights = cfg.devices || {};
   const snippet = cfg.snippet || null;
@@ -995,6 +1125,203 @@ async function run() {
     console.log(`[Schedule] השעה הנוכחית מחוץ לחלון הפעילות (${schedule.startHour}-${schedule.endHour}). ממתין לפתיחת החלון...`);
   }
 
+  // ── Mode C: HTTP Fast Flood (No Browser — 1,000+ visits/min via Node HTTP/S + Proxies + Referer/UTM) ──
+  if (engineMode === 'http_fast') {
+    plan.forEach(targetIdx => {
+      const t = targets[targetIdx] || targets[0];
+      bumpTargetStat(stats, t.url, 'planned');
+    });
+    if (isMultiTarget) {
+      targets.forEach(t => console.log(`[Targets] ${t.url} — ${t.visitCount} בקשות | עמודים: ${t.pages.join(', ')}`));
+    }
+    const workerCount = Math.min(visitCount, Math.max(1, maxConcurrency));
+    stats.desiredConcurrency = workerCount;
+    const directHttpAgent = new http.Agent({ keepAlive: true, maxSockets: workerCount });
+    const directHttpsAgent = new https.Agent({ keepAlive: true, maxSockets: workerCount });
+    const proxyAgentCache = new Map();
+    const getPooledAgent = (proxyUrlStr, targetStr) => {
+      if (proxyUrlStr) {
+        let cached = proxyAgentCache.get(proxyUrlStr);
+        if (!cached) {
+          cached = createAgent(proxyUrlStr);
+          proxyAgentCache.set(proxyUrlStr, cached);
+        }
+        return cached;
+      }
+      return String(targetStr || '').startsWith('https:') ? directHttpsAgent : directHttpAgent;
+    };
+
+    let nextVisitIndex = 0;
+    let inFlight = 0;
+    let nextSlotStartAt = 0;
+    const monitorTimer = setInterval(() => {
+      const within = isWithinActiveHours(schedule);
+      if (schedule.enabled && !within && !schedulePaused) {
+        schedulePaused = true;
+        console.log(`[Schedule] יצאנו מחלון הפעילות (${schedule.startHour}-${schedule.endHour}) — משהה.`);
+      } else if (schedule.enabled && within && schedulePaused) {
+        schedulePaused = false;
+        console.log(`[Schedule] נכנסנו לחלון הפעילות (${schedule.startHour}-${schedule.endHour}) — ממשיך.`);
+      }
+      stats.currentConcurrency = inFlight;
+      stats.desiredConcurrency = workerCount;
+      emitTelemetry(null);
+    }, 500);
+
+    try {
+      const worker = async () => {
+        while (!aborted) {
+          while ((userPaused || schedulePaused) && !aborted) {
+            await sleep(200);
+          }
+          if (aborted || nextVisitIndex >= visitCount) return;
+          const i = nextVisitIndex++;
+          inFlight++;
+          stats.currentConcurrency = inFlight;
+
+          const targetIdx = plan[i] ?? 0;
+          const target = targets[targetIdx] || targets[0];
+          const visitTargetUrl = target.url;
+          const visitPages = normalizePages(target.pages);
+          const targetOfferDomain = proxyScore.hostOf(visitTargetUrl) || offerDomain;
+          const firstPage = visitPages[0];
+          const otherPages = visitPages.filter(p => p !== firstPage);
+          const entryPath = (Math.random() < (firstPagePriority / 100) || !otherPages.length)
+            ? firstPage
+            : randomChoice(otherPages);
+          const fullLandingUrl = resolveTargetUrl(visitTargetUrl, entryPath);
+          const persona = randomChoice(personas);
+          let retried = false;
+
+          try {
+            while (true) {
+              const visitIsLoopback = isLoopbackUrl(visitTargetUrl);
+              let selectedProxyUrl = null;
+              if (proxyConfiguration && !visitIsLoopback) {
+                selectedProxyUrl = proxyMode === 'random'
+                  ? randomChoice(proxyUrls)
+                  : await proxyConfiguration.newUrl(retried ? `http-${i}-retry` : `http-${i}`);
+              }
+              const resolvedCountry = (selectedProxyUrl ? proxyCountryByUrl[selectedProxyUrl] : null) || null;
+              const geo = resolvedCountry ? { countryCode: resolvedCountry } : null;
+              const referrerPick = pickReferrer({
+                geo,
+                title: typeof snippet === 'string' ? snippet.slice(0, 120) : '',
+                targetUrl: visitTargetUrl,
+                mode: referrerMode,
+              });
+              const pacingDelayMs = Number(runtimeState.interVisitDelayMs ?? interVisitDelayMs) || 0;
+              if (i > 0 && pacingDelayMs > 0 && !aborted) {
+                const now = Date.now();
+                const waitUntil = Math.max(now, nextSlotStartAt) + pacingDelayMs;
+                nextSlotStartAt = waitUntil;
+                const waitMs = Math.min(30000, Math.max(0, waitUntil - now));
+                if (waitMs > 0) await sleep(waitMs);
+              }
+              if (aborted) break;
+
+              const ua = randomChoice(HTTP_FAST_USER_AGENTS);
+              const headers = {
+                'User-Agent': ua,
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate',
+                'Cache-Control': 'no-cache',
+                ...(referrerPick?.url ? { Referer: referrerPick.url } : {}),
+                ...originExtraHeaders,
+              };
+              const agent = getPooledAgent(selectedProxyUrl, fullLandingUrl);
+
+              try {
+                const res = await executeHttpFastVisit(fullLandingUrl, {
+                  baseUrl: visitTargetUrl,
+                  pages: visitPages,
+                  extraPageChance: wavesCfg.enabled ? (wavesCfg.extraPageChance ?? 25) : 0,
+                  agent,
+                  headers,
+                  timeoutMs: Math.min(sessionTimeoutMs, 30000),
+                });
+                stats.completed++;
+                stats.succeeded++;
+                bumpTargetStat(stats, visitTargetUrl, 'succeeded');
+                stats.errorsTotal += res.pageErrors;
+                pushLoadTime(stats, res.loadMs);
+                stats.proxyTransferBytes += res.bytesTransferred;
+                if (residentialActive && selectedProxyUrl && residentialPool.isResidentialUrl(selectedProxyUrl) && res.bytesTransferred > 0) {
+                  const overheadRaw = Number(cfg.proxy?.residential?.overheadFactor);
+                  const overhead = Number.isFinite(overheadRaw) && overheadRaw >= 1 ? overheadRaw : 1.15;
+                  residentialPool.addBytes(Math.round(res.bytesTransferred * overhead), { visits: 1 });
+                }
+                proxyPool.reportSuccess();
+                proxyScore.reportOutcome({ domain: targetOfferDomain, proxyUrl: selectedProxyUrl, outcome: 'ok' });
+
+                const shouldLogDetail = visitCount <= 100 || i < 15 || (i % 20 === 0) || i === visitCount - 1;
+                if (shouldLogDetail) {
+                  const pTag = selectedProxyUrl ? `, proxy: ${maskProxyLabel(selectedProxyUrl)}` : '';
+                  console.log(`[HTTP #${i + 1}] ${res.status} | ${res.loadMs}ms | ${Math.round(res.bytesTransferred / 1024)}KB | ${entryPath}${pTag}`);
+                  sendIpc({
+                    type: 'visit_detail',
+                    data: {
+                      visitNumber: i + 1,
+                      persona: persona.name,
+                      device: 'HTTP-Fast (No Browser)',
+                      status: res.status,
+                      loadMs: res.loadMs,
+                      pagesVisited: res.pagesVisited,
+                      pageErrors: res.pageErrors,
+                      visitedUrls: res.visitedUrls || [],
+                      errorDetails: res.errorDetails || [],
+                      stepResults: [],
+                      skippedSteps: 0,
+                      country: resolvedCountry,
+                      ts: new Date().toISOString(),
+                    },
+                  });
+                }
+                break;
+              } catch (err) {
+                const errMsg = String(err?.message || err || '');
+                const isTransient = err?.name === 'TimeoutError' || /timeout|ECONNRESET|ECONNREFUSED|ETIMEDOUT|socket hang up/i.test(errMsg);
+                const retryBudget = Number(stats.retriedVisitsCount || 0);
+                const retryCap = Math.max(3, Math.ceil(visitCount * 0.25));
+                if (!retried && !aborted && !schedulePaused && !userPaused && retryBudget < retryCap && isTransient) {
+                  retried = true;
+                  stats.retriedVisitsCount = retryBudget + 1;
+                  continue;
+                }
+                proxyScore.reportOutcome({
+                  domain: targetOfferDomain,
+                  proxyUrl: selectedProxyUrl,
+                  outcome: classifyVisitFailure(errMsg),
+                  note: errMsg.slice(0, 90),
+                });
+                logVisitFailure(i, persona, err, stats);
+                bumpTargetStat(stats, visitTargetUrl, 'failed');
+                proxyPool.reportFailure(err);
+                break;
+              }
+            }
+          } finally {
+            inFlight--;
+            stats.currentConcurrency = inFlight;
+          }
+        }
+      };
+
+      await Promise.all(Array.from({ length: workerCount }, () => worker()));
+      console.log('All visits complete.');
+    } finally {
+      clearInterval(monitorTimer);
+      for (const a of proxyAgentCache.values()) {
+        try { a.destroy?.(); } catch {}
+      }
+      try { directHttpAgent.destroy(); } catch {}
+      try { directHttpsAgent.destroy(); } catch {}
+      emitTelemetry(null);
+    }
+    return;
+  }
+
   // ── Mode A: Crawlee AutoscaledPool + Multi-Engine + FingerprintSuite + Persistent Contexts ──
   if (engineMode === 'crawlee_autoscaled') {
     plan.forEach(targetIdx => {
@@ -1012,8 +1339,8 @@ async function run() {
     const pool = new AutoscaledPool({
       minConcurrency,
       maxConcurrency,
-      desiredConcurrency: Math.min(maxConcurrency, Math.max(minConcurrency, Math.min(4, maxConcurrency))),
-      autoscaleIntervalSecs: 2,
+      desiredConcurrency: Math.min(maxConcurrency, Math.max(minConcurrency, Math.min(6, maxConcurrency))),
+      autoscaleIntervalSecs: wavesCfg?.mode === 'burst' ? 1 : 2,
       loggingIntervalSecs: null,
       snapshotterOptions: {
         maxBlockedMillis: 250,
@@ -1190,7 +1517,7 @@ async function run() {
           stats.succeeded++;
           bumpTargetStat(stats, visitTargetUrl, 'succeeded');
           stats.errorsTotal += result.pageErrors;
-          stats.loadTimesMs.push(result.loadMs);
+          pushLoadTime(stats, result.loadMs);
           if (result.loadMs > 3000) stats.slowVisitsCount++;
           if (Array.isArray(result.errorDetails) && result.errorDetails.length) {
             stats.lastErrorSample = String(result.errorDetails[0] || '').slice(0, 140);
@@ -1529,7 +1856,7 @@ async function run() {
         stats.succeeded++;
         bumpTargetStat(stats, request.userData.targetUrl, 'succeeded');
         stats.errorsTotal += res.pageErrors;
-        stats.loadTimesMs.push(res.loadMs);
+        pushLoadTime(stats, res.loadMs);
         if (cState) {
           if (cState.isReturning) stats.returningSessions++;
           else stats.newSessions++;

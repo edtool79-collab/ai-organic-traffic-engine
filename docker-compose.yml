@@ -11,7 +11,9 @@ services:
     volumes:
       - ./config.json:/app/config.json
       - ./proxies.txt:/app/proxies.txt
+      - ./data:/app/data
       - ./session-profiles:/app/session-profiles
+      - ./site-profiles:/app/site-profiles
     restart: unless-stopped
 
   worker:
@@ -20,10 +22,14 @@ services:
     shm_size: "2gb"
     environment:
       - NODE_ENV=production
-      - CONCURRENCY=10
+      - WTG_DOCKER=1
+      - WTG_BROWSER_CHANNEL=bundle
+      - CONCURRENCY=${WTG_CONCURRENCY:-10}
+      - MIN_CONCURRENCY=${WTG_MIN_CONCURRENCY:-4}
     volumes:
       - ./config.json:/app/config.json:ro
       - ./proxies.txt:/app/proxies.txt:ro
+      - ./data:/app/data
       - ./session-profiles:/app/session-profiles
     deploy:
       replicas: 1
@@ -32,3 +38,12 @@ services:
           memory: 2560M
     profiles:
       - swarm
+
+  lightpanda:
+    image: lightpanda/browser:latest
+    command: ["lightpanda", "serve", "--host", "0.0.0.0", "--port", "9222"]
+    ports:
+      - "127.0.0.1:9222:9222"
+    restart: unless-stopped
+    profiles:
+      - lightpanda

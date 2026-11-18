@@ -8,7 +8,7 @@ Self-hosted multi-engine Playwright & Crawlee browser automation, flow verificat
 
 | Area | Implemented Behavior |
 | --- | --- |
-| **Execution & Scheduling** | Runs in `crawlee_autoscaled` (Mode A) or `crawlee_playwright` (Mode B) across `behavior`, `scenario`, and `hybrid` task modes. Supports wave pacing (`off`, `steady`, `ramp_up`, `natural_peaks`, `burst`), local time windows (`schedule`), and single-target or multi-target (`targets[]`) round-robin execution with isolated per-target sessions and `byTarget` metrics. |
+| **Execution & Scheduling** | Runs in `crawlee_autoscaled` (Mode A — real browsers), `crawlee_playwright` (Mode B — real browsers), or `http_fast` (no-browser protocol load mode for high-throughput HTTP/S requests with proxies, UTM params, and `Referer` headers — without JS execution or client-side analytics). Real-browser modes run `behavior`, `scenario`, and `hybrid` task modes with wave pacing (`off`, `steady`, `ramp_up`, `natural_peaks`, `burst`), progressive free-MB RAM throttling (`RAM Governor`), sampled `rrweb` preview on mass runs, local time windows (`schedule`), and single- or multi-target (`targets[]`) round-robin execution with `byTarget` metrics. |
 | **Browser Engines & Profiles** | Selects between `chromium` (Playwright + stealth evasions), `patchright`, and `camoufox` (Firefox-based engine), plus optional CDP connections via `browserless` and `@lightpanda/browser`. Weighted device emulation across desktop and mobile viewports plus geo-matched persistent browser profiles (`sessionPersistence`). |
 | **Recorder & Scenario Steps** | Interactive browser recorder (`journeyRecorder.js`), DOM/ad-slot inspector (`pageMapper.js`), and 24 scenario step handlers including `goto`, `click`, `fill`, `fill_email`, `fill_otp`, `select`, `press`, `hover`, `scroll`, `scroll_to`, `read_article`, `human_browse`, `scan_products`, `search_entry`, `ai_explore`, `ai_route_repair`, `ai_form_guard`, `wait`, `dismiss_overlays`, `audit_ads`, `assert`, `go_back`, `close_tab`, and `screenshot`. |
 | **AI Fleet Commander & `clef:27b`** | Connects to Ollama Cloud (`OLLAMA_API_KEY`) and UncensoredLLM (`ULLM_API_KEY`) with automatic quota/429 failover and an offline local fallback advisor. Routes `/v1/systemone` decision models such as `clef:27b` (typed page-state classification and next-action choice with 0 output tokens) for worker/recovery steps while keeping free-form JSON scenario helpers (`ai_route_repair`, `ai_form_guard`, Fleet Commander chat) on chat-capable models. Includes a per-route Playbook Cache (`aiPagePlaybookCache`). |
@@ -37,8 +37,20 @@ Copy-Item .env.example .env.local
 2. Fill in optional tokens in `.env.local` (never committed; automatically loaded by `src/localEnv.js` on dashboard startup).
 3. Launch the dashboard with `start-dashboard.bat` (or `npm start`) and open [http://127.0.0.1:4310](http://127.0.0.1:4310), or run headless directly via CLI:
 
+Run headless directly via CLI or scale workers with Docker:
+
 ```powershell
 node src/crawleeRunner.js config.json
+```
+
+### Docker Swarm & Lightpanda Sidecar
+
+For multi-container execution on a high-RAM Linux host or VPS, [docker-compose.yml](docker-compose.yml) includes a `swarm` worker profile (with `./data` and `./site-profiles` mounts, `2gb` `/dev/shm`, `WTG_DOCKER=1`, and Playwright bundled Chromium) and an optional `lightpanda` CDP sidecar (`127.0.0.1:9222`):
+
+```powershell
+docker compose up -d dashboard
+docker compose --profile swarm up -d --scale worker=4
+docker compose --profile lightpanda up -d
 ```
 
 ---
@@ -102,9 +114,9 @@ Read-only network diagnostic scripts (`tests/probe-geo.js`, `tests/probe-render.
 | --- | --- |
 | `targetUrl`, `pages` | Primary HTTP(S) base URL and default path array. |
 | `targets` | Optional array of `{ url, pages, visitCount }` for multi-target round-robin runs with isolated session profiles. |
-| `visitCount`, `minConcurrency`, `concurrency`, `firstPagePriority` | Total planned visits (1–100,000), concurrency bounds (1–32), and landing-page entry weighting (0–100%). |
+| `visitCount`, `minConcurrency`, `concurrency`, `firstPagePriority` | Total planned visits (1–100,000), concurrency bounds (1–32 for real browsers, up to 128 for `http_fast`), and landing-page entry weighting (0–100%). |
 | `sessionTimeoutMs`, `pageMinMs`, `keepBrowserOpenMs`, `interVisitDelayMs` | Per-visit timeout, minimum page dwell, cleanup wait, and pacing delay in milliseconds. |
-| `headless`, `engineMode`, `browserEngine`, `taskMode`, `referrerMode` | Headless toggle, `crawlee_autoscaled` / `crawlee_playwright`, `chromium` / `patchright` / `camoufox`, `behavior` / `scenario` / `hybrid`, and referrer distribution. |
+| `headless`, `engineMode`, `browserEngine`, `taskMode`, `referrerMode` | Headless toggle, `crawlee_autoscaled` / `crawlee_playwright` / `http_fast`, `chromium` / `patchright` / `camoufox`, `behavior` / `scenario` / `hybrid`, and referrer distribution. |
 | `taskSteps`, `snippet` | Ordered scenario steps (up to 100) and optional page init JavaScript. |
 | `schedule` | Local-time window `{ enabled, startHour, endHour }`. |
 | `devices`, `personas` | Device weights and behavioral reading/interaction presets. |

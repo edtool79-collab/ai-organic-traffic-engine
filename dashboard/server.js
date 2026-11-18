@@ -320,7 +320,11 @@ function validateAndNormalizeConfig(input) {
   const proxyServers = normalizeProxyList(input.proxy?.servers);
   const fallbackServers = normalizeProxyList(input.proxy?.fallbackServers);
 
-  const concurrency = clampInt(input.concurrency, 1, 32, 3);
+  const engineMode = ['crawlee_autoscaled', 'crawlee_playwright', 'http_fast'].includes(input.engineMode)
+    ? input.engineMode
+    : 'crawlee_autoscaled';
+  const maxAllowedConcurrency = engineMode === 'http_fast' ? 128 : 32;
+  const concurrency = clampInt(input.concurrency, 1, maxAllowedConcurrency, 3);
   const minConcurrency = clampInt(input.minConcurrency, 1, concurrency, 1);
   const snippet = (typeof input.snippet === 'string' && input.snippet.trim()) ? input.snippet.trim() : null;
   const validStepTypes = new Set(['goto', 'click', 'go_back', 'close_tab', 'fill', 'fill_email', 'fill_otp', 'select', 'press', 'hover', 'scroll', 'scroll_to', 'read_article', 'human_browse', 'scan_products', 'ai_explore', 'ai_route_repair', 'ai_form_guard', 'search_entry', 'wait', 'dismiss_overlays', 'audit_ads', 'assert', 'screenshot']);
@@ -366,7 +370,7 @@ function validateAndNormalizeConfig(input) {
     sessionTimeoutMs: clampInt(input.sessionTimeoutMs, 5000, 600000, 90000),
     pageMinMs: clampInt(input.pageMinMs, 0, 120000, 4000),
     headless: input.headless !== false,
-    engineMode: input.engineMode === 'crawlee_playwright' ? 'crawlee_playwright' : 'crawlee_autoscaled',
+    engineMode,
     browserEngine: ['chromium', 'patchright', 'camoufox'].includes(input.browserEngine) ? input.browserEngine : 'chromium',
     taskMode: ['behavior', 'scenario', 'hybrid'].includes(input.taskMode) ? input.taskMode : 'behavior',
     referrerMode: ['mixed', 'google_organic', 'search_engines', 'social', 'direct'].includes(input.referrerMode)

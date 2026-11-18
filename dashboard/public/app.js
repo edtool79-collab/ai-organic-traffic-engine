@@ -1888,23 +1888,26 @@ function wireActions() {
       const minConc = Number(btn.dataset.min) || 2;
       const maxConc = Number(btn.dataset.max) || 6;
       const ramMode = btn.dataset.ram || 'ultra_lite';
+      const engine = btn.dataset.engine || 'crawlee_autoscaled';
+      state.config.engineMode = engine;
       state.config.visitCount = visits;
       state.config.minConcurrency = minConc;
       state.config.concurrency = maxConc;
       state.config.resourceMode = ramMode;
       state.config.stealthMode = 'maximum';
       state.config.headless = true;
-      state.config.interVisitDelayMs = visits >= 500
+      state.config.interVisitDelayMs = (visits >= 500 || engine === 'http_fast')
         ? 0
         : Math.min(Number(state.config.interVisitDelayMs ?? 0) || 0, 500);
       delete state.config.waveConfig;
       state.config.waves = {
         ...(state.config.waves || {}),
         enabled: true,
-        mode: visits >= 1000 ? 'burst' : 'natural_peaks',
+        mode: (visits >= 1000 || engine === 'http_fast') ? 'burst' : 'natural_peaks',
       };
       syncFormFromConfig();
-      showToast(`הוגדרה ריצת סקאלה של ${visits.toLocaleString('he-IL')} סשנים (מקביליות ${minConc}–${maxConc}, השהיה ${state.config.interVisitDelayMs}ms, Headless ברקע, מצב זיכרון: ${ramMode}).`);
+      const modeTag = engine === 'http_fast' ? 'HTTP Fast ללא דפדפן' : `Headless ברקע, מצב זיכרון: ${ramMode}`;
+      showToast(`הוגדרה ריצת סקאלה של ${visits.toLocaleString('he-IL')} סשנים (מקביליות ${minConc}–${maxConc}, השהיה ${state.config.interVisitDelayMs}ms, ${modeTag}).`);
     };
   });
 

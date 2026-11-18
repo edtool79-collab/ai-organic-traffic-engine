@@ -336,7 +336,7 @@ function getChromiumStealthArgs(headless = true, { stealthMode = 'standard', pro
     '--mute-audio',
     '--no-pings',
     `--disable-features=${disabledFeatures.join(',')}`,
-    ...(headless ? [] : ['--window-position=90,60']),
+    ...(headless ? ['--renderer-process-limit=4'] : ['--window-position=90,60']),
   ];
   if (stealthMode === 'maximum' || proxied) {
     args.push(

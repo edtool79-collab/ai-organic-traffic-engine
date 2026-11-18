@@ -625,6 +625,7 @@ module.exports = {
   readFallbackProxiesTxt,
   readDatacenterServers,
   createFailoverProxyPool,
+  createAgent,
   checkSingleProxy,
   checkProxiesBatch,
   maskProxyLabel,
