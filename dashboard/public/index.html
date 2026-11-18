@@ -418,10 +418,14 @@
 
           <div class="recorder-box" id="agent-email-pilot-box" style="margin-top:12px;">
             <div class="section-title" style="margin-bottom:8px;">
-              <span>Live inboxes and verification codes</span>
+              <span>📧 Live Inboxes &amp; Automated OTP Verification</span>
               <span class="badge" id="email-pilot-status-badge">Checking inbox service…</span>
             </div>
-            <p class="hint">Create an inbox for a manual test, or add <code>fill_email</code> and <code>fill_otp</code> to a journey on a site you are authorized to test. Creating a live inbox can use service credits.</p>
+            <p class="hint">Create a live inbox for manual testing, or add <code>fill_email</code> and <code>fill_otp</code> steps to automate end-to-end signup &amp; verification flows.</p>
+            <div id="email-pilot-cta" class="advice-box" style="display:none; margin-bottom:10px; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+              <span>Add <code>HIREPULSE_EMAIL_API_KEY</code> to <code>.env.local</code> to unlock automated live inboxes &amp; OTP extraction (optional — core browser QA runs free without a key).</span>
+              <a class="btn-link primary small" href="https://gethirepulse.xyz/credits" target="_blank" rel="noopener">Get Inbox Credits at gethirepulse.xyz ↗</a>
+            </div>
             <div class="inline-row" style="gap:8px; flex-wrap:wrap; align-items:center;">
               <button type="button" class="small primary" id="btn-create-live-inbox" disabled>Create live inbox</button>
               <input id="live-inbox-address" class="ltr" type="text" readonly placeholder="Inbox address" style="min-width:250px; flex:1;" />

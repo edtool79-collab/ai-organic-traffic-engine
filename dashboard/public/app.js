@@ -2258,6 +2258,7 @@ function wireActions() {
     .then(res => {
       const badge = $('email-pilot-status-badge');
       const pilotBox = $('agent-email-pilot-box');
+      const ctaEl = $('email-pilot-cta');
       if (!badge) return;
       if (res.email?.configured) {
         badge.textContent = res.email.isFreeOwnerPilot
@@ -2266,12 +2267,12 @@ function wireActions() {
         $('btn-create-live-inbox').disabled = false;
         badge.style.color = '#4ade80';
         if (pilotBox) pilotBox.style.display = '';
+        if (ctaEl) ctaEl.style.display = 'none';
       } else {
-        // Optional feature: no key means no inbox — the box simply stays out of the way instead of
-        // asking the operator to set an environment variable that traffic generation never needs.
-        badge.textContent = 'Unconfigured — live inbox disabled';
-        badge.style.color = '#94a3b8';
-        if (pilotBox) pilotBox.style.display = 'none';
+        badge.textContent = 'Optional — Get API Key';
+        badge.style.color = '#38bdf8';
+        if (pilotBox) pilotBox.style.display = '';
+        if (ctaEl) ctaEl.style.display = 'flex';
       }
     })
     .catch(() => {});

@@ -16,13 +16,27 @@
   <img src="docs/img/hero-banner.png" alt="Traffic Engine 4-Layer Architecture Banner" width="100%" />
 </p>
 
-## Dashboard &amp; Reporting Preview
+## Visual Showcase
 
 ![Dashboard overview on the built-in demo site](docs/img/dashboard-overview.png)
 
-| Live Runner Logs | AI-Summarized PDF Report |
+### AI Fleet, Live Inboxes &amp; Automated OTP Verification
+<p align="center">
+  <img src="docs/img/feature-ai-otp.png" alt="AI Fleet Commander, Live Inboxes, OTP Verification &amp; PDF Reporting" width="100%" />
+</p>
+
+| AI Site Onboarding &amp; Multi-Target Scale | Live Inbox &amp; OTP Verification |
 | :---: | :---: |
-| ![Live run log](docs/img/live-run-log.png) | ![Generated PDF report](docs/img/generated-pdf-report.png) |
+| ![AI Site Onboarding &amp; Multi-Target Execution](docs/img/onboarding-and-targets.png) | ![Live Inboxes &amp; OTP Verification CTA](docs/img/live-inbox-cta.png) |
+
+### Global Geo Proxy Routing, Multi-Engine Stealth &amp; Ad-Safe Shield
+<p align="center">
+  <img src="docs/img/feature-proxies-stealth.png" alt="Global Geo Proxy Routing &amp; Multi-Engine Stealth" width="100%" />
+</p>
+
+| Unified Geo Routing &amp; Proxy Tier Controls | Live Runner Logs &amp; AI PDF Report |
+| :---: | :---: |
+| ![Geo Routing &amp; Proxy Controls](docs/img/proxy-geo-routing.png) | ![Live run log](docs/img/live-run-log.png)<br/><br/>![Generated PDF report](docs/img/generated-pdf-report.png) |
 
 ## Capabilities at a Glance
 
@@ -105,6 +119,13 @@ Features without a configured key report themselves as `unconfigured` in the das
 * **CLI Tools (`tools/`):**
   * `node tools/preflight-target.js <url> [--country us] [--no-proxy] [--wait 12000] [--shot out.png] [--json]` — read-only target gate classifier (`open`, `cf_interstitial`, `site_tick`, `dead`, `unknown`).
   * `node tools/build-proxy-geo.js` — probes configured proxies against `ip-api.com` and writes anonymized country/latency metadata to `data/proxy-geo.json`.
+
+---
+
+## Live Inboxes &amp; Proxy Setup
+
+* **Live Inboxes &amp; OTP Verification ([gethirepulse.xyz/credits](https://gethirepulse.xyz/credits)):** All core browser automation, recording, and QA features run 100% free with zero API keys. To unlock automated end-to-end signup &amp; OTP verification (`fill_email` / `fill_otp` steps and post-run confirmation sweeps), add your `HIREPULSE_EMAIL_API_KEY` from [gethirepulse.xyz/credits](https://gethirepulse.xyz/credits) to `.env.local`.
+* **Datacenter vs. Residential Proxies:** Use `proxy.tier = "datacenter"` for high-throughput internal QA (0MB residential usage), or `"residential"` with `proxy.residential.byteBudgetMb` to enforce a strict bandwidth cap with automatic datacenter fallback.
 
 ---
 
