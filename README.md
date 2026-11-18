@@ -1,9 +1,9 @@
 <div align="center">
   <img src="docs/img/logo.png" alt="Traffic Engine Logo" width="88" />
-  <h1>Traffic Engine — Web Traffic Generation &amp; Browser QA Studio</h1>
+  <h1>Traffic Engine — Automated Web Traffic &amp; Organic Search Simulator</h1>
   <p>
-    <strong>Self-hosted multi-engine Playwright &amp; Crawlee browser automation, flow verification, and observability suite</strong><br/>
-    Local Express Dashboard (<code>http://127.0.0.1:4310</code>) &bull; Live <code>rrweb</code> Preview &bull; Proxy Tier &amp; Metering Controls &bull; Optional Live-Inbox OTP Verification &bull; AI Fleet Orchestration
+    <strong>Self-hosted multi-engine Playwright &amp; Crawlee traffic engine with real-time live browser preview, organic search &amp; social referrers, geo-targeted proxies, and AI fleet orchestration</strong><br/>
+    Local Express Dashboard (<code>http://127.0.0.1:4310</code>) &bull; Watch Every Session Live (<code>rrweb</code> + Screenshots) &bull; Organic Search &amp; Social Traffic &bull; 19-Country Proxy Routing &bull; Live-Inbox Signups &amp; Conversions
   </p>
   <p>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-10b981.svg" alt="MIT License" /></a>
@@ -37,6 +37,14 @@
 | Unified Geo Routing &amp; Proxy Tier Controls | Live Runner Logs &amp; AI PDF Report |
 | :---: | :---: |
 | ![Geo Routing &amp; Proxy Controls](docs/img/proxy-geo-routing.png) | ![Live run log](docs/img/live-run-log.png)<br/><br/>![Generated PDF report](docs/img/generated-pdf-report.png) |
+
+## Why Traffic Engine?
+
+* **Watch Every Visit Live (Smart Live Preview):** See exactly what every headless or visible worker sees in real time inside the dashboard via live `rrweb` DOM streaming and step-by-step screenshots — pause, inspect, or hide the live feed anytime.
+* **Authentic Organic Search &amp; Social Traffic:** Automatically generates realistic `Referer` headers and search-engine entry trails (`google_organic`, `search_engines`, `social` via YouTube/Reddit/Facebook/X/LinkedIn/TikTok, or `mixed`) with domain-aware search queries.
+* **Smart Waves &amp; Child Variations:** Never replay identical robotic paths. Configure `natural_peaks`, `ramp_up`, `burst`, or `steady` waves so each visitor gets randomized dwell times, extra internal pages, varied form inputs, and returning-visitor cookies (`sessionPersistence`).
+* **Massive Scale &amp; RAM Protection:** Scale from 100 to 5,000+ browser sessions—or switch to `http_fast` (up to 128 concurrent connections, 1,000+ hits/min)—protected by an automatic **RAM Governor** and JS/CSS asset caching (`lite` / `ultra_lite`).
+* **AI Site Onboarding &amp; Fleet Commander:** Paste any URL into the AI Onboarding Wizard to auto-discover live pages, prune 404s, build a tailored traffic/conversion flow, and let 4 tactical AI squads optimize sessions in real time.
 
 ## Capabilities at a Glance
 
