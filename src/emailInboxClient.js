@@ -3,12 +3,23 @@ const path = require('path');
 const { randomUUID } = require('crypto');
 
 const DEFAULT_INBOX_ENDPOINT = 'https://gethirepulse.xyz/v1/email/inboxes';
+const CREDIT_BALANCE_ENDPOINT = 'https://gethirepulse.xyz/v1/credits/balance';
 const COMMERCIAL_CATALOG_URL = 'https://gethirepulse.xyz/v1/email/catalog';
 const COMMERCIAL_CREDITS_URL = 'https://gethirepulse.xyz/credits';
 const OWNER_PILOT_DOC_URL = 'https://gethirepulse.xyz/email-pilot';
 
 let cachedToken = null;
 let cachedMode = null;
+const inboxAccessTokens = new Map();
+
+function rememberInboxAccessToken(inboxId, accessToken) {
+  if (!inboxId || !accessToken) return;
+  if (inboxAccessTokens.size >= 1000) {
+    const firstKey = inboxAccessTokens.keys().next().value;
+    if (firstKey) inboxAccessTokens.delete(firstKey);
+  }
+  inboxAccessTokens.set(inboxId, accessToken);
+}
 
 /**
  * Resolves the HirePulse Email API token strictly in Node.js memory.
@@ -65,12 +76,21 @@ function getEmailClientStatus() {
   };
 }
 
-async function requestEmailApi(url, { headers = {}, timeoutMs = 15000, ...options } = {}) {
-  const { token } = resolveEmailAuthToken();
-  if (!token) {
+async function requestEmailApi(url, { headers = {}, timeoutMs = 15000, accessToken = null, ...options } = {}) {
+  const { token, mode } = resolveEmailAuthToken();
+  if (!accessToken && !token) {
     throw new Error(
       `Missing email inbox access token (HIREPULSE_OWNER_PILOT_TOKEN or commercial key from ${COMMERCIAL_CREDITS_URL})`
     );
+  }
+
+  const authHeaders = {};
+  if (accessToken) {
+    authHeaders.Authorization = `Bearer ${accessToken}`;
+  } else if (mode === 'commercial-api-key') {
+    authHeaders['X-HirePulse-Credit-Key'] = token;
+  } else {
+    authHeaders.Authorization = `Bearer ${token}`;
   }
 
   const ctrl = new AbortController();
@@ -82,7 +102,7 @@ async function requestEmailApi(url, { headers = {}, timeoutMs = 15000, ...option
       signal: ctrl.signal,
       headers: {
         ...headers,
-        Authorization: `Bearer ${token}`,
+        ...authHeaders,
       },
     });
     const text = await res.text();
@@ -123,6 +143,9 @@ async function createEmailInbox({ idempotencyKey = randomUUID(), ttlSeconds = 60
   if (!inbox?.inbox_id || !inbox.address || !inbox.capability) {
     throw new Error('HirePulse Email did not return a usable inbox.');
   }
+  if (inbox.access_token) {
+    rememberInboxAccessToken(inbox.inbox_id, inbox.access_token);
+  }
   return inbox;
 }
 
@@ -130,30 +153,57 @@ async function createEmailInbox({ idempotencyKey = randomUUID(), ttlSeconds = 60
  * Polls the inbox for an OTP / verification code using the capability token in Node.js.
  * Use `code` only when `status === 'code'`.
  */
-async function getEmailCode({ inbox_id, capability }) {
+async function getEmailCode({ inbox_id, capability, access_token = null }) {
   if (!inbox_id || !capability) {
     throw new Error('Missing inbox_id or capability to check verification code.');
   }
+  const scopedToken = access_token || inboxAccessTokens.get(inbox_id) || null;
   const url = `${DEFAULT_INBOX_ENDPOINT}/${encodeURIComponent(inbox_id)}/code`;
   return requestEmailApi(url, {
     method: 'GET',
+    accessToken: scopedToken,
     headers: {
       'X-Inbox-Capability': capability,
     },
   });
 }
 
-async function listEmailMessages({ inbox_id, capability }) {
+async function listEmailMessages({ inbox_id, capability, access_token = null }) {
   if (!inbox_id || !capability) {
     throw new Error('Missing inbox_id or capability to read inbox messages.');
   }
+  const scopedToken = access_token || inboxAccessTokens.get(inbox_id) || null;
   const url = `${DEFAULT_INBOX_ENDPOINT}/${encodeURIComponent(inbox_id)}/messages`;
   return requestEmailApi(url, {
     method: 'GET',
+    accessToken: scopedToken,
     headers: {
       'X-Inbox-Capability': capability,
     },
   });
+}
+
+async function getCreditBalance() {
+  const { token, mode } = resolveEmailAuthToken();
+  if (!token) {
+    return { configured: false, mode, creditsUrl: COMMERCIAL_CREDITS_URL, balanceMicroUsd: null, balanceUsd: null };
+  }
+  if (mode !== 'commercial-api-key') {
+    return { configured: true, mode, isFreeOwnerPilot: true, creditsUrl: COMMERCIAL_CREDITS_URL, balanceMicroUsd: null, balanceUsd: null };
+  }
+  const data = await requestEmailApi(CREDIT_BALANCE_ENDPOINT, { method: 'GET', timeoutMs: 10000 });
+  const micro = typeof data?.balance_micro_usd === 'number' ? data.balance_micro_usd : null;
+  const usd = typeof data?.balance_usd === 'number'
+    ? data.balance_usd
+    : (micro !== null ? Number((micro / 1e6).toFixed(6)) : null);
+  return {
+    configured: true,
+    mode,
+    isFreeOwnerPilot: false,
+    balanceMicroUsd: micro,
+    balanceUsd: usd,
+    creditsUrl: data?.credits_url || COMMERCIAL_CREDITS_URL,
+  };
 }
 
 function extractConfirmationUrlFromMessages(messagesPayload) {
@@ -224,10 +274,12 @@ async function waitForEmailCode({
 
 module.exports = {
   DEFAULT_INBOX_ENDPOINT,
+  CREDIT_BALANCE_ENDPOINT,
   COMMERCIAL_CATALOG_URL,
   COMMERCIAL_CREDITS_URL,
   OWNER_PILOT_DOC_URL,
   getEmailClientStatus,
+  getCreditBalance,
   createEmailInbox,
   getEmailCode,
   listEmailMessages,

@@ -36,7 +36,7 @@ const {
   focusRecorderWindow,
   getDesktopSessionInfo,
 } = require('../src/journeyRecorder');
-const { getEmailClientStatus, createEmailInbox, getEmailCode, listEmailMessages, extractConfirmationUrlFromMessages } = require('../src/emailInboxClient');
+const { getEmailClientStatus, getCreditBalance, createEmailInbox, getEmailCode, listEmailMessages, extractConfirmationUrlFromMessages } = require('../src/emailInboxClient');
 const { maskEmail, redactText, redactData, registerStepSecrets, safeStepLabel, isSecretField } = require('../src/redaction');
 const { readRunInboxes } = require('../src/runInboxStore');
 const {
@@ -1291,6 +1291,15 @@ app.get('/api/email/status', (_req, res) => {
   res.json({ ok: true, email: getEmailClientStatus() });
 });
 
+app.get('/api/email/balance', async (_req, res) => {
+  try {
+    const balance = await getCreditBalance();
+    res.json({ ok: true, ...balance });
+  } catch (err) {
+    res.status(err.httpStatus === 401 ? 401 : 400).json({ error: redactText(err.message || 'Could not fetch credit balance.') });
+  }
+});
+
 app.post('/api/email/create', async (req, res) => {
   try {
     const ttlSeconds = Number(req.body?.ttlSeconds) || 600;
@@ -1298,6 +1307,7 @@ app.post('/api/email/create', async (req, res) => {
     if (inbox?.inbox_id && inbox?.capability) {
       activeDashboardInboxes.set(inbox.inbox_id, {
         capability: inbox.capability,
+        access_token: inbox.access_token || null,
         address: inbox.address,
         createdAt: Date.now(),
       });
@@ -1327,10 +1337,12 @@ app.get('/api/email/code/:inboxId', async (req, res) => {
       getEmailCode({
         inbox_id: inboxId,
         capability: stored.capability,
+        access_token: stored.access_token || null,
       }).catch(() => null),
       listEmailMessages({
         inbox_id: inboxId,
         capability: stored.capability,
+        access_token: stored.access_token || null,
       }).catch(() => null),
     ]);
 

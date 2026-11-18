@@ -2429,6 +2429,15 @@ function wireActions() {
         badge.style.color = '#4ade80';
         if (pilotBox) pilotBox.style.display = '';
         if (ctaEl) ctaEl.style.display = 'none';
+        if (!res.email.isFreeOwnerPilot && $('email-credit-balance-badge')) {
+          api('/api/email/balance').then(bal => {
+            const balEl = $('email-credit-balance-badge');
+            if (!balEl || bal?.balanceUsd == null) return;
+            balEl.style.display = 'inline-block';
+            balEl.textContent = `Balance: $${Number(bal.balanceUsd).toFixed(4)}`;
+            balEl.style.color = bal.balanceUsd > 0 ? '#4ade80' : '#f87171';
+          }).catch(() => {});
+        }
       } else {
         badge.textContent = 'Optional — Get API Key';
         badge.style.color = '#38bdf8';

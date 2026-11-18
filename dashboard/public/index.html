@@ -437,7 +437,11 @@
           <div class="recorder-box" id="agent-email-pilot-box" style="margin-top:12px;">
             <div class="section-title" style="margin-bottom:8px;">
               <span>📧 Live Inboxes &amp; Automated OTP Verification</span>
-              <span class="badge" id="email-pilot-status-badge">Checking inbox service…</span>
+              <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <span class="badge" id="email-credit-balance-badge" style="display:none;">Balance: —</span>
+                <a href="https://gethirepulse.xyz/credits" target="_blank" rel="noopener noreferrer" class="small" style="text-decoration:none; padding:4px 9px; border-radius:6px; border:1px solid var(--border);">💳 Credits Portal</a>
+                <span class="badge" id="email-pilot-status-badge">Checking inbox service…</span>
+              </div>
             </div>
             <p class="hint">Create a live inbox for manual testing, or add <code>fill_email</code> and <code>fill_otp</code> steps to automate end-to-end signup &amp; verification flows.</p>
             <div id="email-pilot-cta" class="advice-box" style="display:none; margin-bottom:10px; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
