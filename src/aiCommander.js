@@ -1250,11 +1250,7 @@ function buildLocalCommanderFallback({ message, runState = {}, config = {} }) {
   const planned = runState.totalPlanned || config.visitCount || 0;
   const mem = runState.memUsedPct || 0;
 
-  if (mem >= 85 && runState.status === 'running') {
-    const safeConc = Math.max(1, Math.min(config.concurrency || 3, 2));
-    directives.push({ type: 'set_concurrency', min: 1, max: safeConc });
-    lines.push(`⚠️ High RAM usage detected (${mem}%). Recommend capping concurrency to ${safeConc} or enabling RAM saver mode (lite).`);
-  }
+
   if (/pause|עצור זמנית|השהה/.test(lower) && runState.status === 'running') {
     directives.push({ type: 'pause' });
     lines.push('Pausing browser fleet.');
@@ -1346,6 +1342,7 @@ async function askFleetCommander({
   provider,
   maxTokens = 2800,
   isAutoCheck = false,
+  allowConcurrencyChange = false,
 } = {}) {
   registerStepSecrets(config.taskSteps);
   let chosenModel = model || config.ai?.commanderModel || DEFAULT_COMMANDER_MODEL;
@@ -1477,20 +1474,22 @@ async function askFleetCommander({
     'Additional low-cost models: nemotron-3-nano:30b, nemotron-3-super, gemma4:31b, deepseek-v4.1-flash:1017 (do not assign clef:27b to chat).',
     'Strict evidence rule (zero fabrication): Rely strictly on real data in telemetrySummary (recording steps, recent logs, currentConfig, and diagnostics).',
     'Language rule: Speak in clear, concise, plain English for the operator. Avoid raw internal code variable names in prose; use clear terms like average load time, conversion rate, empty external tab, fast skip, and ultra-lite mode.',
+    'Operator Concurrency Sovereignty Rule: NEVER change, lower, or cap concurrency (minConcurrency / concurrency / maxConcurrency / set_concurrency) under any circumstances — even if memory usage is high! Do not factor RAM pressure into reducing concurrency and do not recommend lowering concurrency unless the operator explicitly requested a specific concurrency number in the current message.',
+    'You have expanded full authority over browsing intelligence and on-site decisions: selecting pages (pages), traffic sources (referrerMode), dwell durations, and tuning scenario/agent directives (dispatch_directive / add_recording_step / use_tool / set_exploration / set_delays).',
     'If there is no email step in the recording, do not complain about 0 emails. If resourceMode is already ultra_lite for RAM/proxy savings, do not downgrade it back to lite!',
     isAutoCheck
-      ? 'Routine status check: summarize concisely in plain English (under 140 words, one line per topic): errors/tabs, latency, proxy & AI cache savings, free RAM, and recommended action.'
-      : 'Direct operator query! Answer clearly and directly in English, suggest practical fixes if issues exist, and apply any requested configuration changes via COMMAND_JSON!',
-    'When taking action or applying requested changes, append a single line at the end: COMMAND_JSON:{"directives":[...]}.',
-    'You have full control over configuration via update_config (partial patch on currentConfig — e.g. devices, proxy, adSafety, sessionPersistence, schedule, stealthMode, referrerMode, pageMinMs, sessionTimeoutMs, keepBrowserOpenMs, interVisitDelayMs, firstPagePriority, pages, waves, ai, visitCount, concurrency, targetUrl):',
-    '{"type":"update_config","patch":{"devices":{"iphone14":50,"pixel7":30,"desktopChrome":20},"adSafety":{"avoidAdClicks":true},"sessionPersistence":{"returningUserRate":70},"referrerMode":"google_organic"}},',
+      ? 'Routine status check: summarize concisely in plain English (under 140 words, one line per topic): errors/tabs, latency, proxy & AI cache savings, browsing quality, and one smart browsing improvement (without touching concurrency!).'
+      : 'Direct operator query! Answer clearly, smartly, and directly in plain English, suggest practical fixes if issues exist, and apply any requested optimization immediately via COMMAND_JSON!',
+    'When taking action or applying requested changes, append a single line at the end: COMMAND_JSON:{"directives":[...]} (an object with a directives key).',
+    'You have full control over configuration via update_config (partial patch on currentConfig — e.g. devices, adSafety, sessionPersistence, schedule, stealthMode, referrerMode, pageMinMs, sessionTimeoutMs, keepBrowserOpenMs, interVisitDelayMs, firstPagePriority, pages, waves, ai, visitCount' + (allowConcurrencyChange ? ', minConcurrency, concurrency' : '') + '):',
+    '{"type":"update_config","patch":{"devices":{"iphone14":50,"pixel7":30,"desktopChrome":20},"adSafety":{"avoidAdClicks":true},"sessionPersistence":{"returningUserRate":70},"referrerMode":"mixed"}},',
     'Additional dedicated directives:',
-    '{"type":"set_visits","visits":100}, {"type":"start_run","visits":25,"conversionRate":100,"headless":false,"streamMode":false}, {"type":"stop_run"}, {"type":"pause"}, {"type":"resume"},',
-    '{"type":"set_concurrency","min":1,"max":3}, {"type":"set_conversion_rate","rate":100}, {"type":"set_worker_pct","pct":85},',
+    (allowConcurrencyChange ? '{"type":"set_concurrency","min":5,"max":8}, ' : '') + '{"type":"set_visits","visits":100}, {"type":"start_run","visits":25,"conversionRate":100,"headless":false,"streamMode":false}, {"type":"stop_run"}, {"type":"pause"}, {"type":"resume"},',
+    '{"type":"set_conversion_rate","rate":100}, {"type":"set_worker_pct","pct":100},',
     '{"type":"set_headless","headless":true}, {"type":"set_task_mode","mode":"scenario|hybrid|behavior"}, {"type":"set_stream_mode","enabled":true},',
     '{"type":"set_wave_mode","mode":"off|steady|ramp_up|natural_peaks|burst"}, {"type":"set_resource_mode","mode":"full|lite|ultra_lite"},',
-    '{"type":"set_exploration","extraPageChance":70,"scanProductsChance":80,"maxProducts":2}, {"type":"set_delays","interVisitDelayMs":1500},',
-    '{"type":"add_recording_step","afterTab":1,"step":{"type":"ai_explore|scan_products|human_browse|read_article|scroll|wait|goto|close_tab","tab":1,"value":"3","label":"Step label"}},',
+    '{"type":"set_exploration","extraPageChance":75,"scanProductsChance":85,"maxProducts":2}, {"type":"set_delays","interVisitDelayMs":0},',
+    '{"type":"add_recording_step","afterTab":0,"step":{"type":"ai_explore|use_tool|scan_products|human_browse|read_article|scroll|wait|goto|close_tab","tab":0,"value":"2","label":"Step label"}},',
     '{"type":"remove_recording_step","index":5}, {"type":"replace_task_steps","steps":[...]},',
     '{"type":"assign_squad_model","squadId":"alpha|bravo|charlie|delta|all","model":"beam|deepseek-v4.1-flash|minimax-m3.1-flash|gpt-oss:20b|nemotron-3-nano:30b|gemma4:31b"},',
     '{"type":"focus_countries","countries":["US","GB","CA","DE","AU"]}, {"type":"dispatch_directive","directive":"Live tactical instruction for squads"}.',
@@ -1533,11 +1532,13 @@ async function askFleetCommander({
         if ((config.pageMinMs || 3000) < 4000) patch.pageMinMs = 4500;
         if ((config.firstPagePriority || 60) > 45) patch.firstPagePriority = 40;
       }
-      const floorM = String(message || '').match(/(?:אל תוריד.*מתחת ל|רצפה.*היא)\s*-?\s*(\d+)/);
-      if (floorM) {
-        const floorVal = Math.max(1, Math.min(32, parseInt(floorM[1], 10) || 6));
-        patch.minConcurrency = floorVal;
-        patch.concurrency = Math.max(floorVal, Number(config.concurrency) || floorVal);
+      if (allowConcurrencyChange) {
+        const floorM = String(message || '').match(/(?:אל תוריד.*מתחת ל|רצפה.*היא|קבע.*מקביליות.*?)\s*-?\s*(\d+)/);
+        if (floorM) {
+          const floorVal = Math.max(1, Math.min(32, parseInt(floorM[1], 10) || 5));
+          patch.minConcurrency = floorVal;
+          patch.concurrency = Math.max(floorVal, Number(config.concurrency) || floorVal);
+        }
       }
       if (Object.keys(patch).length > 0) {
         parsedReply.directives.push({ type: 'update_config', patch });

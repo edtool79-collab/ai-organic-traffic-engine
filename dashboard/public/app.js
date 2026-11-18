@@ -58,6 +58,7 @@ const STEP_TYPE_META = {
   scroll_to:        { label: 'Scroll to Element Without Clicking (Scroll To)', selectorHint: 'aside.ad-slot-box[data-ad-position="in_content_mid"]', valueHint: '(no value needed)' },
   read_article:     { label: 'Human Article Reading (AdSense Safe)', selectorHint: '(auto — leave empty)', valueHint: '8500 (reading time in ms)' },
   human_browse:     { label: 'Autonomous Human Browsing (Human Browse)', selectorHint: '(auto — leave empty)', valueHint: '7000 (duration in ms)' },
+  use_tool:         { label: '🛠️ Smart Interactive Tool Runner (Smart Tool)', selectorHint: '(auto — leave empty)', valueHint: '1' },
   scan_products:    { label: 'Scan Product Cards / Links (Scan Products)', selectorHint: '(optional container selector)', valueHint: '2 (items to open)' },
   search_entry:     { label: 'Pre-Entry Organic Search (Search Entry)', selectorHint: '(auto — leave empty)', valueHint: '(optional search query)' },
   ai_explore:       { label: 'Autonomous AI Agent (Cloud AI Brain)', selectorHint: '(auto — leave empty)', valueHint: '2 (number of AI actions)' },
@@ -1263,7 +1264,7 @@ function renderProfiles(profiles) {
     return;
   }
   el.textContent = `${state.profiles.length} profiles saved on disk: ` +
-    state.profiles.map(p => `${p.name} (${p.deviceKey}, ${p.cookiesCount} cookies)`).join(' • ');
+    state.profiles.map(p => `${p.name} (${p.deviceKey}, ${p.cookiesCount} cookies, visits: ${p.visitsCount || 1}${p.lifecycleLabelHe ? ' · ' + p.lifecycleLabelHe : ''})`).join(' • ');
 }
 
 function renderRunStatus(st) {
@@ -1300,6 +1301,13 @@ function renderRunStatus(st) {
   $('kpi-avg-load').textContent = st.avgLoadMs != null ? `${st.avgLoadMs} ms` : '—';
   $('kpi-errors-sub').textContent = `JS / Console errors: ${st.errorsTotal || 0}`;
   $('kpi-sessions').textContent = `${st.returningSessions || 0} / ${st.newSessions || 0}`;
+
+  if ($('ga4-live-verified-badge')) {
+    const gv = Number(st.ga4VerifiedVisits || 0);
+    const ge = Number(st.ga4EventsFired || 0);
+    const srcNote = st.lastGa4Source ? ` • Last source: ${st.lastGa4Source}` : '';
+    $('ga4-live-verified-badge').textContent = `📊 GA4 Live Verified: ${gv} visits (${ge} events)${srcNote}`;
+  }
 
   $('progress-label').textContent = `Run Progress: ${pct}%`;
   $('progress-target').textContent = st.targetUrl ? st.targetUrl : '';
@@ -1902,6 +1910,159 @@ function wireActions() {
       } finally {
         btn.disabled = false;
         btn.textContent = '✨ Scan Site & Auto-Adapt with AI';
+      }
+    };
+  }
+
+  const submitOnboardReply = async () => {
+    const inputEl = $('onboard-user-notes');
+    const msg = inputEl?.value.trim() || '';
+    if (!msg) {
+      showToast('Enter a reply or instruction for the AI before sending.', true);
+      return;
+    }
+    const btn = $('btn-onboard-reply');
+    const resBox = $('onboard-ai-result');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '⏳ Processing reply...';
+    }
+    const prevText = resBox && resBox.style.display !== 'none' ? resBox.textContent.trim() : '';
+    if (resBox) {
+      resBox.style.display = 'block';
+      resBox.textContent = (prevText ? prevText + '\n\n' : '') + `🗣️ You: ${msg}\n🤖 Processing adaptation with AI...`;
+      resBox.scrollTop = resBox.scrollHeight;
+    }
+    try {
+      const res = await api('/api/ai/onboard-reply', {
+        method: 'POST',
+        body: JSON.stringify({
+          message: msg,
+          targetUrl: $('targetUrl')?.value.trim() || state.config?.targetUrl,
+          goal: $('onboard-goal')?.value || 'tools_clicks',
+          aiLevel: $('onboard-ai-level')?.value || 'full_autonomous',
+        }),
+      });
+      if (inputEl) inputEl.value = '';
+      if (res && res.config) {
+        state.config = res.config;
+        syncFormFromConfig();
+        renderJsonPreview();
+      }
+      if (resBox) {
+        const appliedNote = Array.isArray(res.applied) && res.applied.length ? `\n⚡ Applied: ${res.applied.join(', ')}` : '';
+        resBox.textContent = (prevText ? prevText + '\n\n' : '') + `🗣️ You: ${msg}\n🤖 AI (${res.model || 'commander'}): ${res.reply || 'Instruction applied successfully.'}${appliedNote}`;
+        resBox.scrollTop = resBox.scrollHeight;
+      }
+      showToast('✅ Reply sent to AI and applied to settings!');
+    } catch (err) {
+      if (resBox) {
+        resBox.textContent = (prevText ? prevText + '\n\n' : '') + `❌ Send error: ${err.message}`;
+      }
+      showToast('Failed to send reply: ' + err.message, true);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '💬 Send Reply to AI';
+      }
+    }
+  };
+
+  if ($('btn-onboard-reply')) {
+    $('btn-onboard-reply').onclick = submitOnboardReply;
+  }
+  if ($('onboard-user-notes')) {
+    $('onboard-user-notes').addEventListener('keydown', ev => {
+      if (ev.key === 'Enter' && !ev.shiftKey) {
+        ev.preventDefault();
+        submitOnboardReply();
+      }
+    });
+  }
+
+  if ($('btn-clone-funnel')) {
+    $('btn-clone-funnel').onclick = async () => {
+      collectSimpleFieldsToConfig();
+      const targetUrl = $('targetUrl')?.value.trim() || state.config?.targetUrl;
+      if (!targetUrl) {
+        showToast('Enter a target site URL first.', true);
+        return;
+      }
+      const btn = $('btn-clone-funnel');
+      const resBox = $('onboard-ai-result');
+      btn.disabled = true;
+      btn.textContent = '🕵️ Analyzing pixels & cloning funnel...';
+      if (resBox) {
+        resBox.style.display = 'block';
+        resBox.textContent = 'Scanning analytics pixels, interactive tools, forms, and site funnels...';
+      }
+      try {
+        const res = await api('/api/ai/clone-funnel', {
+          method: 'POST',
+          body: JSON.stringify({ targetUrl, applyToConfig: true }),
+        });
+        if (res && res.config) {
+          state.config = res.config;
+          syncFormFromConfig();
+          renderJsonPreview();
+        }
+        if (resBox && res.reportHe) {
+          resBox.style.display = 'block';
+          resBox.textContent = res.reportHe;
+        }
+        showToast(`🕵️ Site funnel cloned (${(res.clonedSteps || []).length} steps, ${(res.detectedPixels || []).length} pixels detected)!`);
+      } catch (err) {
+        if (resBox) {
+          resBox.style.display = 'block';
+          resBox.textContent = 'Funnel cloning error: ' + err.message;
+        }
+        showToast('Funnel cloning failed: ' + err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🕵️ Analyze Pixels & Clone Funnel';
+      }
+    };
+  }
+
+  if ($('btn-dispatch-swarm')) {
+    $('btn-dispatch-swarm').onclick = async () => {
+      collectSimpleFieldsToConfig();
+      const rawNodes = $('swarm-nodes-input')?.value || '';
+      const nodes = rawNodes.split(/[\s,;]+/).map(s => s.trim()).filter(s => /^https?:\/\//i.test(s));
+      const resBox = $('swarm-dispatch-result');
+      if (!nodes.length) {
+        showToast('Enter at least one valid Worker node URL (e.g. http://vps-ip:4310).', true);
+        return;
+      }
+      const btn = $('btn-dispatch-swarm');
+      btn.disabled = true;
+      btn.textContent = '🌐 Dispatching to VPS nodes...';
+      try {
+        const res = await api('/api/swarm/dispatch', {
+          method: 'POST',
+          body: JSON.stringify({
+            nodes,
+            totalVisits: Number($('visitCount')?.value) || state.config?.visitCount || 1000,
+            includeLocal: true,
+          }),
+        });
+        const lines = (res.nodeResults || []).map(n =>
+          n.ok ? `✅ ${n.url} — ${n.visitsAssigned} visits dispatched (${n.status})` : `❌ ${n.url} — ${n.error}`
+        );
+        if (resBox) {
+          resBox.style.display = 'block';
+          resBox.textContent = `Distributed swarm dispatched (${res.dispatchedNodes}/${res.totalNodes} nodes online | ${res.visitsPerWorker} visits per node):\n` + lines.join('\n');
+        }
+        showToast(`🌐 Dispatched tasks to ${res.dispatchedNodes}/${res.totalNodes} swarm nodes!`);
+      } catch (err) {
+        if (resBox) {
+          resBox.style.display = 'block';
+          resBox.textContent = 'Swarm dispatch error: ' + err.message;
+        }
+        showToast('Swarm dispatch failed: ' + err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🌐 Dispatch Distributed Swarm';
       }
     };
   }

@@ -160,14 +160,16 @@
               </div>
             </div>
             <div class="inline-row" style="gap:8px; flex-wrap:wrap; margin-bottom:8px;">
-              <input id="onboard-user-notes" type="text" placeholder="Answer AI questions or add focus notes (e.g. focus on /tools/link-cleaner and stay on-domain)..." style="flex:1; min-width:240px;" />
+              <input id="onboard-user-notes" type="text" placeholder="Answer AI questions or add a focus instruction (e.g., focus on /tools/robots-checker) and press Enter or Reply..." style="flex:1; min-width:240px;" />
+              <button type="button" class="small primary" id="btn-onboard-reply">💬 Send Reply to AI</button>
               <label style="display:flex; align-items:center; gap:6px; font-size:0.83rem; cursor:pointer;">
                 <input id="onboard-rebuild-steps" type="checkbox" />
                 <span>Also rebuild scenario steps for this site</span>
               </label>
               <button type="button" class="primary" id="btn-onboard-site">✨ Scan Site &amp; Auto-Adapt with AI</button>
+              <button type="button" class="small" id="btn-clone-funnel" title="Detects analytics &amp; ad pixels (GA4/Clarity/Meta), maps tools &amp; forms, and builds a cloned scenario automatically">🕵️ Analyze Pixels &amp; Clone Funnel</button>
             </div>
-            <div id="onboard-ai-result" class="advice-box" style="display:none; white-space:pre-line; line-height:1.55;"></div>
+            <div id="onboard-ai-result" class="advice-box" style="display:none; white-space:pre-line; line-height:1.55; max-height:240px; overflow-y:auto;"></div>
           </div>
 
           <div class="recorder-box" id="multi-targets-box" style="margin-top:12px;">
@@ -187,6 +189,21 @@
               <button type="button" class="small danger" id="btn-clear-targets">Clear Extra Targets</button>
             </div>
             <div id="targets-list" class="pages-list"></div>
+          </div>
+
+          <div class="recorder-box" id="cloud-swarm-box" style="margin-top:12px;">
+            <div class="section-title" style="margin-bottom:8px;">
+              <span>🌐 Distributed Cloud Swarm &amp; Live GA4 Verification</span>
+              <span class="badge completed" id="ga4-live-verified-badge">📊 GA4 Live Verified: 0 visits (0 events)</span>
+            </div>
+            <p class="hint" style="margin-bottom:8px;">
+              Connect remote VPS / worker machines running this dashboard (<code>http://vps-ip:4310</code>) to distribute thousands of concurrent browsers without overloading your local RAM. The live badge above verifies real-time <code>google-analytics.com/g/collect</code> hits fired by the fleet.
+            </p>
+            <div class="inline-row" style="gap:8px; flex-wrap:wrap;">
+              <input id="swarm-nodes-input" type="text" class="ltr" placeholder="http://vps1.example.com:4310, http://vps2.example.com:4310" style="flex:1; min-width:260px;" />
+              <button type="button" class="small primary" id="btn-dispatch-swarm">🌐 Dispatch Distributed Swarm</button>
+            </div>
+            <div id="swarm-dispatch-result" class="advice-box" style="display:none; margin-top:8px;"></div>
           </div>
 
           <hr style="border:0;border-top:1px solid var(--border);margin:18px 0;" />
@@ -324,6 +341,7 @@
               <button type="button" class="small" data-qtype="hover" data-qsel="nav a" data-qval="800" data-qlbl="Human mouse hover on navigation">+ Human Hover</button>
               <button type="button" class="small" data-qtype="read_article" data-qsel="" data-qval="8500" data-qlbl="Human article reading (8.5s)">+ Read Article (AdSense Safe)</button>
               <button type="button" class="small" data-qtype="human_browse" data-qsel="" data-qval="7000" data-qlbl="Natural human page browsing (7s)">+ Human Browse</button>
+              <button type="button" class="small" data-qtype="use_tool" data-qsel="" data-qval="1" data-qlbl="Run interactive tool/calculator on page (Smart Tool Runner)">🛠️ + Run Interactive Tool (Smart Tool)</button>
               <button type="button" class="small" data-qtype="scan_products" data-qsel="" data-qval="2" data-qlbl="Scan product cards / links">+ Scan Products / Links</button>
               <button type="button" class="small" data-qtype="ai_explore" data-qsel="" data-qval="2" data-qlbl="Autonomous AI exploration (AI Brain)">+ Autonomous AI Agent</button>
               <button type="button" class="small" data-qtype="fill_email" data-qsel="input[type='email'], input[name*='email' i], input[id*='email' i]" data-qval="" data-qlbl="Fill live agent email (HirePulse Inbox)">📧 + Fill Live Agent Email</button>

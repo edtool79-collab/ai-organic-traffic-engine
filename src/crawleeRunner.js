@@ -371,6 +371,7 @@ async function executeVisitWorkload({
   precomputedChildPlan = null,
   geoInfo = null,
   avoidEngines = [],
+  lifecycle = null,
 }) {
   const {
     targetUrl,
@@ -459,6 +460,7 @@ async function executeVisitWorkload({
       geoInfo,
       identityInfo: waveSummary?.identity || null,
       avoidEngines,
+      lifecycle,
     });
     combined = { ...combined, ...scenRes, waveSummary };
   }
@@ -973,6 +975,9 @@ async function run() {
     lastErrorSample: '',
     lastSkippedSelector: '',
     proxyTransferBytes: 0,
+    ga4VerifiedVisits: 0,
+    ga4EventsFired: 0,
+    lastGa4Source: '',
     returningSessions: 0,
     newSessions: 0,
     loadTimesMs: [],
@@ -1094,6 +1099,17 @@ async function run() {
       }
       if (nc.adSafety && typeof nc.adSafety === 'object') Object.assign(adSafety, nc.adSafety);
       if (nc.devices && typeof nc.devices === 'object') Object.assign(deviceWeights, nc.devices);
+      if (nc.minConcurrency != null || nc.concurrency != null) {
+        const upMax = Math.max(1, Math.min(32, Number(nc.concurrency ?? stats.maxConcurrency) || stats.maxConcurrency));
+        const upMin = Math.max(1, Math.min(upMax, Number(nc.minConcurrency ?? stats.minConcurrency) || stats.minConcurrency));
+        stats.minConcurrency = upMin;
+        stats.maxConcurrency = upMax;
+        if (activePoolRef) {
+          activePoolRef.minConcurrency = upMin;
+          activePoolRef.maxConcurrency = upMax;
+          activePoolRef.desiredConcurrency = Math.min(upMax, Math.max(upMin, activePoolRef.desiredConcurrency || upMin));
+        }
+      }
       console.log('[AI Commander] All configuration settings synced live to fleet.');
     } else if (msg.type === 'assign_squad_model' && typeof msg.model === 'string') {
       const targetSquad = ['alpha', 'bravo', 'charlie', 'delta', 'all'].includes(msg.squadId) ? msg.squadId : 'all';
@@ -1366,21 +1382,19 @@ async function run() {
     const pool = new AutoscaledPool({
       minConcurrency,
       maxConcurrency,
-      desiredConcurrency: Math.min(maxConcurrency, Math.max(minConcurrency, Math.min(6, maxConcurrency))),
+      desiredConcurrency: Math.max(minConcurrency, maxConcurrency),
       autoscaleIntervalSecs: wavesCfg?.mode === 'burst' ? 1 : 2,
       loggingIntervalSecs: null,
       snapshotterOptions: {
-        maxBlockedMillis: 250,
-        maxUsedMemoryRatio: 0.98,
+        maxBlockedMillis: 2500,
+        maxUsedMemoryRatio: 0.999,
       },
       systemStatusOptions: {
-        maxMemoryOverloadedRatio: 0.95,
-        maxCpuOverloadedRatio: 0.95,
+        maxMemoryOverloadedRatio: 0.999,
+        maxCpuOverloadedRatio: 0.999,
       },
       isTaskReadyFunction: async () => {
         if (aborted || userPaused || schedulePaused) return false;
-        const freeGbNow = os.freemem() / (1024 ** 3);
-        if (inFlight >= 2 && freeGbNow < 0.45) return false;
         return nextVisitIndex < visitCount;
       },
       isFinishedFunction: async () => {
@@ -1496,8 +1510,28 @@ async function run() {
             deviceKey: pickDeviceKeyForEngine(deviceWeights, cfg.browserEngine || 'chromium'),
           });
 
+          let sessionGa4Verified = false;
           onRespSize = async req => {
             try {
+              const reqUrl = String(req.url() || '');
+              if (/(?:google-analytics\.com|analytics\.google\.com)\/g\/collect|clarity\.ms\/collect|plausible\.io\/api\/event|posthog\.com\/e/i.test(reqUrl)) {
+                stats.ga4EventsFired = (stats.ga4EventsFired || 0) + 1;
+                if (!sessionGa4Verified) {
+                  sessionGa4Verified = true;
+                  stats.ga4VerifiedVisits = (stats.ga4VerifiedVisits || 0) + 1;
+                  try {
+                    const u = new URL(reqUrl);
+                    const evName = u.searchParams.get('en') || 'page_view';
+                    const drRaw = u.searchParams.get('dr') || '';
+                    let drHost = '';
+                    if (drRaw) {
+                      try { drHost = new URL(drRaw).hostname.replace(/^www\./i, ''); } catch { drHost = drRaw.slice(0, 30); }
+                    }
+                    if (drHost) stats.lastGa4Source = drHost;
+                    console.log(`[GA4 Verified ✅ | Visit #${i + 1}] Live Google Analytics hit confirmed (${evName}${drHost ? ' | source: ' + drHost : ''}) [Total verified: ${stats.ga4VerifiedVisits}]`);
+                  } catch {}
+                }
+              }
               const resp = await req.response().catch(() => null);
               if (resp && resp.headers?.()['x-wtg-cache'] === '1') return;
               const s = await req.sizes();
@@ -1538,6 +1572,7 @@ async function run() {
             precomputedChildPlan,
             geoInfo: geo,
             avoidEngines,
+            lifecycle: sessionSlot?.lifecycle || null,
           });
 
           stats.completed++;
@@ -1578,9 +1613,11 @@ async function run() {
             await sleep(Math.max(0, Number(attributionCfg.closeSettleMs) || 2800)).catch(() => {});
           }
 
+          const lcInfo = sessionSlot?.lifecycle ? ` · ${sessionSlot.lifecycle.labelHe}` : '';
+          const ga4Info = sessionGa4Verified ? ', GA4:✓' : '';
           const sessionTag = sessionSlot
-            ? `, session: ${sessionHandle.isReturning ? 'returning' : 'new'}(#${sessionSlot.slot})`
-            : '';
+            ? `, session: ${sessionHandle.isReturning ? 'returning' : 'new'}(#${sessionSlot.slot}${lcInfo})${ga4Info}`
+            : ga4Info;
           const resolvedCountry = geo?.countryCode || (selectedProxyUrl ? proxyCountryByUrl[selectedProxyUrl] : null) || null;
           const geoTag = geo?.countryCode
             ? `, geo: ${geo.countryCode}(${geo.locale}/${geo.timezoneId})`
@@ -1642,8 +1679,6 @@ async function run() {
     });
 
     activePoolRef = pool;
-    const configuredMaxCap = maxConcurrency;
-    let lastRamScaleAt = 0;
     const monitorTimer = setInterval(async () => {
       const within = isWithinActiveHours(schedule);
       if (schedule.enabled && !within && !schedulePaused) {
@@ -1656,38 +1691,14 @@ async function run() {
         await syncPauseState();
       }
 
-      // Progressive RAM Governor (free-MB + ratio aware, graceful step-down & recovery)
-      const totalMemBytes = os.totalmem();
-      const freeMemBytes = os.freemem();
-      const freeMemMb = Math.round(freeMemBytes / (1024 * 1024));
-      const usedMemPct = Math.round(((totalMemBytes - freeMemBytes) / totalMemBytes) * 100);
-      const nowMs = Date.now();
-      if ((freeMemMb < 450 || usedMemPct >= 97) && stats.maxConcurrency > 1 && activePoolRef) {
-        stats.minConcurrency = 1;
-        stats.maxConcurrency = 1;
-        activePoolRef.minConcurrency = 1;
-        activePoolRef.maxConcurrency = 1;
-        activePoolRef.desiredConcurrency = 1;
-        runtimeState.resourceMode = 'ultra_lite';
-        lastRamScaleAt = nowMs;
-        console.log(`[RAM Governor] Critical memory pressure (${usedMemPct}%, ${freeMemMb}MB free) — emergency brake: concurrency 1 & ultra_lite.`);
-      } else if (nowMs - lastRamScaleAt >= 30000 && activePoolRef) {
-        if ((freeMemMb < 750 || usedMemPct >= 95) && stats.maxConcurrency > 1) {
-          const nextMax = Math.max(1, stats.maxConcurrency - 1);
-          stats.minConcurrency = Math.min(stats.minConcurrency, nextMax);
-          stats.maxConcurrency = nextMax;
-          activePoolRef.minConcurrency = stats.minConcurrency;
-          activePoolRef.maxConcurrency = nextMax;
-          activePoolRef.desiredConcurrency = Math.min(nextMax, activePoolRef.desiredConcurrency);
-          lastRamScaleAt = nowMs;
-          console.log(`[RAM Governor] Memory pressure (${usedMemPct}%, ${freeMemMb}MB free) — stepping concurrency down to ${nextMax}.`);
-        } else if (freeMemMb >= 1000 && usedMemPct < 92 && stats.maxConcurrency < configuredMaxCap) {
-          const nextMax = Math.min(configuredMaxCap, stats.maxConcurrency + 1);
-          stats.maxConcurrency = nextMax;
-          activePoolRef.maxConcurrency = nextMax;
-          activePoolRef.desiredConcurrency = Math.min(nextMax, Math.max(stats.minConcurrency, activePoolRef.desiredConcurrency + 1));
-          lastRamScaleAt = nowMs;
-          console.log(`[RAM Governor] Memory healthy (${usedMemPct}%, ${freeMemMb}MB free) — stepping concurrency up to ${nextMax}.`);
+      // Operator Concurrency Sovereignty: never drop below operator minConcurrency due to RAM load
+      if (activePoolRef) {
+        activePoolRef.minConcurrency = stats.minConcurrency;
+        activePoolRef.maxConcurrency = stats.maxConcurrency;
+        if ((activePoolRef.desiredConcurrency || 0) < stats.minConcurrency) {
+          activePoolRef.desiredConcurrency = stats.maxConcurrency >= stats.minConcurrency
+            ? stats.minConcurrency
+            : stats.maxConcurrency;
         }
       }
 
@@ -1767,6 +1778,11 @@ async function run() {
   const crawler = new PlaywrightCrawler({
     minConcurrency,
     maxConcurrency,
+    autoscaledPoolOptions: {
+      desiredConcurrency: Math.max(minConcurrency, maxConcurrency),
+      snapshotterOptions: { maxBlockedMillis: 2500, maxUsedMemoryRatio: 0.999 },
+      systemStatusOptions: { maxMemoryOverloadedRatio: 0.999, maxCpuOverloadedRatio: 0.999 },
+    },
     maxRequestRetries: 0,
     requestHandlerTimeoutSecs: Math.ceil(sessionTimeoutMs / 1000) + 15,
     navigationTimeoutSecs: 25,
@@ -1840,6 +1856,20 @@ async function run() {
         adSafety.closePopunders,
         msg => console.log(`[${i + 1}] ${msg}`)
       );
+      let modeBGa4Verified = false;
+      const onModeBReq = req => {
+        try {
+          const reqUrl = String(req.url() || '');
+          if (/(?:google-analytics\.com|analytics\.google\.com)\/g\/collect|clarity\.ms\/collect|plausible\.io\/api\/event|posthog\.com\/e/i.test(reqUrl)) {
+            stats.ga4EventsFired = (stats.ga4EventsFired || 0) + 1;
+            if (!modeBGa4Verified) {
+              modeBGa4Verified = true;
+              stats.ga4VerifiedVisits = (stats.ga4VerifiedVisits || 0) + 1;
+            }
+          }
+        } catch {}
+      };
+      page.on('requestfinished', onModeBReq);
 
       try {
         const ctxObj = page.context();
@@ -1896,6 +1926,7 @@ async function run() {
         logVisitOutcome(i, persona, request.userData.deviceKey, cfg.browserEngine || 'chromium', res, sessionTag, proxyTag);
         proxyPool.reportSuccess();
       } finally {
+        page.off('requestfinished', onModeBReq);
         stopPopunderShield();
         emitTelemetry(crawler.autoscaledPool?.systemStatus?.getCurrentStatus?.());
       }

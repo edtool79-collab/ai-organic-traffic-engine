@@ -182,7 +182,15 @@ async function smoothScrollTo(page, targetY) {
     for (let k = 0; k < chunks; k++) {
       const jittered = Math.round(stepDelta * randomBetween(0.78, 1.22));
       await page.mouse.wheel(0, jittered).catch(() => {});
-      await sleep(sampleLogNormalDelay(65, 0.4, 28, 180));
+      const nearLandmark = k === 1 && await page.evaluate(() => {
+        const els = document.querySelectorAll('h2, h3, table, .tool-card');
+        for (const el of els) {
+          const r = el.getBoundingClientRect();
+          if (r.top >= 40 && r.top <= window.innerHeight * 0.65) return true;
+        }
+        return false;
+      }).catch(() => false);
+      await sleep(sampleLogNormalDelay(nearLandmark ? 160 : 65, 0.4, 28, nearLandmark ? 380 : 180));
     }
     return;
   }
@@ -236,13 +244,67 @@ async function textSelect(page) {
       await page.mouse.down();
       await moveMouse(page.mouse, { x: dragBox.startX, y: dragBox.startY }, { x: dragBox.endX, y: dragBox.endY }, 8);
       await page.mouse.up();
-      await sleep(randomBetween(350, 850));
+      await page.evaluate(() => {
+        try {
+          document.dispatchEvent(new Event('selectionchange', { bubbles: true }));
+          if (Math.random() < 0.45 && document.activeElement) {
+            document.activeElement.dispatchEvent(new Event('copy', { bubbles: true }));
+          }
+        } catch (_) {}
+      }).catch(() => {});
+      await sleep(randomBetween(380, 920));
       await page.mouse.click(Math.max(10, dragBox.startX - 18), dragBox.startY).catch(() => {});
       return;
     } catch (_) {}
   }
 
   await page.evaluate(() => window.getSelection()?.removeAllRanges()).catch(() => {});
+}
+
+/**
+ * Biometric reading-line cursor tracking: sweeps the mouse horizontally along visible
+ * headings and paragraph lines with micro-tremor and pauses, matching human heatmap signatures.
+ */
+async function performBiometricReadingPass(page, startMouse = { x: 200, y: 200 }) {
+  const lineBoxes = await page.evaluate(() => {
+    try {
+      const nodes = Array.from(document.querySelectorAll('h1, h2, h3, p, li, pre, code'));
+      const out = [];
+      for (const el of nodes) {
+        const r = el.getBoundingClientRect();
+        if (r.width >= 120 && r.height >= 14 && r.top >= 40 && r.bottom <= window.innerHeight - 30) {
+          out.push({
+            tag: el.tagName.toLowerCase(),
+            x: Math.round(r.left),
+            y: Math.round(r.top),
+            w: Math.round(Math.min(r.width, 620)),
+            h: Math.round(r.height),
+          });
+          if (out.length >= 4) break;
+        }
+      }
+      return out;
+    } catch (_) {
+      return [];
+    }
+  }).catch(() => []);
+
+  let cur = startMouse;
+  for (const b of lineBoxes.slice(0, 2)) {
+    const lineY = Math.round(b.y + Math.min(22, b.h * 0.45));
+    const pStart = { x: Math.max(20, b.x + 12), y: lineY };
+    const pMid = { x: Math.max(40, Math.round(b.x + b.w * randomBetween(0.42, 0.58))), y: lineY + randomInt(-3, 3) };
+    const pEnd = { x: Math.max(60, Math.round(b.x + b.w * randomBetween(0.75, 0.92))), y: lineY + randomInt(-2, 2) };
+    await moveMouse(page.mouse, cur, pStart, 6).catch(() => {});
+    await sleep(randomBetween(90, 210));
+    await moveMouse(page.mouse, pStart, pMid, 7).catch(() => {});
+    if (/^h[1-3]$/.test(b.tag)) {
+      await sleep(randomBetween(180, 420));
+    }
+    await moveMouse(page.mouse, pMid, pEnd, 7).catch(() => {});
+    cur = pEnd;
+  }
+  return cur;
 }
 
 async function simulateTabSwitch(page) {
@@ -592,8 +654,11 @@ async function humanBrowsePage(page, totalMs = 7000, adSafety = {}, onStep = nul
       }
     }
 
-    if (i === 1 && Math.random() < 0.45) {
+    if (i === 1 && Math.random() < 0.55) {
+      lastMouse = await performBiometricReadingPass(page, lastMouse).catch(() => lastMouse);
       await textSelect(page).catch(() => {});
+    } else if (i === 2 && Math.random() < 0.65) {
+      lastMouse = await performBiometricReadingPass(page, lastMouse).catch(() => lastMouse);
     }
 
     const rem = budgetMs - (Date.now() - started);
@@ -845,6 +910,7 @@ module.exports = {
   humanType,
   smoothScrollTo,
   humanBrowsePage,
+  performBiometricReadingPass,
   runVisitInteractions,
   sampleLogNormalDelay,
   getErgonomicTargetPoint,
