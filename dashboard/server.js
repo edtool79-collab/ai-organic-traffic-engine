@@ -5,6 +5,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const crypto = require('crypto');
 const { spawn, execFile } = require('child_process');
 
 const { listSavedProfiles, countSavedProfiles, clearSavedProfiles } = require('../src/fingerprintManager');
@@ -38,6 +39,7 @@ const {
 } = require('../src/journeyRecorder');
 const { getEmailClientStatus, getCreditBalance, createEmailInbox, getEmailCode, listEmailMessages, extractConfirmationUrlFromMessages } = require('../src/emailInboxClient');
 const { maskEmail, redactText, redactData, registerStepSecrets, safeStepLabel, isSecretField } = require('../src/redaction');
+const { assertSafeOutboundUrl, safeFetchText } = require('../src/safeOutbound');
 const { readRunInboxes } = require('../src/runInboxStore');
 const {
   REPORTS_DIR,
@@ -173,6 +175,63 @@ const DEFAULT_CONFIG = {
 
 const { TIER1_DEFAULT_COUNTRIES, COUNTRY_CATALOG, normalizeCountryCode } = require('../src/proxyManager');
 const { askFleetCommander, getOllamaStatusPublic, shouldUseHirePulseGateway, resolveHirePulseAiKey, DEFAULT_HIREPULSE_HOST } = require('../src/aiCommander');
+
+// Security middleware: DNS-rebinding Host allowlist, CSRF Origin check, and optional WTG_API_TOKEN Bearer auth
+const ALLOWED_HOSTS = new Set([
+  `127.0.0.1:${PORT}`,
+  `localhost:${PORT}`,
+  `[::1]:${PORT}`,
+  '127.0.0.1',
+  'localhost',
+  '[::1]',
+  ...String(process.env.WTG_ALLOWED_HOSTS || '')
+    .split(',')
+    .map(h => h.trim().toLowerCase())
+    .filter(Boolean),
+]);
+
+function timingSafeTokenMatch(a, b) {
+  const bufA = Buffer.from(String(a || ''), 'utf8');
+  const bufB = Buffer.from(String(b || ''), 'utf8');
+  if (bufA.length === 0 || bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+app.use((req, res, next) => {
+  const hostHeader = String(req.headers.host || '').trim().toLowerCase();
+  if (!hostHeader || !ALLOWED_HOSTS.has(hostHeader)) {
+    return res.status(403).json({ error: 'Forbidden host header.' });
+  }
+
+  const reqPath = req.path || '/';
+  const isApi = reqPath.startsWith('/api/');
+  const isDemoApi = reqPath.startsWith('/api/demo/');
+
+  if (isApi && !isDemoApi && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+    const origin = String(req.headers.origin || '').trim();
+    if (origin) {
+      try {
+        const originUrl = new URL(origin);
+        if (!['http:', 'https:'].includes(originUrl.protocol) || !ALLOWED_HOSTS.has(originUrl.host.toLowerCase())) {
+          return res.status(403).json({ error: 'Cross-origin API mutation blocked.' });
+        }
+      } catch {
+        return res.status(403).json({ error: 'Invalid Origin header.' });
+      }
+    }
+  }
+
+  const requiredToken = String(process.env.WTG_API_TOKEN || '').trim();
+  if (requiredToken && isApi && !isDemoApi && reqPath !== '/api/health') {
+    const auth = String(req.headers.authorization || '').trim();
+    const bearer = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : '';
+    if (!timingSafeTokenMatch(bearer, requiredToken)) {
+      return res.status(401).json({ error: 'Unauthorized: valid Bearer WTG_API_TOKEN required.' });
+    }
+  }
+
+  next();
+});
 
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(PUBLIC_DIR));
@@ -1080,7 +1139,7 @@ app.post('/api/proxies/test', async (req, res) => {
       return res.json({ results: [], message: 'No proxy servers provided to test.' });
     }
     const results = await checkProxiesBatch(cleaned.slice(0, 50), 5);
-    res.json({ results });
+    res.json({ results: results.map(({ raw, ...rest }) => rest) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1213,17 +1272,13 @@ app.post('/api/discover', async (req, res) => {
     const basePath = parsed.pathname && parsed.pathname !== '/' ? parsed.pathname.replace(/\/$/, '') : '';
     const discovered = new Set(['/']);
 
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 8000);
-    let html = '';
-    let rootStatus = 0;
-    try {
-      const resp = await fetch(parsed.toString(), { signal: ctrl.signal, redirect: 'follow' });
-      rootStatus = resp.status;
-      html = await resp.text();
-    } finally {
-      clearTimeout(timer);
-    }
+    const rootRes = await safeFetchText(parsed.toString(), {
+      timeoutMs: 8000,
+      maxBytes: 1500000,
+      allowLoopbackPorts: [PORT],
+    });
+    const rootStatus = rootRes.status;
+    const html = rootRes.text;
 
     const hrefRegex = /href\s*=\s*["']([^"'#]+)["']/gi;
     let m;
@@ -1243,12 +1298,13 @@ app.post('/api/discover', async (req, res) => {
 
     // Also inspect sitemap.xml if available (best-effort)
     try {
-      const sCtrl = new AbortController();
-      const sTimer = setTimeout(() => sCtrl.abort(), 4000);
-      const sResp = await fetch(`${baseOrigin}${basePath}/sitemap.xml`, { signal: sCtrl.signal }).catch(() => null);
-      clearTimeout(sTimer);
+      const sResp = await safeFetchText(`${baseOrigin}${basePath}/sitemap.xml`, {
+        timeoutMs: 4000,
+        maxBytes: 1000000,
+        allowLoopbackPorts: [PORT],
+      }).catch(() => null);
       if (sResp && sResp.ok) {
-        const xml = await sResp.text();
+        const xml = sResp.text;
         const locRegex = /<loc>\s*([^<\s]+)\s*<\/loc>/gi;
         while ((m = locRegex.exec(xml)) !== null) {
           try {
@@ -1350,19 +1406,12 @@ app.get('/api/email/code/:inboxId', async (req, res) => {
 
     const confirmUrl = extractConfirmationUrlFromMessages(msgsPayload);
     if (confirmUrl) {
-      try {
-        await fetch(confirmUrl, {
-          method: 'GET',
-          redirect: 'follow',
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-        });
-      } catch {}
       return res.json({
         ok: true,
         address: stored.address,
-        status: 'link_confirmed',
+        status: 'link_found',
         code: null,
-        confirmationUrl: confirmUrl,
+        confirmationLinkDetected: true,
       });
     }
 
@@ -2119,12 +2168,13 @@ app.post('/api/ai/onboard-site', async (req, res) => {
     let rootStatus = 0;
 
     try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 8000);
-      try {
-        const resp = await fetch(parsedUrl.toString(), { signal: ctrl.signal, redirect: 'follow' });
-        rootStatus = resp.status;
-        const html = await resp.text();
+      const resp = await safeFetchText(parsedUrl.toString(), {
+        timeoutMs: 8000,
+        maxBytes: 1500000,
+        allowLoopbackPorts: [PORT],
+      });
+      rootStatus = resp.status;
+      const html = resp.text;
         const titleM = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
         if (titleM && titleM[1]) {
           siteTitle = titleM[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 90);
@@ -2154,18 +2204,16 @@ app.post('/api/ai/onboard-site', async (req, res) => {
             }
           } catch {}
         }
-      } finally {
-        clearTimeout(timer);
-      }
     } catch {}
 
     try {
-      const sCtrl = new AbortController();
-      const sTimer = setTimeout(() => sCtrl.abort(), 3500);
-      const sResp = await fetch(`${baseOrigin}${basePath}/sitemap.xml`, { signal: sCtrl.signal }).catch(() => null);
-      clearTimeout(sTimer);
+      const sResp = await safeFetchText(`${baseOrigin}${basePath}/sitemap.xml`, {
+        timeoutMs: 3500,
+        maxBytes: 1000000,
+        allowLoopbackPorts: [PORT],
+      }).catch(() => null);
       if (sResp && sResp.ok) {
-        const xml = await sResp.text();
+        const xml = sResp.text;
         const locRegex = /<loc>\s*([^<\s]+)\s*<\/loc>/gi;
         let m;
         while ((m = locRegex.exec(xml)) !== null && discovered.size < 30) {
@@ -2371,17 +2419,13 @@ app.post('/api/ai/clone-funnel', async (req, res) => {
       return res.status(400).json({ error: 'Invalid target URL for analysis and funnel cloning.' });
     }
     const baseOrigin = parsedUrl.origin;
-    let html = '';
-    let rootStatus = 0;
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 9000);
-    try {
-      const resp = await fetch(parsedUrl.toString(), { signal: ctrl.signal, redirect: 'follow' });
-      rootStatus = resp.status;
-      html = await resp.text();
-    } finally {
-      clearTimeout(timer);
-    }
+    const resp = await safeFetchText(parsedUrl.toString(), {
+      timeoutMs: 9000,
+      maxBytes: 1500000,
+      allowLoopbackPorts: [PORT],
+    });
+    const rootStatus = resp.status;
+    const html = resp.text;
 
     const detectedPixels = [];
     if (/googletagmanager\.com\/gtag\/js|G-[A-Z0-9]{6,12}|google-analytics\.com/i.test(html)) detectedPixels.push('Google Analytics 4 (GA4)');
@@ -2536,11 +2580,14 @@ app.post('/api/ai/clone-funnel', async (req, res) => {
 app.post('/api/swarm/dispatch', async (req, res) => {
   try {
     const cfg = readConfigFromDisk();
-    const rawNodes = Array.isArray(req.body?.nodes) ? req.body.nodes : [];
-    const nodes = rawNodes
-      .map(n => (typeof n === 'string' ? n.trim() : String(n?.url || '').trim()))
-      .filter(u => /^https?:\/\//i.test(u))
-      .map(u => u.replace(/\/+$/, ''));
+    const rawNodes = Array.isArray(req.body?.nodes) ? req.body.nodes.slice(0, 20) : [];
+    const nodes = [];
+    for (const n of rawNodes) {
+      const candidate = (typeof n === 'string' ? n.trim() : String(n?.url || '').trim()).replace(/\/+$/, '');
+      if (!/^https?:\/\//i.test(candidate)) continue;
+      await assertSafeOutboundUrl(candidate, { allowLoopbackPorts: [PORT] });
+      nodes.push(candidate);
+    }
     if (!nodes.length) {
       return res.status(400).json({ error: 'Enter at least one remote worker URL (e.g. http://vps-ip:4310).' });
     }
@@ -2553,11 +2600,20 @@ app.post('/api/swarm/dispatch', async (req, res) => {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 6000);
       try {
-        const workerCfg = { ...cfg, visitCount: visitsPerWorker };
+        const forwardSecrets = process.env.WTG_SWARM_FORWARD_SECRETS === '1';
+        const workerCfg = {
+          ...cfg,
+          visitCount: visitsPerWorker,
+          ...(forwardSecrets ? {} : {
+            formInputs: {},
+            proxy: { ...(cfg.proxy || {}), username: '', password: '', customUrl: '' },
+          }),
+        };
         const putResp = await fetch(`${nodeUrl}/api/config`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(workerCfg),
+          redirect: 'error',
           signal: ctrl.signal,
         });
         if (!putResp.ok) throw new Error(`PUT /api/config HTTP ${putResp.status}`);
@@ -2565,6 +2621,7 @@ app.post('/api/swarm/dispatch', async (req, res) => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ streamMode: Boolean(req.body?.streamMode) }),
+          redirect: 'error',
           signal: ctrl.signal,
         });
         const startData = await startResp.json().catch(() => ({}));

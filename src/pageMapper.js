@@ -1,4 +1,5 @@
 const { chromium } = require('playwright');
+const { assertSafeOutboundUrl } = require('./safeOutbound');
 
 function resolveInspectTargetUrl(rawTargetUrl, pagePath = '/') {
   const baseStr = String(rawTargetUrl || '').trim();
@@ -37,9 +38,8 @@ async function inspectPageElements({ targetUrl, pagePath = '/' }) {
   if (!['http:', 'https:'].includes(finalUrlObj.protocol)) {
     throw new Error('Only http:// or https:// URLs can be inspected');
   }
-  if (isDisallowedPrivateHost(finalUrlObj.hostname)) {
-    throw new Error('Inspecting private/internal network addresses is not permitted.');
-  }
+  const allowedLoopbackPort = parseInt(process.env.DASHBOARD_PORT || '4310', 10);
+  await assertSafeOutboundUrl(finalUrlObj.toString(), { allowLoopbackPorts: [allowedLoopbackPort] });
 
   const finalUrl = finalUrlObj.toString();
   const browser = await chromium.launch({

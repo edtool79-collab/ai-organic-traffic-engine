@@ -1769,14 +1769,18 @@ async function loadRecorderProxyList() {
       const ib = order.indexOf(b.cc);
       return ((ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)) || String(a.city || '').localeCompare(String(b.city || ''));
     });
-    group.innerHTML = list.map(p => {
+    group.textContent = '';
+    for (const p of list) {
       const offerMark = p.offerOk === true ? '✅' : (p.offerOk === false ? '⛔' : '');
       const city = p.city ? ` · ${p.city}` : '';
       const ms = p.ms ? ` · ${p.ms}ms` : '';
       // The metered gateway publishes one host:port for every sticky session, so it has no single country.
       const label = p.cc ? countryLabel(p.cc) : (/webshare/i.test(p.hostPort) ? '🌍 Residential (Webshare)' : 'Unknown');
-      return `<option value="${p.hostPort}">${label}${city} — ${p.hostPort}${ms} ${offerMark}</option>`;
-    }).join('');
+      const opt = document.createElement('option');
+      opt.value = String(p.hostPort || '');
+      opt.textContent = `${label}${city} — ${p.hostPort}${ms} ${offerMark}`;
+      group.appendChild(opt);
+    }
   } catch {
     group.innerHTML = '<option value="" disabled>Failed to load proxy list</option>';
   }

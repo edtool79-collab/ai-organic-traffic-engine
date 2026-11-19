@@ -1349,7 +1349,7 @@ async function openSessionContext({
     headless,
     viewport,
     ...(userAgent ? { userAgent } : {}),
-    ignoreHTTPSErrors: true,
+    ignoreHTTPSErrors: process.env.WTG_IGNORE_HTTPS_ERRORS === '1',
     ...(locale ? { locale } : {}),
     ...(timezoneId ? { timezoneId } : {}),
     ...((launchEngine === 'chromium' || launchEngine === 'patchright') ? { args: getChromiumStealthArgs(headless, { stealthMode, proxied: Boolean(proxy) }) } : {}),

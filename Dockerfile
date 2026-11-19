@@ -9,10 +9,18 @@ ENV NODE_ENV=production \
 COPY package*.json ./
 COPY dashboard/package*.json ./dashboard/
 
-RUN npm install --omit=dev && \
-    cd dashboard && npm install --omit=dev
+RUN npm ci --omit=dev && \
+    cd dashboard && npm ci --omit=dev
 
-COPY . .
+COPY src ./src
+COPY tools ./tools
+COPY dashboard ./dashboard
+COPY .env.example ./
+
+RUN mkdir -p /app/data /app/reports /app/runs /app/session-profiles && \
+    chown -R pwuser:pwuser /app
+
+USER pwuser
 
 EXPOSE 4310
 

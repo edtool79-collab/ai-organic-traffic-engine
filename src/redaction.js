@@ -91,6 +91,13 @@ function redactText(input) {
   // Credential-shaped URL userinfo: scheme://user:pass@host — keep the scheme and host.
   out = out.replace(/((?:https?|socks(?:4a?|5h?)?):\/\/)[^\s/@:]+(?::[^\s/@]*)?@/gi, `$1${REDACTED}:${REDACTED}@`);
 
+  // Bearer tokens, HirePulse credit keys, and named API key headers/assignments.
+  out = out.replace(/(Authorization\s*:\s*Bearer\s+)[^\s"']+/gi, `$1${REDACTED}`);
+  out = out.replace(/(Bearer\s+)[A-Za-z0-9._~+/-]{16,}=*/g, `$1${REDACTED}`);
+  out = out.replace(/(X-HirePulse-Credit-Key\s*[:=]\s*)[^\s"']+/gi, `$1${REDACTED}`);
+  out = out.replace(/\bhpc_[A-Za-z0-9_-]{8,}\b/g, REDACTED);
+  out = out.replace(/\b((?:OLLAMA_API_KEY|ULLM_API_KEY|HIREPULSE_CREDIT_KEY|HIREPULSE_EMAIL_API_KEY|WTG_API_TOKEN)\s*[:=]\s*)[^\s"']+/gi, `$1${REDACTED}`);
+
   return out.replace(/[a-z0-9.!#$%&'*+/=?^_{}|~-]+@[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}/gi,
     address => address.startsWith(`${REDACTED}@`) ? address : maskEmail(address));
 }

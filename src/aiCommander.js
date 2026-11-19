@@ -3,7 +3,7 @@ const os = require('os');
 const path = require('path');
 const { AD_SAFE_EXCLUSION_SELECTOR, registerScenarioPage } = require('./adSafetyHelper');
 const { runScanProductsStep, analyzeRecordedJourney } = require('./wavePlanner');
-const { redactData, registerStepSecrets } = require('./redaction');
+const { redactData, redactText, registerSecret, registerStepSecrets } = require('./redaction');
 
 const DEFAULT_OLLAMA_HOST = 'https://ollama.com';
 const DEFAULT_ULLM_HOST = 'https://api.uncensoredllm.ai';
@@ -419,8 +419,9 @@ async function postOllama({ cred, model, messages, temperature, tokenCap, json, 
     });
 
     if (!resp.ok) {
+      if (cred?.apiKey) registerSecret(cred.apiKey);
       const bodyText = await resp.text().catch(() => '');
-      const err = new Error(`ollama_cloud ${transport} HTTP ${resp.status}: ${bodyText.slice(0, 180)}`);
+      const err = new Error(`ollama_cloud ${transport} HTTP ${resp.status}: ${redactText(bodyText.slice(0, 180))}`);
       err.httpStatus = resp.status;
       err.transport = transport;
       throw err;
@@ -481,8 +482,9 @@ async function callDecisionModel({ cred, model, state, questions, timeoutMs = 20
       body: JSON.stringify(redactData({ model, state, questions })),
     });
     if (!resp.ok) {
+      if (cred?.apiKey) registerSecret(cred.apiKey);
       const bodyText = await resp.text().catch(() => '');
-      const err = new Error(`ollama_cloud systemone HTTP ${resp.status}: ${bodyText.slice(0, 180)}`);
+      const err = new Error(`ollama_cloud systemone HTTP ${resp.status}: ${redactText(bodyText.slice(0, 180))}`);
       err.httpStatus = resp.status;
       err.transport = 'systemone';
       throw err;

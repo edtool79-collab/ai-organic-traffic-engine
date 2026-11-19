@@ -224,10 +224,6 @@ function extractConfirmationUrlFromMessages(messagesPayload) {
       !/unsubscribe|privacy|terms|facebook\.com|twitter\.com|linkedin\.com/i.test(u)
     );
     if (confirmLink) return confirmLink.replace(/[.,;]+$/, '');
-    if (urls.length > 0) {
-      const firstSafe = urls.find(u => !/unsubscribe|privacy|terms|\.png|\.jpg|\.gif|\.svg|\.css/i.test(u));
-      if (firstSafe) return firstSafe.replace(/[.,;]+$/, '');
-    }
   }
   return null;
 }
