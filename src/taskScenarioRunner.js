@@ -83,6 +83,87 @@ function safeFrames(page) {
   try { return (page && typeof page.frames === 'function') ? page.frames() : []; } catch { return []; }
 }
 
+const ANALYTICS_COLLECT_RE = /(?:google-analytics\.com|analytics\.google\.com)\/g\/collect|clarity\.ms\/collect|plausible\.io\/api\/event|posthog\.com\/e/i;
+
+/**
+ * Waits briefly once per visit on the initial landing page so async analytics scripts
+ * (e.g., gtag.js downloading over a proxy) finish firing the first page_view with its
+ * external document.referrer (`dr=`) before subsequent click/goto steps unload the page.
+ */
+async function waitForLandingAnalyticsFlush(page, ctx, maxWaitMs = 5000) {
+  if (!page || !ctx || ctx.landingAnalyticsChecked) return false;
+  if (ctx._landingCollectFired) {
+    ctx.landingAnalyticsChecked = true;
+    return true;
+  }
+
+  const probe = async () => {
+    if (typeof page.evaluate !== 'function') return { collectSeen: false, hasAnalytics: false };
+    return page.evaluate(() => {
+      const collectRe = /(?:google-analytics\.com|analytics\.google\.com)\/g\/collect|clarity\.ms\/collect|plausible\.io\/api\/event|posthog\.com\/e/i;
+      let collectSeen = false;
+      try {
+        collectSeen = performance.getEntriesByType('resource').some(e => collectRe.test(String(e?.name || '')));
+      } catch {}
+      const hasAnalytics = Boolean(
+        typeof window.gtag === 'function'
+        || Array.isArray(window.dataLayer)
+        || typeof window.plausible === 'function'
+        || window.posthog
+        || window.clarity
+        || document.querySelector(
+          'meta[name*="ga4"], script[src*="googletagmanager"], script[src*="google-analytics"], script[src*="clarity.ms"], script[src*="plausible.io"]'
+        )
+      );
+      return { collectSeen, hasAnalytics };
+    }).catch(() => null);
+  };
+
+  let state = await probe();
+  if (ctx._landingCollectFired || state?.collectSeen) {
+    ctx._landingCollectFired = true;
+    ctx.landingAnalyticsChecked = true;
+    return true;
+  }
+
+  if (!state?.hasAnalytics) {
+    await sleep(250);
+    if (ctx._landingCollectFired) {
+      ctx.landingAnalyticsChecked = true;
+      return true;
+    }
+    state = await probe();
+    if (!state?.hasAnalytics) {
+      ctx.landingAnalyticsChecked = true;
+      return Boolean(state?.collectSeen);
+    }
+  }
+
+  const deadline = Date.now() + Math.max(500, maxWaitMs);
+  let ticks = 0;
+  while (Date.now() < deadline) {
+    if (ctx._landingCollectFired) {
+      await sleep(150);
+      ctx.landingAnalyticsChecked = true;
+      return true;
+    }
+    if (ticks % 2 === 1) {
+      const check = await probe();
+      if (check?.collectSeen) {
+        ctx._landingCollectFired = true;
+        await sleep(150);
+        ctx.landingAnalyticsChecked = true;
+        return true;
+      }
+    }
+    ticks++;
+    await sleep(150);
+  }
+  ctx.landingAnalyticsChecked = true;
+  return Boolean(ctx._landingCollectFired);
+  try { return (page && typeof page.frames === 'function') ? page.frames() : []; } catch { return []; }
+}
+
 /**
  * Attribution fix: offer-wall lockers embed partner links inside cross-origin iframes.
  * Main-frame locator can never see them, so we scan every frame of the page.
@@ -572,27 +653,33 @@ const STEP_HANDLERS = {
    */
   async search_entry(page, step, ctx) {
     const geo = ctx.geo || null;
-    const engine = pickSearchEngine(step.engine || '', ctx.avoidEngines || []);
+    const avoidList = Array.isArray(ctx.avoidEngines) ? ctx.avoidEngines : [];
+    const wantGoogleOnly = String(step.mode || '').toLowerCase() === 'google_organic'
+      || String(step.engine || '').toLowerCase() === 'google';
+    const engine = pickSearchEngine(step.engine || '', avoidList);
     const profile = searchEngineProfile(engine.id, geo?.countryCode || geo?.cc || 'US');
     const query = String(step.query || '').trim() || buildQuery({
       title: ctx.parsedSnippet?.title || '',
       targetUrl: ctx.targetUrl,
     });
 
-    if (step.fastHeaderOnly) {
+    // When `google` is in `avoidEngines` (e.g. datacenter proxies where live google.com returns 429 /sorry/index),
+    // mixed/search_engines modes still run live SERP on Bing/DuckDuckGo/Brave, while explicit google_organic
+    // falls back cleanly to a localized Google Referer URL without triggering 429s.
+    if (step.fastHeaderOnly || (wantGoogleOnly && avoidList.includes('google'))) {
       const picked = pickReferrer({
         geo,
         title: ctx.parsedSnippet?.title || '',
         targetUrl: ctx.targetUrl,
-        mode: step.mode || 'mixed',
+        mode: wantGoogleOnly ? 'google_organic' : (step.mode || 'mixed'),
       });
       if (picked && picked.url) {
         ctx.serpUrl = picked.url;
       } else {
-        ctx.serpUrl = buildSerpUrl(engine.id, query, geo?.countryCode || geo?.cc || 'US');
+        ctx.serpUrl = buildSerpUrl(wantGoogleOnly ? 'google' : engine.id, query, geo?.countryCode || geo?.cc || 'US');
       }
       ctx.searchQuery = query;
-      let sourceHost = engine.id;
+      let sourceHost = wantGoogleOnly ? 'google.com' : engine.id;
       try { sourceHost = new URL(ctx.serpUrl).hostname.replace(/^www\./i, ''); } catch {}
       ctx.searchEngine = sourceHost;
       return `Organic/social referrer (${sourceHost}): "${query}" → routing to target`;
@@ -919,6 +1006,7 @@ const STEP_HANDLERS = {
           ctx.lastStatus = 200;
           ctx.visitedUrls.push({ path: step.value || '/', url: page.url(), status: 200, loadMs: Date.now() - started });
           await injectSnippet(page, ctx.parsedSnippet);
+          await waitForLandingAnalyticsFlush(page, ctx);
           return `Landed directly via organic search click-through (SERP) on ${page.url()}`;
         }
       } catch {}
@@ -976,6 +1064,9 @@ const STEP_HANDLERS = {
     ctx.pagesVisited++;
     ctx.visitedUrls.push({ path: step.value || '/', url: page.url(), status, loadMs });
     await injectSnippet(page, ctx.parsedSnippet);
+    if (!ctx.landingAnalyticsChecked && (ctx.initialRefererConsumed || !hasRealCurrentPage)) {
+      await waitForLandingAnalyticsFlush(page, ctx);
+    }
     if (typeof status === 'number' && status >= 400) {
       throw new Error(`Page ${dest} returned HTTP ${status}`);
     }
@@ -1805,9 +1896,21 @@ async function executeTaskSteps({
     attribution: attribution || {},
     partnerActivity: false,
     __wtgLockerOpenedAt: null,
+    landingAnalyticsChecked: false,
+    _landingCollectFired: false,
     steps,
     currentStepIndex: 0,
   };
+  const onLandingCollectReq = req => {
+    try {
+      if (ANALYTICS_COLLECT_RE.test(String(req?.url?.() || ''))) {
+        ctx._landingCollectFired = true;
+      }
+    } catch {}
+  };
+  if (typeof page?.on === 'function') {
+    page.on('requestfinished', onLandingCollectReq);
+  }
   const stepResults = [];
   const emitStep = msg => { if (typeof onStep === 'function') onStep(redactText(msg)); };
   applyPageSafeTimeouts(page);
@@ -1815,6 +1918,7 @@ async function executeTaskSteps({
   try {
     if (alreadyNavigated) {
       await injectSnippet(page, parsedSnippet);
+      await waitForLandingAnalyticsFlush(page, ctx, 3500);
       await captureFrameSafe(page, { visitIndex, label: 'Scenario entry page', persona: personaName }, onFrame);
     } else if (!steps.length || !['goto', 'search_entry'].includes(steps[0].type)) {
       // A leading `search_entry` is the entry point: navigating to the target here first would
@@ -1829,6 +1933,7 @@ async function executeTaskSteps({
       ctx.lastStatus = entryResp ? entryResp.status() : 'n/a';
       ctx.pagesVisited = 1;
       await injectSnippet(page, parsedSnippet);
+      await waitForLandingAnalyticsFlush(page, ctx);
       await captureFrameSafe(page, { visitIndex, label: 'Opened base page', persona: personaName }, onFrame);
     }
 
@@ -2127,6 +2232,11 @@ async function executeTaskSteps({
         await tabP.close().catch(() => {});
       }
     }
+    if (typeof page?.off === 'function') {
+      page.off('requestfinished', onLandingCollectReq);
+    } else if (typeof page?.removeListener === 'function') {
+      page.removeListener('requestfinished', onLandingCollectReq);
+    }
     telemetry.detach();
   }
 }
@@ -2184,4 +2294,7 @@ module.exports = {
   confirmRunInboxes,
   resolveTargetUrl,
   executeTaskSteps,
+  waitForLandingAnalyticsFlush,
+  STEP_HANDLERS,
+  ANALYTICS_COLLECT_RE,
 };

@@ -1179,8 +1179,30 @@ function releaseProfileSlot(slotInfo) {
   if (slotInfo) activeProfileSlots.delete(slotInfo.slotKey ?? slotInfo.slot);
 }
 
-function listSavedProfiles(profilesDir) {
-  if (!fs.existsSync(profilesDir)) return [];
+const SAVED_PROFILES_CACHE_TTL_MS = 15000;
+const savedProfilesCache = new Map();
+
+function countSavedProfiles(profilesDir) {
+  if (!profilesDir || !fs.existsSync(profilesDir)) return 0;
+  try {
+    let count = 0;
+    for (const ent of fs.readdirSync(profilesDir, { withFileTypes: true })) {
+      if ((ent.isDirectory() && ent.name.startsWith('persistent_')) || (ent.isFile() && ent.name.endsWith('.json'))) {
+        count++;
+      }
+    }
+    return count;
+  } catch {
+    return 0;
+  }
+}
+
+function listSavedProfiles(profilesDir, { forceRefresh = false } = {}) {
+  if (!profilesDir || !fs.existsSync(profilesDir)) return [];
+  const cached = savedProfilesCache.get(profilesDir);
+  if (!forceRefresh && cached && (Date.now() - cached.ts) < SAVED_PROFILES_CACHE_TTL_MS) {
+    return cached.list;
+  }
   const entries = fs.readdirSync(profilesDir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
   const out = [];
   for (const ent of entries) {
@@ -1235,10 +1257,12 @@ function listSavedProfiles(profilesDir) {
       });
     }
   }
+  savedProfilesCache.set(profilesDir, { ts: Date.now(), list: out });
   return out;
 }
 
-function clearSavedProfiles(profilesDir) {
+  function clearSavedProfiles(profilesDir) {
+  savedProfilesCache.delete(profilesDir);
   if (fs.existsSync(profilesDir)) {
     for (const ent of fs.readdirSync(profilesDir, { withFileTypes: true })) {
       const full = path.join(profilesDir, ent.name);
@@ -1505,6 +1529,7 @@ module.exports = {
   acquireProfileSlot,
   releaseProfileSlot,
   listSavedProfiles,
+  countSavedProfiles,
   clearSavedProfiles,
   openSessionContext,
   closeAllSharedBrowsers,

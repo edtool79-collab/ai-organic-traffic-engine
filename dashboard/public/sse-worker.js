@@ -45,6 +45,10 @@ function patchInitCache(type, rawData) {
 function ensureEventSource() {
   if (es) return;
   es = new EventSource('/api/events');
+  // Clear cached init whenever the backend restarts so a new tab never flashes stale state (e.g. old desktop warning).
+  es.onerror = () => {
+    lastInit = null;
+  };
   const events = [
     'init',
     'system_pulse',
@@ -77,6 +81,10 @@ self.onconnect = event => {
   const port = event.ports[0];
   if (!port) return;
   ports.add(port);
+  if (es && !lastInit && es.readyState === 0) {
+    try { es.close(); } catch {}
+    es = null;
+  }
   ensureEventSource();
 
   port.onmessage = msg => {

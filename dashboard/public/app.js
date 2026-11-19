@@ -475,7 +475,9 @@ function renderTargets() {
     visitsTag.className = 'badge';
     visitsTag.style.padding = '2px 8px';
     visitsTag.style.fontSize = '0.75rem';
-    visitsTag.textContent = t.visitCount > 0 ? `${t.visitCount} visits` : 'Equal split';
+    visitsTag.textContent = t.visitCount > 0
+      ? `${t.visitCount} visits`
+      : (Number(t.weightPct) > 0 ? `${t.weightPct}% of run (dynamic)` : 'Equal split');
     left.appendChild(visitsTag);
 
     const liveStat = byTargetStats[t.url] || byTargetStats[String(t.url).replace(/\/$/, '')];
@@ -3087,18 +3089,25 @@ refreshResidentialStatus();
 setInterval(refreshResidentialStatus, 20000);
 
   try {
-    const [sys, cfgData, profilesData, countriesData, aiData] = await Promise.all([
-      api('/api/system'),
+    const [sys, cfgData, profilesData, countriesData, aiData, recData] = await Promise.all([
+      api('/api/system').catch(() => null),
       api('/api/config'),
       api('/api/site-profiles'),
       api('/api/proxies/countries').catch(() => ({ tier1Defaults: state.tier1Defaults, catalog: [], datacenterCounts: {} })),
       api('/api/ai/status').catch(() => null),
+      api('/api/recorder/status').catch(() => null),
     ]);
     state.system = sys;
     state.config = cfgData.config;
     state.defaultConfig = cfgData.defaultConfig;
     state.siteProfiles = profilesData.profiles || [];
     state.activeProfileId = profilesData.activeProfileId || null;
+    if (recData && recData.recorder) {
+      const recObj = recData.desktop && !recData.recorder.desktop
+        ? { ...recData.recorder, desktop: recData.desktop }
+        : recData.recorder;
+      renderRecorderState(recObj);
+    }
     if (Array.isArray(countriesData.tier1Defaults) && countriesData.tier1Defaults.length) {
       state.tier1Defaults = countriesData.tier1Defaults;
     }

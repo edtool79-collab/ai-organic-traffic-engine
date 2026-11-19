@@ -7,7 +7,7 @@ const path = require('path');
 const os = require('os');
 const { spawn, execFile } = require('child_process');
 
-const { listSavedProfiles, clearSavedProfiles } = require('../src/fingerprintManager');
+const { listSavedProfiles, countSavedProfiles, clearSavedProfiles } = require('../src/fingerprintManager');
 const {
   PROXIES_TXT_PATH,
   normalizeProxyLine,
@@ -257,10 +257,12 @@ function normalizeTargets(rawTargets, fallbackPages) {
     const cleanUrl = rawUrl.replace(/\/+$/, '');
     const tPages = Array.isArray(t.pages) && t.pages.length ? normalizePages(t.pages) : [...fallbackPages];
     const vc = t.visitCount != null ? clampInt(t.visitCount, 0, 100000, 0) : 0;
+    const wp = t.weightPct != null ? Math.round(clamp(t.weightPct, 0, 100, 0) * 100) / 100 : 0;
     out.push({
       url: cleanUrl,
       pages: tPages,
       ...(vc > 0 ? { visitCount: vc } : {}),
+      ...(wp > 0 ? { weightPct: wp } : {}),
     });
   }
   return out;
@@ -557,7 +559,7 @@ function getSystemInfo() {
       sweetSpot: [minSafe, recommended],
       maxStress,
     },
-    savedProfilesCount: listSavedProfiles(PROFILES_DIR).length,
+    savedProfilesCount: countSavedProfiles(PROFILES_DIR),
   };
 }
 
@@ -3151,7 +3153,9 @@ app.post('/api/run/stop', (_req, res) => {
 });
 
 app.get('/api/events', async (req, res) => {
-  await getDesktopSessionInfo().catch(() => null);
+  // Never block SSE handshake on PowerShell desktop probe; warm cache asynchronously if needed.
+  getDesktopSessionInfo().catch(() => null);
+  const sysInfo = getSystemInfo();
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -3161,7 +3165,7 @@ app.get('/api/events', async (req, res) => {
     ...getRunStatus(),
     demoEvents,
     profiles: listSavedProfiles(PROFILES_DIR),
-    system: getSystemInfo(),
+    system: sysInfo,
     recorder: getRecorderState(),
   })}\n\n`);
 

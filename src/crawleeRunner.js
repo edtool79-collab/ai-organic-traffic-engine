@@ -19,7 +19,7 @@ const {
   sleep,
 } = require('./behaviorEngine');
 
-const { executeTaskSteps, resetRunInboxFile, confirmRunInboxes } = require('./taskScenarioRunner');
+const { executeTaskSteps, resetRunInboxFile, confirmRunInboxes, ANALYTICS_COLLECT_RE } = require('./taskScenarioRunner');
 
 const {
   applyOriginScopedHeaders,
@@ -89,6 +89,43 @@ function pushLoadTime(statsObj, loadMs) {
   if (statsObj.loadTimesMs.length > 1000) {
     statsObj.loadTimesMs.shift();
   }
+}
+
+/**
+ * Records outbound analytics pings (GA4 / Clarity / Plausible / PostHog) uniformly
+ * across Mode A and Mode B, extracting the real `dr` referrer host Google received.
+ */
+function trackGa4NetworkRequest(reqUrl, statsObj, visitNumber, claimVisit) {
+  if (!ANALYTICS_COLLECT_RE.test(String(reqUrl || ''))) return false;
+  statsObj.ga4EventsFired = (statsObj.ga4EventsFired || 0) + 1;
+  if (!claimVisit()) return false;
+  statsObj.ga4VerifiedVisits = (statsObj.ga4VerifiedVisits || 0) + 1;
+  try {
+    const u = new URL(reqUrl);
+    const evName = u.searchParams.get('en') || 'page_view';
+    const drRaw = u.searchParams.get('dr') || '';
+    let drHost = '';
+    if (drRaw) {
+      try { drHost = new URL(drRaw).hostname.replace(/^www\./i, ''); } catch { drHost = drRaw.slice(0, 30); }
+    }
+    if (drHost) statsObj.lastGa4Source = drHost;
+    console.log(`[GA4 Verified ✅ | Visit #${visitNumber}] Live Google Analytics hit confirmed (${evName}${drHost ? ' | source: ' + drHost : ''}) [Total verified: ${statsObj.ga4VerifiedVisits}]`);
+  } catch {}
+  return true;
+}
+
+/**
+ * Avoids live `google.com` SERP requests on datacenter proxies (which trigger HTTP 429 /sorry/index)
+ * while preserving live Bing/DuckDuckGo/Brave SERPs and clean Google Referer headers.
+ */
+function buildAvoidEnginesForProxy(proxyUrl, residentialActive = false) {
+  const avoid = [];
+  const isResProxy = Boolean(proxyUrl && residentialActive && residentialPool.isResidentialUrl(proxyUrl));
+  const isDcProxy = Boolean(proxyUrl && !isResProxy);
+  if (isDcProxy || proxyScore.isCoolingDown('google.com', proxyUrl)) {
+    avoid.push('google');
+  }
+  return avoid;
 }
 
 function performHttpGetOnce(targetUrlStr, { agent = undefined, headers = {}, timeoutMs = 15000 } = {}) {
@@ -615,32 +652,74 @@ function buildTargets(cfg, { targetUrl, pages, totalVisits }) {
     return [{ index: 0, url: targetUrl, pages: normalizePages(pages), visitCount: totalVisits }];
   }
 
-  const list = raw.map((t, index) => ({
-    index,
-    url: String(t.url).replace(/\/$/, ''),
-    pages: normalizePages(t.pages && t.pages.length ? t.pages : pages),
-    visitCount: Math.max(0, parseInt(String(t.visitCount ?? 0), 10) || 0),
-  }));
+  const list = raw.map((t, index) => {
+    const wp = Number(t.weightPct);
+    return {
+      index,
+      url: String(t.url).replace(/\/$/, ''),
+      pages: normalizePages(t.pages && t.pages.length ? t.pages : pages),
+      visitCount: Math.max(0, parseInt(String(t.visitCount ?? 0), 10) || 0),
+      weightPct: Number.isFinite(wp) && wp > 0 ? Math.min(100, wp) : 0,
+    };
+  });
 
-  // Explicit per-target budgets win. The rest of the total budget is split evenly between the
-  // targets that did not declare one, so `visitCount` keeps meaning "total visits".
+  // Explicit per-target budgets win. Remaining visits allocate by `weightPct` if declared
+  // (using largest-remainder apportionment so totals sum cleanly), otherwise evenly.
   const fixedSum = list.reduce((a, t) => a + t.visitCount, 0);
   const open = list.filter(t => !t.visitCount);
   if (!open.length) return list;
   const remaining = Math.max(0, totalVisits - fixedSum);
+  const hasWeights = open.some(t => t.weightPct > 0);
+  if (hasWeights && remaining > 0) {
+    const declaredSum = open.reduce((a, t) => a + t.weightPct, 0);
+    const unweighted = open.filter(t => t.weightPct <= 0);
+    const fillWeight = unweighted.length && declaredSum < 100
+      ? (100 - declaredSum) / unweighted.length
+      : 0;
+    const weights = open.map(t => (t.weightPct > 0 ? t.weightPct : fillWeight));
+    const totalWeight = weights.reduce((a, w) => a + w, 0) || open.length;
+    const shares = weights.map((w, idx) => {
+      const exact = (remaining * w) / totalWeight;
+      return { idx, floored: Math.floor(exact), frac: exact - Math.floor(exact) };
+    });
+    let leftover = remaining - shares.reduce((a, s) => a + s.floored, 0);
+    const byFrac = [...shares].sort((a, b) => b.frac - a.frac || a.idx - b.idx);
+    for (let k = 0; k < byFrac.length && leftover > 0; k += 1) {
+      byFrac[k].floored += 1;
+      leftover -= 1;
+    }
+    const assignedByIndex = new Map(open.map((t, i) => [t.index, shares[i].floored]));
+    return list.map(t => (t.visitCount ? t : { ...t, visitCount: assignedByIndex.get(t.index) || 0 }));
+  }
+
   const base = Math.floor(remaining / open.length);
   let extra = remaining - base * open.length;
   return list.map(t => (t.visitCount ? t : { ...t, visitCount: base + (extra-- > 0 ? 1 : 0) }));
 }
 
-/** Round-robins target indexes so every site gets traffic early instead of one site first. */
+/** Smoothly interleaves targets proportionally to their visit budgets (deficit round-robin). */
 function buildVisitPlan(targets) {
+  const weights = targets.map(t => Math.max(0, t.visitCount || 0));
+  const total = weights.reduce((a, n) => a + n, 0);
+  if (total === 0) return [];
+  const rem = weights.slice();
+  const cur = weights.map(() => 0);
   const plan = [];
-  const deepest = targets.reduce((a, t) => Math.max(a, t.visitCount), 0);
-  for (let k = 0; k < deepest; k += 1) {
-    targets.forEach((t, idx) => {
-      if (k < t.visitCount) plan.push(idx);
-    });
+  for (let step = 0; step < total; step += 1) {
+    let best = -1;
+    let bestScore = -Infinity;
+    for (let j = 0; j < targets.length; j += 1) {
+      if (rem[j] <= 0) continue;
+      cur[j] += weights[j];
+      if (cur[j] > bestScore) {
+        bestScore = cur[j];
+        best = j;
+      }
+    }
+    if (best === -1) break;
+    cur[best] -= total;
+    rem[best] -= 1;
+    plan.push(best);
   }
   return plan;
 }
@@ -1437,7 +1516,7 @@ async function run() {
         const referrer = referrerPick.url;
         // Google itself remembers this proxy (the "sorry" page). Only Google is avoided — and only
         // while its own cooldown lasts; the same proxy keeps searching on Bing/DuckDuckGo/Yahoo.
-        const avoidEngines = proxyScore.isCoolingDown('google.com', selectedProxyUrl) ? ['google'] : [];
+        const avoidEngines = buildAvoidEnginesForProxy(selectedProxyUrl, residentialActive);
         const sessionSlot = acquireProfileSlot({
           ...sessionCfg,
           countryCode: geo?.countryCode || null,
@@ -1514,24 +1593,11 @@ async function run() {
           onRespSize = async req => {
             try {
               const reqUrl = String(req.url() || '');
-              if (/(?:google-analytics\.com|analytics\.google\.com)\/g\/collect|clarity\.ms\/collect|plausible\.io\/api\/event|posthog\.com\/e/i.test(reqUrl)) {
-                stats.ga4EventsFired = (stats.ga4EventsFired || 0) + 1;
-                if (!sessionGa4Verified) {
-                  sessionGa4Verified = true;
-                  stats.ga4VerifiedVisits = (stats.ga4VerifiedVisits || 0) + 1;
-                  try {
-                    const u = new URL(reqUrl);
-                    const evName = u.searchParams.get('en') || 'page_view';
-                    const drRaw = u.searchParams.get('dr') || '';
-                    let drHost = '';
-                    if (drRaw) {
-                      try { drHost = new URL(drRaw).hostname.replace(/^www\./i, ''); } catch { drHost = drRaw.slice(0, 30); }
-                    }
-                    if (drHost) stats.lastGa4Source = drHost;
-                    console.log(`[GA4 Verified ✅ | Visit #${i + 1}] Live Google Analytics hit confirmed (${evName}${drHost ? ' | source: ' + drHost : ''}) [Total verified: ${stats.ga4VerifiedVisits}]`);
-                  } catch {}
-                }
-              }
+              trackGa4NetworkRequest(reqUrl, stats, i + 1, () => {
+                if (sessionGa4Verified) return false;
+                sessionGa4Verified = true;
+                return true;
+              });
               const resp = await req.response().catch(() => null);
               if (resp && resp.headers?.()['x-wtg-cache'] === '1') return;
               const s = await req.sizes();
@@ -1859,14 +1925,11 @@ async function run() {
       let modeBGa4Verified = false;
       const onModeBReq = req => {
         try {
-          const reqUrl = String(req.url() || '');
-          if (/(?:google-analytics\.com|analytics\.google\.com)\/g\/collect|clarity\.ms\/collect|plausible\.io\/api\/event|posthog\.com\/e/i.test(reqUrl)) {
-            stats.ga4EventsFired = (stats.ga4EventsFired || 0) + 1;
-            if (!modeBGa4Verified) {
-              modeBGa4Verified = true;
-              stats.ga4VerifiedVisits = (stats.ga4VerifiedVisits || 0) + 1;
-            }
-          }
+          trackGa4NetworkRequest(String(req.url() || ''), stats, i + 1, () => {
+            if (modeBGa4Verified) return false;
+            modeBGa4Verified = true;
+            return true;
+          });
         } catch {}
       };
       page.on('requestfinished', onModeBReq);
@@ -1898,6 +1961,7 @@ async function run() {
           alreadyNavigated: true,
           initialStatus: status,
           initialLoadMs: loadMs,
+          avoidEngines: buildAvoidEnginesForProxy(proxyInfo?.url, residentialActive),
         });
 
         if (res?.partnerActivity) {
@@ -1996,4 +2060,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { run, resolveProxies };
+module.exports = { run, resolveProxies, trackGa4NetworkRequest, buildAvoidEnginesForProxy, buildTargets, buildVisitPlan };
