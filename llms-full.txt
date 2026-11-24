@@ -1,0 +1,47 @@
+# Traffic Engine AI — Complete Reference (https://edtool79-collab.github.io/ai-organic-traffic-engine/)
+
+Repository: https://github.com/edtool79-collab/ai-organic-traffic-engine
+License: MIT
+Primary Runtime: Node.js LTS (Express dashboard on 127.0.0.1:4310) + Docker Compose (swarm & lightpanda profiles)
+
+## Core Dependencies (package.json)
+- crawlee ^3.18.2
+- playwright ^1.58.2
+- patchright ^1.64.3
+- camoufox ^0.5.9
+- rrweb ^2.2.2
+- @lightpanda/browser ^1.2.0 (optional CDP sidecar)
+- fingerprint-generator & fingerprint-injector ^2.1.90
+
+## Quickstart Commands
+```bash
+git clone https://github.com/edtool79-collab/ai-organic-traffic-engine.git
+cd ai-organic-traffic-engine
+npm install
+npm --prefix dashboard install
+npx playwright install chromium firefox webkit
+cp config.example.json config.json
+cp .env.example .env.local
+npm start
+```
+
+## Offline Zero-Spend Verification Suite
+- `npm test` (tests/redaction.js)
+- `node tests/verify-plan.js`
+- `node tests/verify-proxy-resolution.js`
+- `node tests/verify-proxyscore.js`
+- `node tests/verify-residential.js`
+- `node tests/signup-release.js`
+- `node tests/verify-engine.js chromium`
+
+## Hosted Integrations & Connected Ecosystem
+- HirePulse Cloud Credits & Live Inboxes: https://gethirepulse.xyz/credits (supports ai.provider="hirepulse" and src/emailInboxClient.js)
+- HirePulse Gateway (MCP + x402): https://gethirepulse.xyz/
+- HirePulse Data Tools: https://edtool79-collab.github.io/hirepulse-tools/
+- Apify Store: https://apify.com/hirepulse
+- HirePulse Jobs Radar: https://jobs.gethirepulse.xyz/
+- CitedCart Storefront AI Audits: https://citedcart.com/
+- CitedCart Free Tools: https://tools.citedcart.com/
+- CleanTab Lab: https://cleantab-lab.hirepulse-commerce-sandbox.workers.dev/
+- GTA 6 U.S. Launch Clock: https://gta6.gethirepulse.xyz/
+- ModcraftForge: https://www.modcraftforge.com/

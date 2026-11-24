@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Crawlee Stealth: Patchright vs Camoufox | Traffic Engine</title>
+  <meta name="description" content="Compare Playwright Chromium, Patchright, Camoufox, and Lightpanda CDP in Traffic Engine AI, including mobile Client Hints and read-only preflight." />
+  <link rel="canonical" href="https://edtool79-collab.github.io/ai-organic-traffic-engine/guides/playwright-stealth-crawlee/" />
+  <meta name="robots" content="index,follow,max-image-preview:large" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="Traffic Engine AI" />
+  <meta property="og:title" content="Crawlee Stealth: Patchright vs Camoufox | Traffic Engine" />
+  <meta property="og:description" content="Compare Playwright Chromium, Patchright, Camoufox, and Lightpanda CDP in Traffic Engine AI, including mobile Client Hints and read-only preflight." />
+  <meta property="og:url" content="https://edtool79-collab.github.io/ai-organic-traffic-engine/guides/playwright-stealth-crawlee/" />
+  <meta property="og:image" content="https://edtool79-collab.github.io/ai-organic-traffic-engine/assets/img/hero-banner.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Crawlee Stealth: Patchright vs Camoufox | Traffic Engine" />
+  <meta name="twitter:description" content="Compare Playwright Chromium, Patchright, Camoufox, and Lightpanda CDP in Traffic Engine AI, including mobile Client Hints and read-only preflight." />
+  <meta name="twitter:image" content="https://edtool79-collab.github.io/ai-organic-traffic-engine/assets/img/hero-banner.png" />
+  <link rel="icon" type="image/png" href="../../assets/img/logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../../assets/styles.css" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "Multi-Engine Stealth: Playwright, Patchright & Camoufox",
+  "description": "Compare Playwright Chromium, Patchright, Camoufox, and Lightpanda CDP in Traffic Engine AI, including mobile Client Hints and read-only preflight.",
+  "url": "https://edtool79-collab.github.io/ai-organic-traffic-engine/guides/playwright-stealth-crawlee/",
+  "datePublished": "2026-11-24",
+  "dateModified": "2026-11-24",
+  "author": {
+    "@type": "Organization",
+    "name": "HirePulse",
+    "url": "https://gethirepulse.xyz/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "HirePulse",
+    "url": "https://gethirepulse.xyz/"
+  },
+  "mainEntityOfPage": "https://edtool79-collab.github.io/ai-organic-traffic-engine/guides/playwright-stealth-crawlee/"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Traffic Engine AI",
+      "item": "https://edtool79-collab.github.io/ai-organic-traffic-engine/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "Guides",
+      "item": "https://edtool79-collab.github.io/ai-organic-traffic-engine/guides/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": "Multi-Engine Stealth: Playwright, Patchright & Camoufox",
+      "item": "https://edtool79-collab.github.io/ai-organic-traffic-engine/guides/playwright-stealth-crawlee/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Does Traffic Engine attempt to solve or bypass CAPTCHAs?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. challengeDetector.js and tools/preflight-target.js are strictly read-only detectors that log and stop cleanly when a challenge interstitial appears."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I test both desktop and mobile footprints in one run?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Configure weights under devices in config.json and run node tests/verify-engine.js chromium to verify navigator integrity."
+      }
+    }
+  ]
+}
+</script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="../../">
+        <img src="../../assets/img/logo.png" alt="Traffic Engine AI logo" width="32" height="32" />
+        <span>Traffic Engine AI</span>
+      </a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav">Menu</button>
+      <nav id="primary-nav" class="nav-links" aria-label="Primary navigation">
+        <a href="../../">Overview</a>
+        <a href="../../architecture/">AI Architecture</a>
+        <a href="../../guides/" aria-current="page">Guides</a>
+        <a href="../../config-builder/">Config Builder</a>
+        <a href="../../ecosystem/">Ecosystem</a>
+      </nav>
+      <div class="header-cta">
+        <a class="btn btn-secondary btn-sm" href="https://github.com/edtool79-collab/ai-organic-traffic-engine/archive/refs/heads/main.zip">Download ZIP</a>
+        <a class="btn btn-primary btn-sm" href="https://github.com/edtool79-collab/ai-organic-traffic-engine">Clone on GitHub</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+  <section class="page-banner">
+    <div class="container">
+      <div class="breadcrumbs"><a href="../../">Home</a> / <a href="../../guides/">Guides</a> / Multi-Engine Stealth: Playwright, Patchright &amp; Camoufox</div>
+      <h1>Multi-Engine Stealth: Playwright, Patchright &amp; Camoufox</h1>
+      <p class="hero-lead">Configure Patchright, Camoufox, Lightpanda CDP, device Client Hints, and read-only challenge detection inside one unified Crawlee runner.</p>
+      <div class="action-row">
+        <a class="btn btn-primary btn-sm" href="https://github.com/edtool79-collab/ai-organic-traffic-engine">Get Source on GitHub</a>
+        <a class="btn btn-secondary btn-sm" href="../../config-builder/">Build config.json</a>
+        <a class="btn btn-secondary btn-sm" href="https://gethirepulse.xyz/credits">Get HirePulse Credits</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="container doc-layout">
+    <article class="doc-body">
+      
+      <section id="engines">
+        <h2>Choosing the right browser engine in config.json</h2>
+        <p>Different QA targets behave differently depending on TLS signatures, navigator properties, and rendering cost. Traffic Engine AI lets you pick the exact engine per run via <code>engineMode</code> and <code>browserEngine</code> without rewriting scenario steps.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Engine Option</th><th>Underlying Stack</th><th>Best Use Case</th></tr></thead>
+            <tbody>
+              <tr><td><code>patchright</code></td><td>Patched Chromium runtime</td><td>Default high-compatibility browser QA with clean navigator client hints and zero injected webdriver flags</td></tr>
+              <tr><td><code>chromium</code></td><td>Standard Playwright Chromium</td><td>Fast loopback testing, DevTools CDP traffic inspection, and CI regression suites</td></tr>
+              <tr><td><code>camoufox</code></td><td>Hardened Firefox browser</td><td>Cross-browser rendering verification and alternative TLS/canvas profiles</td></tr>
+              <tr><td><code>lightpanda_cdp</code></td><td>Lightpanda Zig headless CDP</td><td>Low-memory container execution attached on <code>127.0.0.1:9222</code></td></tr>
+              <tr><td><code>http_fast</code></td><td>Concurrency up to 128</td><td>Lightweight HTTP reachability, status checks, and header preflight sweeps</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section id="fingerprints">
+        <h2>Device profiles &amp; User-Agent Client Hints</h2>
+        <p><code>src/fingerprintManager.js</code> assigns desktop and mobile weights (<code>desktopChrome</code>, <code>pixel7</code>, <code>iphone14</code>, <code>ipadPro</code>) and keeps Chromium mobile sessions aligned with Android/ARM Client Hints and native <code>deviceScaleFactor</code> instead of leaking mismatched Windows host headers on mobile viewports.</p>
+        <pre><code>"devices": {
+  "desktopChrome": 60,
+  "pixel7": 40
+},
+"stealthMode": "maximum"</code></pre>
+      </section>
+      <section id="preflight">
+        <h2>Read-only preflight &amp; challenge inspection</h2>
+        <p>Before committing a full run, <code>tools/preflight-target.js</code> classifies target availability (<code>open</code>, <code>cf_interstitial</code>, <code>site_tick</code>, <code>dead</code>), while <code>src/challengeDetector.js</code> detects CAPTCHA or verification walls strictly read-only so workers pause or abort cleanly without attempting to bypass security checks.</p>
+        <p>For live storefront compatibility audits, verify crawl rules alongside <a href="https://tools.citedcart.com/tools/robots-checker">CitedCart AI Robots.txt Checker</a> and <a href="https://cleantab-lab.hirepulse-commerce-sandbox.workers.dev/">CleanTab Lab</a>.</p>
+      </section>
+    
+      
+      <section id="faq">
+        <h2>Frequently asked questions</h2>
+        <div class="faq-list">
+          <details><summary>Does Traffic Engine attempt to solve or bypass CAPTCHAs?</summary><p>No. challengeDetector.js and tools/preflight-target.js are strictly read-only detectors that log and stop cleanly when a challenge interstitial appears.</p></details>
+<details><summary>Can I test both desktop and mobile footprints in one run?</summary><p>Yes. Configure weights under devices in config.json and run node tests/verify-engine.js chromium to verify navigator integrity.</p></details>
+        </div>
+      </section>
+    </article>
+
+    <aside class="doc-sidebar" aria-label="On this page">
+      <h3>On this page</h3>
+      <ul>
+        <li><a href="#engines">Engine comparison</a></li>
+        <li><a href="#fingerprints">Mobile &amp; desktop fingerprints</a></li>
+        <li><a href="#preflight">Preflight &amp; challenge detection</a></li>
+        <li><a href="#faq">FAQ</a></li>
+      </ul>
+      <h3>Quick Links</h3>
+      <ul>
+        <li><a href="https://github.com/edtool79-collab/ai-organic-traffic-engine">GitHub Repository</a></li>
+        <li><a href="https://github.com/edtool79-collab/ai-organic-traffic-engine/archive/refs/heads/main.zip">Download ZIP Archive</a></li>
+        <li><a href="../../config-builder/">config.json Builder</a></li>
+        <li><a href="../../ecosystem/">All Connected Sites</a></li>
+      </ul>
+      <h3>Related Ecosystem Tools</h3>
+      <ul>
+        <li><a href="https://gethirepulse.xyz/credits">HirePulse AI &amp; OTP Credits</a></li>
+        <li><a href="https://citedcart.com/">CitedCart AI Store Audit</a></li>
+        <li><a href="https://tools.citedcart.com/">CitedCart Free SEO Tools</a></li>
+        <li><a href="https://edtool79-collab.github.io/hirepulse-tools/">HirePulse MCP Data Hub</a></li>
+      </ul>
+    </aside>
+  </div>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <h3>Traffic Engine AI</h3>
+          <p>Self-hosted Playwright, Patchright, Camoufox, and Crawlee browser automation studio with live rrweb replay, GA4 hit verification, bandwidth caps, OTP sweeps, and hybrid AI.</p>
+          <p><a href="https://github.com/edtool79-collab/ai-organic-traffic-engine">GitHub: edtool79-collab/ai-organic-traffic-engine</a></p>
+        </div>
+        <div>
+          <h3>Documentation</h3>
+          <ul class="footer-list">
+            <li><a href="../../architecture/">Multi-Agent AI Architecture</a></li>
+            <li><a href="../../guides/playwright-stealth-crawlee/">Multi-Engine Stealth &amp; Fingerprints</a></li>
+            <li><a href="../../guides/limit-residential-bandwidth/">Limit Residential Proxy Bandwidth</a></li>
+            <li><a href="../../guides/webshare-decodo-proxies/">Webshare &amp; Decodo Proxy Setup</a></li>
+            <li><a href="../../guides/ai-agents-budget/">AI Browser Agents Budget</a></li>
+            <li><a href="../../guides/ga4-otp-funnel-qa/">GA4 Hit &amp; OTP Verification</a></li>
+            <li><a href="../../guides/docker-swarm-setup/">Docker Swarm &amp; Lightpanda</a></li>
+            <li><a href="../../config-builder/">Interactive config.json Builder</a></li>
+          </ul>
+        </div>
+        <div>
+          <h3>HirePulse Platform</h3>
+          <ul class="footer-list">
+            <li><a href="https://gethirepulse.xyz/credits">HirePulse Cloud Credits &amp; OTP Inboxes</a></li>
+            <li><a href="https://gethirepulse.xyz/">HirePulse MCP &amp; x402 Gateway</a></li>
+            <li><a href="https://edtool79-collab.github.io/hirepulse-tools/">HirePulse Data Tools Hub</a></li>
+            <li><a href="https://apify.com/hirepulse">HirePulse Actors on Apify</a></li>
+            <li><a href="https://jobs.gethirepulse.xyz/">HirePulse Jobs Radar</a></li>
+          </ul>
+        </div>
+        <div>
+          <h3>Connected Sites &amp; Case Studies</h3>
+          <ul class="footer-list">
+            <li><a href="https://citedcart.com/">CitedCart AI Visibility Audit</a></li>
+            <li><a href="https://tools.citedcart.com/">CitedCart Free SEO Workbench</a></li>
+            <li><a href="https://tools.citedcart.com/tools/product-schema">Product Schema Generator</a></li>
+            <li><a href="https://tools.citedcart.com/tools/robots-checker">AI Robots.txt Checker</a></li>
+            <li><a href="https://cleantab-lab.hirepulse-commerce-sandbox.workers.dev/">CleanTab Lab Privacy Utilities</a></li>
+            <li><a href="https://gta6.gethirepulse.xyz/">GTA 6 U.S. Launch Clock</a></li>
+            <li><a href="https://www.modcraftforge.com/">ModcraftForge Mods Directory</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>MIT Licensed Open-Source Software • Intended strictly for authorized QA, flow verification, and self-hosted testing.</span>
+        <span>Machine Discovery: <a href="../../llms.txt">llms.txt</a> · <a href="../../llms-full.txt">llms-full.txt</a> · <a href="../../sitemap.xml">sitemap.xml</a></span>
+      </div>
+    </div>
+  </footer>
+  <script src="../../assets/app.js" defer></script>
+</body>
+</html>

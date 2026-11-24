@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Docker Compose Swarm &amp; Playwright Setup | Traffic Engine AI</title>
+  <meta name="description" content="Install Traffic Engine AI on Windows or Docker Compose Swarm with Lightpanda CDP sidecar, 2GB /dev/shm worker scaling, and offline QA verification tests." />
+  <link rel="canonical" href="https://edtool79-collab.github.io/ai-organic-traffic-engine/guides/docker-swarm-setup/" />
+  <meta name="robots" content="index,follow,max-image-preview:large" />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="Traffic Engine AI" />
+  <meta property="og:title" content="Docker Compose Swarm &amp; Playwright Setup | Traffic Engine AI" />
+  <meta property="og:description" content="Install Traffic Engine AI on Windows or Docker Compose Swarm with Lightpanda CDP sidecar, 2GB /dev/shm worker scaling, and offline QA verification tests." />
+  <meta property="og:url" content="https://edtool79-collab.github.io/ai-organic-traffic-engine/guides/docker-swarm-setup/" />
+  <meta property="og:image" content="https://edtool79-collab.github.io/ai-organic-traffic-engine/assets/img/hero-banner.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Docker Compose Swarm &amp; Playwright Setup | Traffic Engine AI" />
+  <meta name="twitter:description" content="Install Traffic Engine AI on Windows or Docker Compose Swarm with Lightpanda CDP sidecar, 2GB /dev/shm worker scaling, and offline QA verification tests." />
+  <meta name="twitter:image" content="https://edtool79-collab.github.io/ai-organic-traffic-engine/assets/img/hero-banner.png" />
+  <link rel="icon" type="image/png" href="../../assets/img/logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../../assets/styles.css" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "Self-Hosted Docker Swarm & Local Quickstart",
+  "description": "Install Traffic Engine AI on Windows or Docker Compose Swarm with Lightpanda CDP sidecar, 2GB /dev/shm worker scaling, and offline QA verification tests.",
+  "url": "https://edtool79-collab.github.io/ai-organic-traffic-engine/guides/docker-swarm-setup/",
+  "datePublished": "2026-11-24",
+  "dateModified": "2026-11-24",
+  "author": {
+    "@type": "Organization",
+    "name": "HirePulse",
+    "url": "https://gethirepulse.xyz/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "HirePulse",
+    "url": "https://gethirepulse.xyz/"
+  },
+  "mainEntityOfPage": "https://edtool79-collab.github.io/ai-organic-traffic-engine/guides/docker-swarm-setup/"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Traffic Engine AI",
+      "item": "https://edtool79-collab.github.io/ai-organic-traffic-engine/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "Guides",
+      "item": "https://edtool79-collab.github.io/ai-organic-traffic-engine/guides/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": "Self-Hosted Docker Swarm & Local Quickstart",
+      "item": "https://edtool79-collab.github.io/ai-organic-traffic-engine/guides/docker-swarm-setup/"
+    }
+  ]
+}
+</script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="../../">
+        <img src="../../assets/img/logo.png" alt="Traffic Engine AI logo" width="32" height="32" />
+        <span>Traffic Engine AI</span>
+      </a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav">Menu</button>
+      <nav id="primary-nav" class="nav-links" aria-label="Primary navigation">
+        <a href="../../">Overview</a>
+        <a href="../../architecture/">AI Architecture</a>
+        <a href="../../guides/" aria-current="page">Guides</a>
+        <a href="../../config-builder/">Config Builder</a>
+        <a href="../../ecosystem/">Ecosystem</a>
+      </nav>
+      <div class="header-cta">
+        <a class="btn btn-secondary btn-sm" href="https://github.com/edtool79-collab/ai-organic-traffic-engine/archive/refs/heads/main.zip">Download ZIP</a>
+        <a class="btn btn-primary btn-sm" href="https://github.com/edtool79-collab/ai-organic-traffic-engine">Clone on GitHub</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+  <section class="page-banner">
+    <div class="container">
+      <div class="breadcrumbs"><a href="../../">Home</a> / <a href="../../guides/">Guides</a> / Self-Hosted Docker Swarm &amp; Local Quickstart</div>
+      <h1>Self-Hosted Docker Swarm &amp; Local Quickstart</h1>
+      <p class="hero-lead">Clone from GitHub, configure .env.local safely, scale Playwright workers with Docker Compose, and verify everything with offline tests.</p>
+      <div class="action-row">
+        <a class="btn btn-primary btn-sm" href="https://github.com/edtool79-collab/ai-organic-traffic-engine">Get Source on GitHub</a>
+        <a class="btn btn-secondary btn-sm" href="../../config-builder/">Build config.json</a>
+        <a class="btn btn-secondary btn-sm" href="https://gethirepulse.xyz/credits">Get HirePulse Credits</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="container doc-layout">
+    <article class="doc-body">
+      
+      <section id="local-install">
+        <h2>1. Local installation (Windows &amp; Node.js LTS)</h2>
+        <pre><code>git clone https://github.com/edtool79-collab/ai-organic-traffic-engine.git
+cd ai-organic-traffic-engine
+npm install
+npm --prefix dashboard install
+npx playwright install chromium firefox webkit
+Copy-Item config.example.json config.json
+Copy-Item .env.example .env.local
+npm start</code></pre>
+        <p>Open <code>http://127.0.0.1:4310</code> to launch the dashboard, or execute headless runs straight from CLI with <code>node src/crawleeRunner.js config.json</code>.</p>
+      </section>
+      <section id="docker-swarm">
+        <h2>2. Docker Compose Swarm &amp; Lightpanda CDP</h2>
+        <p>For multi-container horizontal scaling on Linux hosts, <code>docker-compose.yml</code> defines three profiles with loopback-bound ports and isolated mounts for <code>data/</code>, <code>site-profiles/</code>, and <code>session-profiles/</code>:</p>
+        <pre><code>docker compose up -d dashboard
+docker compose --profile swarm up -d --scale worker=4
+docker compose --profile lightpanda up -d</code></pre>
+        <p>Workers receive <code>2gb</code> <code>/dev/shm</code> and a <code>2560M</code> container memory limit per replica, while the optional Lightpanda container exposes CDP on <code>127.0.0.1:9222</code>.</p>
+      </section>
+      <section id="tests">
+        <h2>3. Offline verification suite ($0 cost)</h2>
+        <pre><code>npm test
+node tests/verify-plan.js
+node tests/verify-proxy-resolution.js
+node tests/verify-proxyscore.js
+node tests/verify-residential.js
+node tests/signup-release.js
+node tests/verify-engine.js chromium</code></pre>
+        <p>Every file under <code>config.json</code>, <code>.env.local</code>, <code>proxies.txt</code>, <code>reports/</code>, and <code>runs/</code> remains excluded by <code>.gitignore</code> so secrets never leak to public repositories.</p>
+      </section>
+    
+      
+    </article>
+
+    <aside class="doc-sidebar" aria-label="On this page">
+      <h3>On this page</h3>
+      <ul>
+        <li><a href="#local-install">Local Node.js quickstart</a></li>
+        <li><a href="#docker-swarm">Docker Swarm &amp; Lightpanda</a></li>
+        <li><a href="#tests">Offline test suite</a></li>
+      </ul>
+      <h3>Quick Links</h3>
+      <ul>
+        <li><a href="https://github.com/edtool79-collab/ai-organic-traffic-engine">GitHub Repository</a></li>
+        <li><a href="https://github.com/edtool79-collab/ai-organic-traffic-engine/archive/refs/heads/main.zip">Download ZIP Archive</a></li>
+        <li><a href="../../config-builder/">config.json Builder</a></li>
+        <li><a href="../../ecosystem/">All Connected Sites</a></li>
+      </ul>
+      <h3>Related Ecosystem Tools</h3>
+      <ul>
+        <li><a href="https://gethirepulse.xyz/credits">HirePulse AI &amp; OTP Credits</a></li>
+        <li><a href="https://citedcart.com/">CitedCart AI Store Audit</a></li>
+        <li><a href="https://tools.citedcart.com/">CitedCart Free SEO Tools</a></li>
+        <li><a href="https://edtool79-collab.github.io/hirepulse-tools/">HirePulse MCP Data Hub</a></li>
+      </ul>
+    </aside>
+  </div>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <h3>Traffic Engine AI</h3>
+          <p>Self-hosted Playwright, Patchright, Camoufox, and Crawlee browser automation studio with live rrweb replay, GA4 hit verification, bandwidth caps, OTP sweeps, and hybrid AI.</p>
+          <p><a href="https://github.com/edtool79-collab/ai-organic-traffic-engine">GitHub: edtool79-collab/ai-organic-traffic-engine</a></p>
+        </div>
+        <div>
+          <h3>Documentation</h3>
+          <ul class="footer-list">
+            <li><a href="../../architecture/">Multi-Agent AI Architecture</a></li>
+            <li><a href="../../guides/playwright-stealth-crawlee/">Multi-Engine Stealth &amp; Fingerprints</a></li>
+            <li><a href="../../guides/limit-residential-bandwidth/">Limit Residential Proxy Bandwidth</a></li>
+            <li><a href="../../guides/webshare-decodo-proxies/">Webshare &amp; Decodo Proxy Setup</a></li>
+            <li><a href="../../guides/ai-agents-budget/">AI Browser Agents Budget</a></li>
+            <li><a href="../../guides/ga4-otp-funnel-qa/">GA4 Hit &amp; OTP Verification</a></li>
+            <li><a href="../../guides/docker-swarm-setup/">Docker Swarm &amp; Lightpanda</a></li>
+            <li><a href="../../config-builder/">Interactive config.json Builder</a></li>
+          </ul>
+        </div>
+        <div>
+          <h3>HirePulse Platform</h3>
+          <ul class="footer-list">
+            <li><a href="https://gethirepulse.xyz/credits">HirePulse Cloud Credits &amp; OTP Inboxes</a></li>
+            <li><a href="https://gethirepulse.xyz/">HirePulse MCP &amp; x402 Gateway</a></li>
+            <li><a href="https://edtool79-collab.github.io/hirepulse-tools/">HirePulse Data Tools Hub</a></li>
+            <li><a href="https://apify.com/hirepulse">HirePulse Actors on Apify</a></li>
+            <li><a href="https://jobs.gethirepulse.xyz/">HirePulse Jobs Radar</a></li>
+          </ul>
+        </div>
+        <div>
+          <h3>Connected Sites &amp; Case Studies</h3>
+          <ul class="footer-list">
+            <li><a href="https://citedcart.com/">CitedCart AI Visibility Audit</a></li>
+            <li><a href="https://tools.citedcart.com/">CitedCart Free SEO Workbench</a></li>
+            <li><a href="https://tools.citedcart.com/tools/product-schema">Product Schema Generator</a></li>
+            <li><a href="https://tools.citedcart.com/tools/robots-checker">AI Robots.txt Checker</a></li>
+            <li><a href="https://cleantab-lab.hirepulse-commerce-sandbox.workers.dev/">CleanTab Lab Privacy Utilities</a></li>
+            <li><a href="https://gta6.gethirepulse.xyz/">GTA 6 U.S. Launch Clock</a></li>
+            <li><a href="https://www.modcraftforge.com/">ModcraftForge Mods Directory</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>MIT Licensed Open-Source Software • Intended strictly for authorized QA, flow verification, and self-hosted testing.</span>
+        <span>Machine Discovery: <a href="../../llms.txt">llms.txt</a> · <a href="../../llms-full.txt">llms-full.txt</a> · <a href="../../sitemap.xml">sitemap.xml</a></span>
+      </div>
+    </div>
+  </footer>
+  <script src="../../assets/app.js" defer></script>
+</body>
+</html>

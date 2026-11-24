@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Interactive config.json Generator | Traffic Engine AI</title>
+  <meta name="description" content="Build a ready-to-run Traffic Engine AI config.json with Playwright/Patchright/Camoufox engines, proxy bandwidth limits, and CLI launch commands." />
+  <link rel="canonical" href="https://edtool79-collab.github.io/ai-organic-traffic-engine/config-builder/" />
+  <meta name="robots" content="index,follow,max-image-preview:large" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Traffic Engine AI" />
+  <meta property="og:title" content="Interactive config.json Generator | Traffic Engine AI" />
+  <meta property="og:description" content="Build a ready-to-run Traffic Engine AI config.json with Playwright/Patchright/Camoufox engines, proxy bandwidth limits, and CLI launch commands." />
+  <meta property="og:url" content="https://edtool79-collab.github.io/ai-organic-traffic-engine/config-builder/" />
+  <meta property="og:image" content="https://edtool79-collab.github.io/ai-organic-traffic-engine/assets/img/hero-banner.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Interactive config.json Generator | Traffic Engine AI" />
+  <meta name="twitter:description" content="Build a ready-to-run Traffic Engine AI config.json with Playwright/Patchright/Camoufox engines, proxy bandwidth limits, and CLI launch commands." />
+  <meta name="twitter:image" content="https://edtool79-collab.github.io/ai-organic-traffic-engine/assets/img/hero-banner.png" />
+  <link rel="icon" type="image/png" href="../assets/img/logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/styles.css" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Traffic Engine AI Config Builder",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Web",
+  "url": "https://edtool79-collab.github.io/ai-organic-traffic-engine/config-builder/",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Traffic Engine AI",
+      "item": "https://edtool79-collab.github.io/ai-organic-traffic-engine/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "Config Builder",
+      "item": "https://edtool79-collab.github.io/ai-organic-traffic-engine/config-builder/"
+    }
+  ]
+}
+</script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="../">
+        <img src="../assets/img/logo.png" alt="Traffic Engine AI logo" width="32" height="32" />
+        <span>Traffic Engine AI</span>
+      </a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav">Menu</button>
+      <nav id="primary-nav" class="nav-links" aria-label="Primary navigation">
+        <a href="../">Overview</a>
+        <a href="../architecture/">AI Architecture</a>
+        <a href="../guides/">Guides</a>
+        <a href="../config-builder/" aria-current="page">Config Builder</a>
+        <a href="../ecosystem/">Ecosystem</a>
+      </nav>
+      <div class="header-cta">
+        <a class="btn btn-secondary btn-sm" href="https://github.com/edtool79-collab/ai-organic-traffic-engine/archive/refs/heads/main.zip">Download ZIP</a>
+        <a class="btn btn-primary btn-sm" href="https://github.com/edtool79-collab/ai-organic-traffic-engine">Clone on GitHub</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+  <section class="page-banner">
+    <div class="container">
+      <div class="breadcrumbs"><a href="../">Home</a> / Interactive Config Builder</div>
+      <h1>Interactive <code>config.json</code> &amp; CLI Builder</h1>
+      <p class="hero-lead">Generate a valid Traffic Engine configuration and clone command entirely in your browser—no account required.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container builder-grid">
+      <form id="config-builder-form" class="panel" onsubmit="return false;">
+        <h2>Run parameters</h2>
+        <div class="field">
+          <label for="cb-url">Target URL (owned or authorized QA site)</label>
+          <input id="cb-url" name="targetUrl" type="url" value="https://citedcart.com" />
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="cb-engine-mode">Engine Mode</label>
+            <select id="cb-engine-mode" name="engineMode">
+              <option value="crawlee_autoscaled" selected>crawlee_autoscaled</option>
+              <option value="crawlee_playwright">crawlee_playwright</option>
+              <option value="http_fast">http_fast</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="cb-browser">Browser Engine</label>
+            <select id="cb-browser" name="browserEngine">
+              <option value="patchright" selected>patchright (stealth Chromium)</option>
+              <option value="chromium">chromium</option>
+              <option value="camoufox">camoufox (Firefox)</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="cb-visits">Visit Count</label>
+            <input id="cb-visits" name="visitCount" type="number" min="1" max="100000" value="25" />
+          </div>
+          <div class="field">
+            <label for="cb-conc">Concurrency (1–32)</label>
+            <input id="cb-conc" name="concurrency" type="number" min="1" max="32" value="4" />
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="cb-res">Resource Saver Mode</label>
+            <select id="cb-res" name="resourceMode">
+              <option value="ultra_lite" selected>ultra_lite (max savings)</option>
+              <option value="lite">lite (balanced)</option>
+              <option value="full">full (all assets)</option>
+              <option value="lightpanda_cdp">lightpanda_cdp (9222)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="cb-ref">Referrer Mode</label>
+            <select id="cb-ref" name="referrerMode">
+              <option value="mixed" selected>mixed</option>
+              <option value="google_organic">google_organic</option>
+              <option value="search_engines">search_engines</option>
+              <option value="social">social</option>
+              <option value="direct">direct</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="cb-proxy">Proxy Tier</label>
+            <select id="cb-proxy" name="proxyTier">
+              <option value="datacenter" selected>datacenter (0MB residential)</option>
+              <option value="residential">residential (metered cap)</option>
+              <option value="none">none (direct loopback/local)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="cb-budget">Residential Budget (MB)</label>
+            <input id="cb-budget" name="byteBudgetMb" type="number" min="50" value="1000" />
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="cb-country">Country Code</label>
+            <input id="cb-country" name="country" type="text" value="US" maxlength="2" />
+          </div>
+          <div class="field">
+            <label for="cb-ai">AI Provider</label>
+            <select id="cb-ai" name="aiProvider">
+              <option value="hirepulse" selected>hirepulse (Cloud Credits)</option>
+              <option value="ollama_cloud">ollama_cloud (BYOK)</option>
+              <option value="none">none (scripted only)</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="cb-wpct">AI Worker Percentage (<code>workerPct</code>)</label>
+          <input id="cb-wpct" name="workerPct" type="number" min="0" max="100" value="50" />
+        </div>
+        <label class="check-field"><input type="checkbox" name="useInbox" /> Include HirePulse Live Email &amp; OTP verification steps</label>
+        <label class="check-field"><input type="checkbox" name="headless" checked /> Run headless browser workers</label>
+      </form>
+
+      <div>
+        <div class="code-wrap">
+          <div class="code-head">
+            <span>config.json</span>
+            <button class="copy-btn" type="button" data-copy="generated-config-json">Copy JSON</button>
+          </div>
+          <pre><code id="generated-config-json"></code></pre>
+        </div>
+        <div class="code-wrap">
+          <div class="code-head">
+            <span>PowerShell / Bash Launch</span>
+            <button class="copy-btn" type="button" data-copy="generated-cli">Copy CLI</button>
+          </div>
+          <pre><code id="generated-cli"></code></pre>
+        </div>
+        <div class="action-row">
+          <a class="btn btn-primary" href="https://github.com/edtool79-collab/ai-organic-traffic-engine">Clone Repo on GitHub</a>
+          <a class="btn btn-secondary" href="https://gethirepulse.xyz/credits">Get HirePulse Credits</a>
+          <a class="btn btn-secondary" href="https://tools.citedcart.com/">Audit Target Storefront First</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <h3>Traffic Engine AI</h3>
+          <p>Self-hosted Playwright, Patchright, Camoufox, and Crawlee browser automation studio with live rrweb replay, GA4 hit verification, bandwidth caps, OTP sweeps, and hybrid AI.</p>
+          <p><a href="https://github.com/edtool79-collab/ai-organic-traffic-engine">GitHub: edtool79-collab/ai-organic-traffic-engine</a></p>
+        </div>
+        <div>
+          <h3>Documentation</h3>
+          <ul class="footer-list">
+            <li><a href="../architecture/">Multi-Agent AI Architecture</a></li>
+            <li><a href="../guides/playwright-stealth-crawlee/">Multi-Engine Stealth &amp; Fingerprints</a></li>
+            <li><a href="../guides/limit-residential-bandwidth/">Limit Residential Proxy Bandwidth</a></li>
+            <li><a href="../guides/webshare-decodo-proxies/">Webshare &amp; Decodo Proxy Setup</a></li>
+            <li><a href="../guides/ai-agents-budget/">AI Browser Agents Budget</a></li>
+            <li><a href="../guides/ga4-otp-funnel-qa/">GA4 Hit &amp; OTP Verification</a></li>
+            <li><a href="../guides/docker-swarm-setup/">Docker Swarm &amp; Lightpanda</a></li>
+            <li><a href="../config-builder/">Interactive config.json Builder</a></li>
+          </ul>
+        </div>
+        <div>
+          <h3>HirePulse Platform</h3>
+          <ul class="footer-list">
+            <li><a href="https://gethirepulse.xyz/credits">HirePulse Cloud Credits &amp; OTP Inboxes</a></li>
+            <li><a href="https://gethirepulse.xyz/">HirePulse MCP &amp; x402 Gateway</a></li>
+            <li><a href="https://edtool79-collab.github.io/hirepulse-tools/">HirePulse Data Tools Hub</a></li>
+            <li><a href="https://apify.com/hirepulse">HirePulse Actors on Apify</a></li>
+            <li><a href="https://jobs.gethirepulse.xyz/">HirePulse Jobs Radar</a></li>
+          </ul>
+        </div>
+        <div>
+          <h3>Connected Sites &amp; Case Studies</h3>
+          <ul class="footer-list">
+            <li><a href="https://citedcart.com/">CitedCart AI Visibility Audit</a></li>
+            <li><a href="https://tools.citedcart.com/">CitedCart Free SEO Workbench</a></li>
+            <li><a href="https://tools.citedcart.com/tools/product-schema">Product Schema Generator</a></li>
+            <li><a href="https://tools.citedcart.com/tools/robots-checker">AI Robots.txt Checker</a></li>
+            <li><a href="https://cleantab-lab.hirepulse-commerce-sandbox.workers.dev/">CleanTab Lab Privacy Utilities</a></li>
+            <li><a href="https://gta6.gethirepulse.xyz/">GTA 6 U.S. Launch Clock</a></li>
+            <li><a href="https://www.modcraftforge.com/">ModcraftForge Mods Directory</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>MIT Licensed Open-Source Software • Intended strictly for authorized QA, flow verification, and self-hosted testing.</span>
+        <span>Machine Discovery: <a href="../llms.txt">llms.txt</a> · <a href="../llms-full.txt">llms-full.txt</a> · <a href="../sitemap.xml">sitemap.xml</a></span>
+      </div>
+    </div>
+  </footer>
+  <script src="../assets/app.js" defer></script>
+</body>
+</html>

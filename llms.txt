@@ -1,0 +1,29 @@
+# Traffic Engine AI
+
+> Self-hosted Playwright, Patchright, Camoufox, and Crawlee browser automation studio with live rrweb replay, GA4 hit verification, metered proxy guards, live OTP inboxes, and hybrid multi-agent AI. MIT licensed.
+
+## Source & Downloads
+- [GitHub Repository](https://github.com/edtool79-collab/ai-organic-traffic-engine): Clone full Node.js LTS + Docker Compose studio
+- [Download Source ZIP](https://github.com/edtool79-collab/ai-organic-traffic-engine/archive/refs/heads/main.zip): Direct main branch snapshot
+- [Interactive config.json Builder](https://edtool79-collab.github.io/ai-organic-traffic-engine/config-builder/): Generate valid configuration and CLI commands in the browser
+
+## Architecture & Engineering Guides
+- [Multi-Agent Hybrid AI Architecture](https://edtool79-collab.github.io/ai-organic-traffic-engine/architecture/): 4 specialized worker roles, /v1/systemone decision routing (`clef:27b`), Playbook Caching, and HirePulse Cloud Credits failover
+- [Multi-Engine Stealth & Fingerprints](https://edtool79-collab.github.io/ai-organic-traffic-engine/guides/playwright-stealth-crawlee/): Playwright Chromium, Patchright, Camoufox, and Lightpanda CDP
+- [Limit Residential Proxy Bandwidth](https://edtool79-collab.github.io/ai-organic-traffic-engine/guides/limit-residential-bandwidth/): byteBudgetMb hard caps, fallbackServers, RAM cache, lite/ultra_lite filters
+- [Geo Proxy Routing (Webshare & Decodo)](https://edtool79-collab.github.io/ai-organic-traffic-engine/guides/webshare-decodo-proxies/): 19-country routing and per-domain cooldown scoring
+- [Run AI Browser Agents on a Fixed Budget](https://edtool79-collab.github.io/ai-organic-traffic-engine/guides/ai-agents-budget/): Decision vs chat model split and workerPct tuning
+- [GA4 Hit Verification & Email OTP QA](https://edtool79-collab.github.io/ai-organic-traffic-engine/guides/ga4-otp-funnel-qa/): Verify g/collect hits and run temporary inbox OTP sweeps
+- [Docker Swarm & Local Quickstart](https://edtool79-collab.github.io/ai-organic-traffic-engine/guides/docker-swarm-setup/): Docker Compose worker scaling and Lightpanda sidecar
+
+## Connected Ecosystem Sites
+- [HirePulse Cloud Credits & Live OTP Inboxes](https://gethirepulse.xyz/credits): Hosted AI Commander, /v1/qa/* endpoints, and disposable email verification inboxes
+- [HirePulse Agent Gateway (MCP + x402)](https://gethirepulse.xyz/): 21 B2B, tech stack, Google Ads, and ecommerce security APIs
+- [HirePulse Data Tools Hub](https://edtool79-collab.github.io/hirepulse-tools/): Documentation and runnable examples for HirePulse tools
+- [HirePulse Actors on Apify](https://apify.com/hirepulse): Public scraping and intelligence Actors
+- [HirePulse Jobs Radar](https://jobs.gethirepulse.xyz/): Direct company ATS job board index
+- [CitedCart AI Visibility Audit](https://citedcart.com/): Shopify and WooCommerce AI shopping readability audits
+- [CitedCart Free SEO & Schema Tools](https://tools.citedcart.com/): Free Product Schema Generator, Robots.txt Checker, Policy Checker, Copy Readability tool
+- [CleanTab Lab](https://cleantab-lab.hirepulse-commerce-sandbox.workers.dev/): Client-side browser privacy utilities
+- [GTA 6 U.S. Launch Clock](https://gta6.gethirepulse.xyz/): Edge static-asset showcase
+- [ModcraftForge](https://www.modcraftforge.com/): Curated gaming mods directory

@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Traffic Engine AI — Self-Hosted Playwright &amp; Crawlee Studio</title>
+  <meta name="description" content="Self-hosted Playwright, Patchright, Camoufox, and Crawlee studio with live rrweb replay, GA4 hit checks, proxy budget caps, OTP inboxes, and AI." />
+  <link rel="canonical" href="https://edtool79-collab.github.io/ai-organic-traffic-engine/" />
+  <meta name="robots" content="index,follow,max-image-preview:large" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Traffic Engine AI" />
+  <meta property="og:title" content="Traffic Engine AI — Self-Hosted Playwright &amp; Crawlee Studio" />
+  <meta property="og:description" content="Self-hosted Playwright, Patchright, Camoufox, and Crawlee studio with live rrweb replay, GA4 hit checks, proxy budget caps, OTP inboxes, and AI." />
+  <meta property="og:url" content="https://edtool79-collab.github.io/ai-organic-traffic-engine/" />
+  <meta property="og:image" content="https://edtool79-collab.github.io/ai-organic-traffic-engine/assets/img/hero-banner.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Traffic Engine AI — Self-Hosted Playwright &amp; Crawlee Studio" />
+  <meta name="twitter:description" content="Self-hosted Playwright, Patchright, Camoufox, and Crawlee studio with live rrweb replay, GA4 hit checks, proxy budget caps, OTP inboxes, and AI." />
+  <meta name="twitter:image" content="https://edtool79-collab.github.io/ai-organic-traffic-engine/assets/img/hero-banner.png" />
+  <link rel="icon" type="image/png" href="assets/img/logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/styles.css" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Traffic Engine AI",
+  "alternateName": "ai-organic-traffic-engine",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Windows, Linux, macOS, Docker",
+  "license": "https://opensource.org/licenses/MIT",
+  "url": "https://edtool79-collab.github.io/ai-organic-traffic-engine/",
+  "downloadUrl": "https://github.com/edtool79-collab/ai-organic-traffic-engine/archive/refs/heads/main.zip",
+  "codeRepository": "https://github.com/edtool79-collab/ai-organic-traffic-engine",
+  "image": "https://edtool79-collab.github.io/ai-organic-traffic-engine/assets/img/hero-banner.png",
+  "description": "Self-hosted Playwright, Patchright, Camoufox, and Crawlee browser automation studio with live rrweb replay, GA4 hit verification, metered proxy guards, OTP inboxes, and hybrid multi-agent AI.",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  },
+  "author": {
+    "@type": "Organization",
+    "name": "HirePulse",
+    "url": "https://gethirepulse.xyz/"
+  },
+  "isPartOf": {
+    "@type": "WebSite",
+    "name": "HirePulse Ecosystem",
+    "url": "https://gethirepulse.xyz/"
+  }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What engines does Traffic Engine AI support out of the box?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "It orchestrates Playwright Chromium, Patchright stealth Chromium, Camoufox (anti-fingerprint Firefox), Lightpanda CDP sidecar, and lightweight HTTP fast-mode workers from one config.json schema."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How does it prevent proxy bandwidth overages on metered residential pools?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "src/residentialPool.js measures downloaded session bytes multiplied by overheadFactor and enforces byteBudgetMb. When the budget is reached, traffic switches cleanly to fallbackServers or halts instead of overrunning your bill."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do I need external AI API keys to run the dashboard and scenarios?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. Scripted scenario, behavior, and hybrid modes work locally without AI keys. When you want autonomous DOM exploration, route healing, and AI Fleet Commander directives, you can plug in Ollama Cloud, UncensoredLLM, or hosted HirePulse Cloud Credits."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do live email and OTP verification steps work during a QA signup run?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "src/emailInboxClient.js connects to the HirePulse inbox API (configured via HIREPULSE_EMAIL_API_KEY or HIREPULSE_OWNER_PILOT_TOKEN) to provision disposable per-visit addresses, fill forms with fill_email, extract codes via fill_otp, and run post-visit emailSweepPasses."
+      }
+    }
+  ]
+}
+</script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="./">
+        <img src="assets/img/logo.png" alt="Traffic Engine AI logo" width="32" height="32" />
+        <span>Traffic Engine AI</span>
+      </a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav">Menu</button>
+      <nav id="primary-nav" class="nav-links" aria-label="Primary navigation">
+        <a href="./" aria-current="page">Overview</a>
+        <a href="architecture/">AI Architecture</a>
+        <a href="guides/">Guides</a>
+        <a href="config-builder/">Config Builder</a>
+        <a href="ecosystem/">Ecosystem</a>
+      </nav>
+      <div class="header-cta">
+        <a class="btn btn-secondary btn-sm" href="https://github.com/edtool79-collab/ai-organic-traffic-engine/archive/refs/heads/main.zip">Download ZIP</a>
+        <a class="btn btn-primary btn-sm" href="https://github.com/edtool79-collab/ai-organic-traffic-engine">Clone on GitHub</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+  <section class="hero">
+    <div class="container hero-grid">
+      <div>
+        <h1>Self-hosted Playwright &amp; Crawlee browser automation studio</h1>
+        <p class="hero-lead">Run geo-routed Chromium, Patchright, Camoufox, or Lightpanda sessions from one Express dashboard on port 4310—with live rrweb replay, GA4 hit verification, metered proxy caps, OTP inboxes, and hybrid multi-agent AI.</p>
+
+        <div class="clone-bar">
+          <code id="hero-clone-cmd">git clone https://github.com/edtool79-collab/ai-organic-traffic-engine.git &amp;&amp; cd ai-organic-traffic-engine</code>
+          <button class="copy-btn" type="button" data-copy="hero-clone-cmd">Copy</button>
+        </div>
+
+        <div class="action-row">
+          <a class="btn btn-primary" href="https://github.com/edtool79-collab/ai-organic-traffic-engine">Clone on GitHub</a>
+          <a class="btn btn-secondary" href="https://github.com/edtool79-collab/ai-organic-traffic-engine/archive/refs/heads/main.zip">Download ZIP</a>
+          <a class="btn btn-secondary" href="config-builder/">Generate config.json</a>
+          <a class="btn btn-secondary" href="https://gethirepulse.xyz/credits">Get Cloud Credits</a>
+        </div>
+
+        <div class="spec-strip">
+          <span><strong>License:</strong> MIT Open Source</span>
+          <span><strong>Runtime:</strong> Node.js LTS &amp; Docker Swarm</span>
+          <span><strong>Dashboard:</strong> <code>127.0.0.1:4310</code></span>
+          <span><strong>Engines:</strong> Playwright · Patchright · Camoufox · Lightpanda</span>
+        </div>
+      </div>
+
+      <div class="workbench-frame">
+        <div class="frame-bar">
+          <div class="frame-tabs" role="tablist" aria-label="Studio captures">
+            <button class="frame-tab" type="button" role="tab" aria-selected="true" data-tab-target="panel-overview">Dashboard UI</button>
+            <button class="frame-tab" type="button" role="tab" aria-selected="false" data-tab-target="panel-ga4">Live GA4 Demo (GIF)</button>
+            <button class="frame-tab" type="button" role="tab" aria-selected="false" data-tab-target="panel-arch">4-Layer Architecture</button>
+          </div>
+          <span class="status-pill">6 / 6 GA4 Hits Verified</span>
+        </div>
+        <div class="frame-viewport">
+          <div id="panel-overview" class="frame-panel">
+            <img src="assets/img/dashboard-overview.png" alt="Traffic Engine AI Express dashboard overview on built-in demo site" width="1440" height="960" />
+          </div>
+          <div id="panel-ga4" class="frame-panel" hidden>
+            <img data-src="assets/img/live-ga4-demo.gif" alt="Live Traffic Engine run counter, active workers, browser preview and GA4 hit verification" width="840" height="556" />
+          </div>
+          <div id="panel-arch" class="frame-panel" hidden>
+            <img data-src="assets/img/ai-architecture.jpg" alt="Traffic Engine multi-agent hybrid AI architecture, playbook cache and hosted gateway" width="1376" height="768" />
+          </div>
+        </div>
+        <p class="frame-caption">Local Express dashboard streaming live Crawlee workers, <code>rrweb</code> browser frames, and real <code>google-analytics.com/g/collect</code> verification payloads.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-alt">
+    <div class="container">
+      <div class="section-header">
+        <h2>Core studio capabilities built for real browser QA</h2>
+        <p>Everything runs locally inside your own infrastructure or Docker Swarm with strict redaction and zero forced SaaS lock-in.</p>
+      </div>
+      <div class="grid-3">
+        <div class="panel">
+          <h3>Multi-engine stealth &amp; fingerprints</h3>
+          <p>Switch seamlessly between standard Playwright Chromium, Patchright, Camoufox, Lightpanda CDP, and HTTP fast-mode workers. Desktop and mobile fingerprints enforce matched <code>userAgentData</code>, scale factors, and local profile persistence.</p>
+          <p><a href="guides/playwright-stealth-crawlee/">Read Stealth &amp; Engine Guide</a></p>
+        </div>
+        <div class="panel">
+          <h3>Live rrweb &amp; GA4 hit inspection</h3>
+          <p>Inspect live worker frames inside the dashboard via Server-Sent Events and <code>rrweb</code> DOM snapshots while verifying outgoing <code>google-analytics.com/g/collect</code> hits per session.</p>
+          <p><a href="guides/ga4-otp-funnel-qa/">Read GA4 &amp; OTP Guide</a></p>
+        </div>
+        <div class="panel">
+          <h3>Hard proxy byte budget &amp; RAM saver</h3>
+          <p>Cap metered residential consumption in megabytes (<code>byteBudgetMb</code>) with automatic datacenter fallback, RAM static caching, and third-party tracker blocking in <code>lite</code> and <code>ultra_lite</code> modes.</p>
+          <p><a href="guides/limit-residential-bandwidth/">Read Bandwidth Guard Guide</a></p>
+        </div>
+        <div class="panel">
+          <h3>Hybrid multi-agent AI &amp; Playbook cache</h3>
+          <p>Combine deterministic Playwright scenarios with 4 specialized AI roles, zero-output-token <code>clef:27b</code> step routing, and an in-memory route Playbook Cache that drops repeat token cost to zero.</p>
+          <p><a href="architecture/">Explore AI Architecture</a></p>
+        </div>
+        <div class="panel">
+          <h3>Live temporary inboxes &amp; OTP sweeps</h3>
+          <p>Provision fresh disposable email addresses per session via HirePulse, submit signup forms with <code>fill_email</code>, wait for real confirmation codes with <code>fill_otp</code>, and re-sweep delayed emails after runs finish.</p>
+          <p><a href="https://gethirepulse.xyz/credits">Configure HirePulse Inboxes</a></p>
+        </div>
+        <div class="panel">
+          <h3>Docker Swarm &amp; Windows quickstart</h3>
+          <p>Run directly on Windows with <code>start-dashboard.bat</code> or scale headless Chromium workers and a Lightpanda CDP sidecar across Linux containers via <code>docker-compose.yml</code>.</p>
+          <p><a href="guides/docker-swarm-setup/">Open Docker &amp; CLI Setup</a></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <h2>Inside the workbench: real captures from production runs</h2>
+        <p>Every capability in the repository is backed by deterministic tests and visible telemetry inside the local UI.</p>
+      </div>
+      <div class="grid-2">
+        <figure class="figure-box">
+          <img src="assets/img/live-ga4-demo.gif" alt="Live Traffic Engine dashboard running Crawlee workers and verifying 6 of 6 GA4 hits" width="840" height="556" loading="lazy" />
+          <figcaption><strong>Live GA4 Hit Verification:</strong> Click Start Run, watch workers execute search-entry and internal browsing, and verify live analytics collection hits per visit.</figcaption>
+        </figure>
+        <figure class="figure-box">
+          <img src="assets/img/hero-banner.png" alt="Traffic Engine 4-layer architecture banner" width="1200" height="630" loading="lazy" />
+          <figcaption><strong>Four-Layer Execution Pipeline:</strong> AI Fleet Commander, Playwright/Crawlee stealth runners, 19-country proxy router, and live verification reporting.</figcaption>
+        </figure>
+        <figure class="figure-box">
+          <img src="assets/img/feature-ai-otp.png" alt="AI Commander, live email inboxes, OTP verification and PDF report generation" width="1200" height="675" loading="lazy" />
+          <figcaption><strong>AI Onboarding &amp; Live OTP Sweeps:</strong> Detect site pixels automatically, map interactive forms, and confirm real inbox verification loops.</figcaption>
+        </figure>
+        <figure class="figure-box">
+          <img src="assets/img/feature-proxies-stealth.png" alt="Global geo proxy routing, multi-engine stealth and ad-safe shield" width="1200" height="675" loading="lazy" />
+          <figcaption><strong>Geo Proxy Routing &amp; Ad-Safe Controls:</strong> Route by country, monitor per-domain proxy scores, and prevent accidental ad clicks during QA runs.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-alt">
+    <div class="container">
+      <div class="section-header">
+        <h2>Install and run in two minutes</h2>
+        <p>Start locally with Node.js LTS or generate a tailored configuration in your browser before cloning.</p>
+      </div>
+      <div class="grid-2">
+        <div>
+          <h3>Windows PowerShell / Node.js LTS</h3>
+          <div class="code-wrap">
+            <div class="code-head">
+              <span>powershell</span>
+              <button class="copy-btn" type="button" data-copy="qs-win">Copy</button>
+            </div>
+            <pre><code id="qs-win">git clone https://github.com/edtool79-collab/ai-organic-traffic-engine.git
+cd ai-organic-traffic-engine
+npm install
+npm --prefix dashboard install
+npx playwright install chromium firefox webkit
+Copy-Item config.example.json config.json
+Copy-Item .env.example .env.local
+npm start</code></pre>
+          </div>
+        </div>
+        <div>
+          <h3>Docker Compose Swarm &amp; Lightpanda Sidecar</h3>
+          <div class="code-wrap">
+            <div class="code-head">
+              <span>bash / docker</span>
+              <button class="copy-btn" type="button" data-copy="qs-docker">Copy</button>
+            </div>
+            <pre><code id="qs-docker">cp config.example.json config.json
+cp .env.example .env.local
+docker compose up -d dashboard
+docker compose --profile swarm up -d --scale worker=4
+docker compose --profile lightpanda up -d</code></pre>
+          </div>
+          <p>Run offline unit &amp; redaction verification at \$0 cost with <code>npm test</code> and <code>node tests/verify-plan.js</code>.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <h2>Connected tools, data APIs &amp; real-world sites</h2>
+        <p>Traffic Engine AI is part of the HirePulse &amp; CitedCart open developer ecosystem. Explore our live gateways, MCP tools, storefront AI audits, and reference apps.</p>
+      </div>
+      <div class="grid-3">
+                <div class="panel">
+          <h3><a href="https://github.com/edtool79-collab/ai-organic-traffic-engine">GitHub Source &amp; Releases</a></h3>
+          <p>Clone the full Node.js, Playwright, Crawlee, and Docker Compose studio, inspect source files, or open an issue.</p>
+        </div>
+        <div class="panel">
+          <h3><a href="https://gethirepulse.xyz/credits">HirePulse Cloud Credits &amp; Live Inboxes</a></h3>
+          <p>Power AI Commander, /v1/qa/step-decision, and automated temporary email + OTP verification sweeps with zero upstream AI keys.</p>
+        </div>
+        <div class="panel">
+          <h3><a href="https://gethirepulse.xyz/">HirePulse Agent Gateway (MCP + x402)</a></h3>
+          <p>Autonomous B2B, tech stack, Google Ads transparency, and storefront security tools over MCP and x402 USDC on Base.</p>
+        </div>
+        <div class="panel">
+          <h3><a href="https://edtool79-collab.github.io/hirepulse-tools/">HirePulse Data Tools Hub</a></h3>
+          <p>Interactive calculator, sample outputs, and runnable API guides across 21 public intelligence tools.</p>
+        </div>
+        <div class="panel">
+          <h3><a href="https://apify.com/hirepulse">HirePulse Public Actors (Apify)</a></h3>
+          <p>Managed Apify Actors and public Tasks for Google Jobs, ATS boards, keyword volume, and AI visibility audits.</p>
+        </div>
+        <div class="panel">
+          <h3><a href="https://jobs.gethirepulse.xyz/">HirePulse Jobs Radar</a></h3>
+          <p>Daily refreshed company job listings read directly from Greenhouse, Lever, Ashby, and Workable systems.</p>
+        </div>
+        <div class="panel">
+          <h3><a href="https://citedcart.com/">CitedCart — AI Visibility Audit</a></h3>
+          <p>Check what AI shopping assistants read on Shopify and WooCommerce product pages—price, stock, shipping, and returns.</p>
+        </div>
+        <div class="panel">
+          <h3><a href="https://tools.citedcart.com/">CitedCart Free SEO &amp; Schema Tools</a></h3>
+          <p>Free Product Schema Generator, AI Robots.txt Checker, Shipping Policy Checker, and Product Copy Readability tool.</p>
+        </div>
+        <div class="panel">
+          <h3><a href="https://cleantab-lab.hirepulse-commerce-sandbox.workers.dev/">CleanTab Lab</a></h3>
+          <p>Zero-upload browser utilities for stripping tracking parameters, formatting AI prompts, and verifying consent hygiene.</p>
+        </div>
+        <div class="panel">
+          <h3><a href="https://gta6.gethirepulse.xyz/">GTA 6 U.S. Launch Clock</a></h3>
+          <p>Fast Cloudflare static-asset site demonstrating GA4 consent tracking and high-speed global edge delivery.</p>
+        </div>
+        <div class="panel">
+          <h3><a href="https://www.modcraftforge.com/">ModcraftForge</a></h3>
+          <p>Daily curated directory of PC and console game mods across top titles.</p>
+        </div>
+      </div>
+      <p style="margin-top: 1.25rem;"><a class="btn btn-secondary" href="ecosystem/">View Full Ecosystem Map &amp; Integrations</a></p>
+    </div>
+  </section>
+
+  <section class="section section-alt">
+    <div class="container">
+      <div class="section-header">
+        <h2>Frequently asked questions</h2>
+      </div>
+      <div class="faq-list">
+        <details><summary>What engines does Traffic Engine AI support out of the box?</summary><p>It orchestrates Playwright Chromium, Patchright stealth Chromium, Camoufox (anti-fingerprint Firefox), Lightpanda CDP sidecar, and lightweight HTTP fast-mode workers from one config.json schema.</p></details>
+<details><summary>How does it prevent proxy bandwidth overages on metered residential pools?</summary><p>src/residentialPool.js measures downloaded session bytes multiplied by overheadFactor and enforces byteBudgetMb. When the budget is reached, traffic switches cleanly to fallbackServers or halts instead of overrunning your bill.</p></details>
+<details><summary>Do I need external AI API keys to run the dashboard and scenarios?</summary><p>No. Scripted scenario, behavior, and hybrid modes work locally without AI keys. When you want autonomous DOM exploration, route healing, and AI Fleet Commander directives, you can plug in Ollama Cloud, UncensoredLLM, or hosted HirePulse Cloud Credits.</p></details>
+<details><summary>How do live email and OTP verification steps work during a QA signup run?</summary><p>src/emailInboxClient.js connects to the HirePulse inbox API (configured via HIREPULSE_EMAIL_API_KEY or HIREPULSE_OWNER_PILOT_TOKEN) to provision disposable per-visit addresses, fill forms with fill_email, extract codes via fill_otp, and run post-visit emailSweepPasses.</p></details>
+      </div>
+    </div>
+  </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <h3>Traffic Engine AI</h3>
+          <p>Self-hosted Playwright, Patchright, Camoufox, and Crawlee browser automation studio with live rrweb replay, GA4 hit verification, bandwidth caps, OTP sweeps, and hybrid AI.</p>
+          <p><a href="https://github.com/edtool79-collab/ai-organic-traffic-engine">GitHub: edtool79-collab/ai-organic-traffic-engine</a></p>
+        </div>
+        <div>
+          <h3>Documentation</h3>
+          <ul class="footer-list">
+            <li><a href="architecture/">Multi-Agent AI Architecture</a></li>
+            <li><a href="guides/playwright-stealth-crawlee/">Multi-Engine Stealth &amp; Fingerprints</a></li>
+            <li><a href="guides/limit-residential-bandwidth/">Limit Residential Proxy Bandwidth</a></li>
+            <li><a href="guides/webshare-decodo-proxies/">Webshare &amp; Decodo Proxy Setup</a></li>
+            <li><a href="guides/ai-agents-budget/">AI Browser Agents Budget</a></li>
+            <li><a href="guides/ga4-otp-funnel-qa/">GA4 Hit &amp; OTP Verification</a></li>
+            <li><a href="guides/docker-swarm-setup/">Docker Swarm &amp; Lightpanda</a></li>
+            <li><a href="config-builder/">Interactive config.json Builder</a></li>
+          </ul>
+        </div>
+        <div>
+          <h3>HirePulse Platform</h3>
+          <ul class="footer-list">
+            <li><a href="https://gethirepulse.xyz/credits">HirePulse Cloud Credits &amp; OTP Inboxes</a></li>
+            <li><a href="https://gethirepulse.xyz/">HirePulse MCP &amp; x402 Gateway</a></li>
+            <li><a href="https://edtool79-collab.github.io/hirepulse-tools/">HirePulse Data Tools Hub</a></li>
+            <li><a href="https://apify.com/hirepulse">HirePulse Actors on Apify</a></li>
+            <li><a href="https://jobs.gethirepulse.xyz/">HirePulse Jobs Radar</a></li>
+          </ul>
+        </div>
+        <div>
+          <h3>Connected Sites &amp; Case Studies</h3>
+          <ul class="footer-list">
+            <li><a href="https://citedcart.com/">CitedCart AI Visibility Audit</a></li>
+            <li><a href="https://tools.citedcart.com/">CitedCart Free SEO Workbench</a></li>
+            <li><a href="https://tools.citedcart.com/tools/product-schema">Product Schema Generator</a></li>
+            <li><a href="https://tools.citedcart.com/tools/robots-checker">AI Robots.txt Checker</a></li>
+            <li><a href="https://cleantab-lab.hirepulse-commerce-sandbox.workers.dev/">CleanTab Lab Privacy Utilities</a></li>
+            <li><a href="https://gta6.gethirepulse.xyz/">GTA 6 U.S. Launch Clock</a></li>
+            <li><a href="https://www.modcraftforge.com/">ModcraftForge Mods Directory</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>MIT Licensed Open-Source Software • Intended strictly for authorized QA, flow verification, and self-hosted testing.</span>
+        <span>Machine Discovery: <a href="llms.txt">llms.txt</a> · <a href="llms-full.txt">llms-full.txt</a> · <a href="sitemap.xml">sitemap.xml</a></span>
+      </div>
+    </div>
+  </footer>
+  <script src="assets/app.js" defer></script>
+</body>
+</html>
