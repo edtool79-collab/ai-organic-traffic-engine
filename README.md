@@ -1,16 +1,19 @@
 <div align="center">
   <img src="docs/img/logo.png" alt="Traffic Engine Logo" width="88" />
-  <h1>Traffic Engine AI — Autonomous Organic Web Traffic, Geo Proxy &amp; Conversion Studio</h1>
+  <h1>Traffic Engine AI — Autonomous Synthetic User Journey QA, Traffic Simulator &amp; GA4 Verification Studio</h1>
   <p>
-    <strong>Self-hosted multi-engine Playwright &amp; Crawlee traffic engine with real-time live browser preview, organic search &amp; social referrers, geo-targeted proxies, and multi-agent AI orchestration</strong><br/>
-    Local Express Dashboard (<code>http://127.0.0.1:4310</code>) &bull; Watch Every Session Live (<code>rrweb</code> + Screenshots) &bull; Organic Search &amp; Social Traffic &bull; 19-Country Proxy Routing &bull; Live-Inbox Signups &amp; Conversions
+    <strong>Run instantly in the cloud via our official <a href="https://apify.com/hirepulse/website-traffic-generator">Apify Store Actor</a> or self-host the multi-engine Playwright &amp; Crawlee QA studio locally</strong><br/>
+    Managed Apify Cloud + Apify Proxy &bull; Local Express Dashboard (<code>http://127.0.0.1:4310</code>) &bull; Live Browser Preview (<code>rrweb</code>) &bull; Organic Search &amp; Social Referrers &bull; Live GA4 &amp; OTP Verification
   </p>
   <p>
+    <a href="https://apify.com/hirepulse/website-traffic-generator"><img src="https://img.shields.io/badge/Run_on_Apify_Cloud-Website_Traffic_Generator-ff6b2b?logo=apify&logoColor=white" alt="Run on Apify Store" /></a>
+    <a href="https://edtool79-collab.github.io/ai-organic-traffic-engine/config-builder/"><img src="https://img.shields.io/badge/Interactive_Builder-Apify_%26_Local_JSON-2563eb" alt="Interactive Config Builder" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-10b981.svg" alt="MIT License" /></a>
-    <img src="https://img.shields.io/badge/Node.js-LTS-3b82f6.svg" alt="Node.js LTS" />
-    <img src="https://img.shields.io/badge/Engines-Playwright%20%7C%20Patchright%20%7C%20Camoufox-38bdf8.svg" alt="Supported Engines" />
+    <img src="https://img.shields.io/badge/Engines-Patchright%20%7C%20Playwright%20%7C%20Camoufox-38bdf8.svg" alt="Supported Engines" />
   </p>
 </div>
+
+> **New — Zero-Setup Cloud Execution:** Launch synthetic multi-step browser journeys, load tests, and live `GA4` beacon verification directly in the cloud via **[Website Traffic Generator on Apify Store (`hirepulse/website-traffic-generator`)](https://apify.com/hirepulse/website-traffic-generator)**, or export both `apify-input.json` and local `config.json` in one click at **[edtool79-collab.github.io/ai-organic-traffic-engine/config-builder/](https://edtool79-collab.github.io/ai-organic-traffic-engine/config-builder/)**.
 
 <p align="center">
   <img src="docs/img/hero-banner.png" alt="Traffic Engine 4-Layer Architecture Banner" width="100%" />

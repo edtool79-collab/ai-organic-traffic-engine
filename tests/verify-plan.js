@@ -139,7 +139,7 @@ let direct = 0;
 const sampleUrls = [];
 for (let i = 0; i < 300; i++) {
   const geo = { country: ['US', 'CA', 'GB', 'AU', 'DE'][i % 5] };
-  const r = re.pickReferrer({ geo, title: 'Get $1000 Cash App Gift Card', targetUrl: cfg.targetUrl, mode: 'mixed' });
+  const r = re.pickReferrer({ geo, title: 'CitedCart Storefront SEO Audit', targetUrl: cfg.targetUrl, mode: 'mixed' });
   if (!r || (r.kind === 'direct' && !r.url)) { direct++; continue; }
   if (!r.url || !/^https?:\/\//.test(r.url)) empty++;
   else {

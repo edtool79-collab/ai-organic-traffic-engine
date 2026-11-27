@@ -48,9 +48,9 @@ const QUERY_PATTERNS = [
   '{reward} sign up',
   'how to get {reward}',
   '{reward} offer',
-  '{brand} gift card ${amount}',
-  '$ {amount} {brand} gift card',
-  '{brand} gift card giveaway',
+  '{brand} official platform',
+  '{brand} web analytics audit',
+  '{brand} tools and pricing',
   '{reward} 2026',
   'is {reward} worth it',
 ];
@@ -130,10 +130,10 @@ function describeOffer({ title = '', targetUrl = '' } = {}) {
           ? 'Walmart'
           : /target/.test(text)
             ? 'Target'
-            : 'Gift Card';
+            : 'Web App';
   const amountMatch = text.match(/\$\s?(\d{2,4})/) || text.match(/(\d{3,4})/);
   const amount = amountMatch ? amountMatch[1] : '1000';
-  const reward = `${brand} gift card`;
+  const reward = `${brand} platform`;
   return { brand, amount, reward, title: String(title || '').trim() };
 }
 
