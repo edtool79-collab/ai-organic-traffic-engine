@@ -14,9 +14,13 @@ Runs multi-engine synthetic user journeys, load tests, and live Google Analytics
 - `startUrls` (array): Additional URLs visited in round-robin rotation.
 - `pages` (array): Internal sub-paths (e.g., `["/", "/pricing", "/blog"]`).
 - `visitCount` (integer, 1–50000): Total synthetic visits to run.
+- `visitorPersona` (enum): `mixed_personas`, `deep_reader`, `product_shopper`, `funnel_converter`, `video_media_viewer` — controls scroll depth, card hovering, CTA engagement and video playback behavior.
 - `maxConcurrency` (integer, 1–32): Parallel sessions bounded by container RAM Governor.
 - `dwellTimeSecs` (integer, 1–180): Biometric scroll and reading dwell time per page.
 - `waveMode` (enum): `natural_peaks`, `steady`, `ramp_up`, `burst`, `off`.
+- `enableCtaAndFunnel` (boolean): Discover and click safe same-origin conversion CTAs (Pricing, Shop, Catalog, Demo, Add-to-Cart); ad containers and destructive actions are excluded.
+- `enableVideoInteraction` (boolean): Scroll to on-page `<video>` players and verify real playback (`currentTime` progress or `readyState >= 2`).
+- `auditAdPlacementsReadOnly` (boolean): Counts ad slots (`adsbygoogle`, `data-ad-slot`, banner containers) with **zero clicks**.
 - `aiMode` (enum): `smart_heuristic` (default zero-key autonomous DOM explorer & advisor), `hirepulse` (`gethirepulse.xyz/credits`), `openai`, `gemini`, `openrouter`, `groq`, `ollama_cloud`, or `off`.
 - `aiGoal` (string): Plain-English visitor mission guiding autonomous `ai_explore` actions with in-memory `Playbook Cache` (0 repeat LLM tokens).
 - `aiRouteRepair` (boolean): Self-healing selector recovery when UI classes/IDs change.
@@ -27,9 +31,11 @@ Runs multi-engine synthetic user journeys, load tests, and live Google Analytics
 - `devicePreset` (enum): `mixed_realistic`, `desktopChrome`, `iphone14`, `pixel7`, `desktopFirefox`, `desktopSafari`, `ipadPro11`.
 - `sessionPersistence` (boolean): Reuse `storageState` across visits to simulate returning visitors.
 - `referrerMode` (enum): `mixed`, `google_organic`, `search_engines`, `social`, `direct`.
+- `liveSerpWarmup` (boolean): Opens a real search results page first and then clicks through to the target site so the referrer chain stays consistent.
 - `searchQuery` (string): Custom organic keyword injected into Google/Bing/DuckDuckGo/Social referrer URLs.
 - `utmCampaign` (string): Optional UTM campaign tag.
-- `scenarioSteps` (array): Custom journey steps (`goto`, `search_entry`, `human_browse`, `read_article`, `scroll`, `scroll_to`, `click`, `hover`, `fill`, `select`, `press`, `internal_nav`, `scan_products`, `dismiss_overlays`, `wait`, `assert`, `go_back`, `close_tab`, `screenshot`).
+- `scenarioSteps` (array): Custom journey steps (`goto`, `ai_explore`, `search_entry`, `human_browse`, `read_article`, `scan_products`, `play_video`, `use_tool`, `scroll`, `scroll_to`, `click`, `hover`, `fill`, `fill_email`, `fill_otp`, `select`, `press`, `internal_nav`, `dismiss_overlays`, `wait`, `assert`, `go_back`, `close_tab`, `screenshot`).
+- `hirepulseEmailKey` (secret string): Optional HirePulse key enabling real signup/OTP flows through `fill_email` and `fill_otp`.
 - `verifyGa4` (boolean): Captures outgoing `/g/collect`, GTM, Clarity, Plausible, and PostHog beacons (`ga4Verified`, `ga4MeasurementIds`, `ga4Events`, `consoleErrors`).
 - `resourceMode` (enum): `ultra_lite` (~80% bandwidth saved while keeping JS & GA4), `lite`, `full`.
 - `captureScreenshots` (boolean): Saves viewport PNGs (`VISIT_001.png`...) to Key-Value Store.

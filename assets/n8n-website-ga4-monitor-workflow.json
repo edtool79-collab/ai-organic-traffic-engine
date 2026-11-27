@@ -1,0 +1,190 @@
+{
+  "name": "Website Traffic & GA4 Monitor — HirePulse Apify Actor",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Daily 08:00 Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-460, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.apify.com/v2/acts/hirepulse~website-traffic-generator/runs?token={{$env.APIFY_TOKEN}}&waitForFinish=300",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"targetUrl\": \"{{$env.TARGET_URL}}\",\n  \"visitCount\": 3,\n  \"maxConcurrency\": 1,\n  \"dwellTimeSecs\": 6,\n  \"visitorPersona\": \"mixed_personas\",\n  \"enableCtaAndFunnel\": true,\n  \"enableVideoInteraction\": true,\n  \"auditAdPlacementsReadOnly\": true,\n  \"aiMode\": \"smart_heuristic\",\n  \"aiGoal\": \"Explore products and pricing like an engaged organic visitor\",\n  \"referrerMode\": \"google_organic\",\n  \"verifyGa4\": true,\n  \"resourceMode\": \"ultra_lite\",\n  \"countryCode\": \"US\",\n  \"proxyConfiguration\": { \"useApifyProxy\": true }\n}",
+        "options": {
+          "timeout": 320000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "start-apify-run",
+      "name": "Run Traffic Generator (Apify API)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-240, 0]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.apify.com/v2/key-value-stores/{{$json.data.defaultKeyValueStoreId}}/records/OUTPUT?token={{$env.APIFY_TOKEN}}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "fetch-output",
+      "name": "Fetch OUTPUT Summary JSON",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-20, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "ga4-degraded",
+              "leftValue": "={{$json.ga4VerificationRatePct}}",
+              "rightValue": 100,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            },
+            {
+              "id": "runs-failing",
+              "leftValue": "={{$json.successRatePct}}",
+              "rightValue": 100,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "health-gate",
+      "name": "GA4 or Success Rate Degraded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [200, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.ALERT_WEBHOOK_URL}}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": \"⚠️ Website traffic QA degraded for {{$env.TARGET_URL}}\\nHealth: {{$json.healthScore}} ({{$json.healthGrade}})\\nSuccess rate: {{$json.successRatePct}}%\\nGA4 verification: {{$json.ga4VerificationRatePct}}%\\nTTFB: {{$json.avgTtfbMs}} ms · FCP: {{$json.avgFcpMs}} ms\\nCTAs clicked: {{$json.totalCtasClicked}} · Videos played: {{$json.totalVideosPlayed}}\\nReport: https://console.apify.com/actors/0e2CyZBgsrMYynpkY/runs\"\n}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "alert-webhook",
+      "name": "Alert Slack / Webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, -100]
+    },
+    {
+      "parameters": {
+        "content": "## Website Traffic & GA4 Monitor\n\n**What it does**\n1. Runs `hirepulse/website-traffic-generator` on Apify Cloud with 3 realistic persona visits.\n2. Fetches the `OUTPUT` summary from the run's key-value store.\n3. Alerts your Slack/webhook when GA4 verification or the visit success rate drops below 100%.\n\n**Setup**\n- `APIFY_TOKEN` — Apify API token (Settings → Integrations).\n- `TARGET_URL` — the site you own or are authorized to test.\n- `ALERT_WEBHOOK_URL` — Slack incoming webhook or any JSON endpoint.\n\n**Compliance**\nAd slots are audited read-only (0 clicks). Use only on properties you own or are authorized to test.",
+        "height": 320,
+        "width": 420,
+        "color": 5
+      },
+      "id": "sticky-note",
+      "name": "Setup Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-460, 220]
+    }
+  ],
+  "connections": {
+    "Daily 08:00 Trigger": {
+      "main": [
+        [
+          {
+            "node": "Run Traffic Generator (Apify API)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Traffic Generator (Apify API)": {
+      "main": [
+        [
+          {
+            "node": "Fetch OUTPUT Summary JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch OUTPUT Summary JSON": {
+      "main": [
+        [
+          {
+            "node": "GA4 or Success Rate Degraded?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GA4 or Success Rate Degraded?": {
+      "main": [
+        [
+          {
+            "node": "Alert Slack / Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

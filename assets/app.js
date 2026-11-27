@@ -157,24 +157,36 @@
       var country = ((form.country && form.country.value) || 'US').toUpperCase();
       var verifyGa4 = form.verifyGa4 ? form.verifyGa4.checked : true;
       var sessionPersistence = form.sessionPersistence ? form.sessionPersistence.checked : false;
+      var visitorPersona = (form.visitorPersona && form.visitorPersona.value) || 'mixed_personas';
+      var enableCtaAndFunnel = form.enableCtaAndFunnel ? form.enableCtaAndFunnel.checked : true;
+      var enableVideoInteraction = form.enableVideoInteraction ? form.enableVideoInteraction.checked : true;
+      var auditAdPlacementsReadOnly = form.auditAdPlacementsReadOnly ? form.auditAdPlacementsReadOnly.checked : true;
+      var liveSerpWarmup = form.liveSerpWarmup ? form.liveSerpWarmup.checked : false;
       var useApifyProxy = form.useApifyProxy ? form.useApifyProxy.checked : true;
       var includeCustomSteps = form.includeCustomSteps ? form.includeCustomSteps.checked : true;
 
       var apifySteps = includeCustomSteps ? [
         { type: 'goto', value: '/', label: 'Open landing page with organic referrer' },
         { type: 'dismiss_overlays', label: 'Accept cookie/consent banner if present' },
-        { type: 'human_browse', value: dwellTimeSecs * 1000, label: 'Biometric mouse & reading scroll' },
-        { type: aiMode === 'off' ? 'internal_nav' : 'ai_explore', value: aiMode === 'off' ? 1 : '', label: aiMode === 'off' ? 'Follow 1 internal link' : 'AI autonomous page discovery (Playbook Cached)' }
-      ] : [];
+        { type: 'human_browse', value: dwellTimeSecs * 1000, label: 'Biometric mouse & reading scroll' }
+      ].concat(
+        enableVideoInteraction ? [{ type: 'play_video', label: 'Play & verify on-page HTML5 video' }] : [],
+        enableCtaAndFunnel ? [{ type: 'use_tool', label: 'Click a safe high-intent conversion CTA (ads excluded)' }] : [],
+        [{ type: aiMode === 'off' ? 'internal_nav' : 'ai_explore', value: aiMode === 'off' ? 1 : '', label: aiMode === 'off' ? 'Follow 1 internal link' : 'AI autonomous page discovery (Playbook Cached)' }]
+      ) : [];
 
       // 100% 1:1 Schema Match with .actor/input_schema.json
       var apifyInput = {
         targetUrl: targetUrl,
         pages: pagesList,
         visitCount: visitCount,
+        visitorPersona: visitorPersona,
         maxConcurrency: concurrency,
         dwellTimeSecs: dwellTimeSecs,
         waveMode: waveMode,
+        enableCtaAndFunnel: enableCtaAndFunnel,
+        enableVideoInteraction: enableVideoInteraction,
+        auditAdPlacementsReadOnly: auditAdPlacementsReadOnly,
         aiMode: aiMode,
         aiGoal: aiGoal,
         aiRouteRepair: aiRouteRepair,
@@ -183,6 +195,7 @@
         devicePreset: devicePreset,
         sessionPersistence: sessionPersistence,
         referrerMode: referrerMode,
+        liveSerpWarmup: liveSerpWarmup,
         searchQuery: searchQuery,
         scenarioSteps: apifySteps,
         verifyGa4: verifyGa4,

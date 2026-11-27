@@ -147,9 +147,21 @@
         </div>
         <div class="field-row">
           <div class="field">
+            <label for="cb-persona">Visitor Behavioral Persona (<code>visitorPersona</code>)</label>
+            <select id="cb-persona" name="visitorPersona">
+              <option value="mixed_personas" selected>mixed_personas (Reader + Shopper + Converter + Video)</option>
+              <option value="deep_reader">deep_reader (Long-form scroll)</option>
+              <option value="product_shopper">product_shopper (Catalog hovers)</option>
+              <option value="funnel_converter">funnel_converter (CTA &amp; forms)</option>
+              <option value="video_media_viewer">video_media_viewer (Play on-page video)</option>
+            </select>
+          </div>
+          <div class="field">
             <label for="cb-visits">Total Visits (<code>visitCount</code>)</label>
             <input id="cb-visits" name="visitCount" type="number" min="1" max="50000" value="10" />
           </div>
+        </div>
+        <div class="field-row">
           <div class="field">
             <label for="cb-conc">Max Concurrency (1–32)</label>
             <input id="cb-conc" name="concurrency" type="number" min="1" max="32" value="3" />
@@ -210,6 +222,10 @@
         </div>
 
         <label class="check-field"><input type="checkbox" name="aiRouteRepair" checked /> Enable AI Self-Healing Selector Repair (<code>aiRouteRepair</code>)</label>
+        <label class="check-field"><input type="checkbox" name="enableCtaAndFunnel" checked /> Discover &amp; click safe conversion CTAs (<code>enableCtaAndFunnel</code>) — ads excluded</label>
+        <label class="check-field"><input type="checkbox" name="enableVideoInteraction" checked /> Play &amp; verify on-page HTML5 video (<code>enableVideoInteraction</code>)</label>
+        <label class="check-field"><input type="checkbox" name="auditAdPlacementsReadOnly" checked /> Read-only ad inventory audit — 0 clicks (<code>auditAdPlacementsReadOnly</code>)</label>
+        <label class="check-field"><input type="checkbox" name="liveSerpWarmup" /> Live search-results warm-up before landing (<code>liveSerpWarmup</code>)</label>
         <label class="check-field"><input type="checkbox" name="verifyGa4" checked /> Verify live GA4 (<code>/g/collect</code>) &amp; analytics beacons</label>
         <label class="check-field"><input type="checkbox" name="useApifyProxy" checked /> Enable Apify Proxy / Geo Proxy Pool</label>
         <label class="check-field"><input type="checkbox" name="sessionPersistence" /> Enable Returning Visitor Persistence (<code>storageState</code> slots)</label>

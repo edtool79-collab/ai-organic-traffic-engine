@@ -408,6 +408,55 @@
     </div>
   </section>
 
+  <section class="section section-alt" id="ready-tasks">
+    <div class="container">
+      <div class="section-header">
+        <h2>Ready-made tasks &amp; automation recipes</h2>
+        <p>Six pre-configured public tasks on Apify — each one is a runnable preset for a specific job. Copy the input into your own task, or wire the Actor into your stack with the n8n workflow.</p>
+      </div>
+      <div class="grid-3">
+        <div class="mode-card">
+          <h3>Shopify / E-Commerce Traffic &amp; GA4 Auditor</h3>
+          <p>Shopper personas browse collections, hover product cards, click a safe CTA and prove GA4 fired.</p>
+          <p><a class="btn btn-ghost" href="https://apify.com/hirepulse/website-traffic-generator" rel="noopener">Open task preset</a></p>
+        </div>
+        <div class="mode-card">
+          <h3>GA4 Beacon &amp; Consent Verifier</h3>
+          <p>Confirms whether <code>/g/collect</code> beacons actually fire after the consent banner, per country.</p>
+          <p><a class="btn btn-ghost" href="https://apify.com/hirepulse/website-traffic-generator" rel="noopener">Open task preset</a></p>
+        </div>
+        <div class="mode-card">
+          <h3>Organic Google Search Simulator</h3>
+          <p>Live SERP warm-up, localized Google domain, consistent referrer chain and keyword attribution.</p>
+          <p><a class="btn btn-ghost" href="https://apify.com/hirepulse/website-traffic-generator" rel="noopener">Open task preset</a></p>
+        </div>
+        <div class="mode-card">
+          <h3>Core Web Vitals &amp; Load Speed Tester</h3>
+          <p>TTFB, FCP, DOM load, P50/P95 latency and transferred bytes with an HTML performance report.</p>
+          <p><a class="btn btn-ghost" href="https://apify.com/hirepulse/website-traffic-generator" rel="noopener">Open task preset</a></p>
+        </div>
+        <div class="mode-card">
+          <h3>AI Self-Healing Journey QA</h3>
+          <p>Plain-English goals, Playbook Cache and automatic selector repair when the DOM changes.</p>
+          <p><a class="btn btn-ghost" href="https://apify.com/hirepulse/website-traffic-generator" rel="noopener">Open task preset</a></p>
+        </div>
+        <div class="mode-card">
+          <h3>Video &amp; CTA Engagement Tester</h3>
+          <p>Plays on-page HTML5 video, verifies real playback progress and clicks the main conversion CTA.</p>
+          <p><a class="btn btn-ghost" href="https://apify.com/hirepulse/website-traffic-generator" rel="noopener">Open task preset</a></p>
+        </div>
+      </div>
+      <div class="mode-card featured" style="margin-top:24px;">
+        <h3>n8n workflow: website traffic &amp; GA4 monitor</h3>
+        <p>Schedule the Actor, read its <code>OUTPUT</code> summary and alert Slack or any webhook when <code>ga4VerificationRatePct</code> or <code>successRatePct</code> drops below 100%. Import the JSON into n8n and set three environment variables.</p>
+        <p>
+          <a class="btn btn-apify" href="assets/n8n-website-ga4-monitor-workflow.json" download>Download n8n workflow (.json)</a>
+          <a class="btn btn-ghost" href="https://console.apify.com/actors/0e2CyZBgsrMYynpkY/runs" rel="noopener">View runs in Apify Console</a>
+        </p>
+      </div>
+    </div>
+  </section>
+
   <section class="section section-alt">
     <div class="container">
       <div class="section-header">
