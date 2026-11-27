@@ -3,22 +3,22 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Interactive config.json Generator | Traffic Engine AI</title>
-  <meta name="description" content="Build a ready-to-run Traffic Engine AI config.json with Playwright/Patchright/Camoufox engines, proxy bandwidth limits, and CLI launch commands." />
+  <title>Interactive Apify Actor Input &amp; config.json Generator | Traffic Engine AI</title>
+  <meta name="description" content="Build a 100% schema-valid Apify Actor Input JSON (hirepulse/website-traffic-generator) and self-hosted config.json in one click with Patchright, GA4 verification, and organic referrers." />
   <link rel="canonical" href="https://edtool79-collab.github.io/ai-organic-traffic-engine/config-builder/" />
   <meta name="robots" content="index,follow,max-image-preview:large" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Traffic Engine AI" />
-  <meta property="og:title" content="Interactive config.json Generator | Traffic Engine AI" />
-  <meta property="og:description" content="Build a ready-to-run Traffic Engine AI config.json with Playwright/Patchright/Camoufox engines, proxy bandwidth limits, and CLI launch commands." />
+  <meta property="og:title" content="Interactive Apify Actor Input &amp; config.json Generator | Traffic Engine AI" />
+  <meta property="og:description" content="Export ready-to-run Apify Actor Input JSON and local config.json with Patchright/Playwright/Camoufox engines, organic search keywords, and GA4 verification." />
   <meta property="og:url" content="https://edtool79-collab.github.io/ai-organic-traffic-engine/config-builder/" />
-  <meta property="og:image" content="https://edtool79-collab.github.io/ai-organic-traffic-engine/assets/img/hero-banner.png" />
+  <meta property="og:image" content="https://edtool79-collab.github.io/ai-organic-traffic-engine/assets/img/apify-cover.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Interactive config.json Generator | Traffic Engine AI" />
-  <meta name="twitter:description" content="Build a ready-to-run Traffic Engine AI config.json with Playwright/Patchright/Camoufox engines, proxy bandwidth limits, and CLI launch commands." />
-  <meta name="twitter:image" content="https://edtool79-collab.github.io/ai-organic-traffic-engine/assets/img/hero-banner.png" />
+  <meta name="twitter:title" content="Interactive Apify Actor Input &amp; config.json Generator | Traffic Engine AI" />
+  <meta name="twitter:description" content="Export ready-to-run Apify Actor Input JSON and local config.json in one click." />
+  <meta name="twitter:image" content="https://edtool79-collab.github.io/ai-organic-traffic-engine/assets/img/apify-cover.png" />
   <link rel="icon" type="image/png" href="../assets/img/logo.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -28,7 +28,7 @@
 {
   "@context": "https://schema.org",
   "@type": "WebApplication",
-  "name": "Traffic Engine AI Config Builder",
+  "name": "Traffic Engine AI — Apify Input & Local Config Builder",
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "Web",
   "url": "https://edtool79-collab.github.io/ai-organic-traffic-engine/config-builder/",
@@ -53,7 +53,7 @@
     {
       "@type": "ListItem",
       "position": 2,
-      "name": "Config Builder",
+      "name": "Apify & Local Config Builder",
       "item": "https://edtool79-collab.github.io/ai-organic-traffic-engine/config-builder/"
     }
   ]
@@ -76,8 +76,8 @@
         <a href="../ecosystem/">Ecosystem</a>
       </nav>
       <div class="header-cta">
-        <a class="btn btn-secondary btn-sm" href="https://github.com/edtool79-collab/ai-organic-traffic-engine/archive/refs/heads/main.zip">Download ZIP</a>
-        <a class="btn btn-primary btn-sm" href="https://github.com/edtool79-collab/ai-organic-traffic-engine">Clone on GitHub</a>
+        <a class="btn btn-apify btn-sm" href="https://apify.com/hirepulse/website-traffic-generator">Run on Apify Cloud</a>
+        <a class="btn btn-secondary btn-sm" href="https://github.com/edtool79-collab/ai-organic-traffic-engine">GitHub Source</a>
       </div>
     </div>
   </header>
@@ -86,123 +86,179 @@
 
   <section class="page-banner">
     <div class="container">
-      <div class="breadcrumbs"><a href="../">Home</a> / Interactive Config Builder</div>
-      <h1>Interactive <code>config.json</code> &amp; CLI Builder</h1>
-      <p class="hero-lead">Generate a valid Traffic Engine configuration and clone command entirely in your browser—no account required.</p>
+      <div class="breadcrumbs"><a href="../">Home</a> / Interactive Apify &amp; Local Config Builder</div>
+      <h1>1-Click Apify Actor Input &amp; Local <code>config.json</code> Builder</h1>
+      <p class="hero-lead">Design your synthetic user journey once—export a <strong>100% schema-compatible Apify Actor Input JSON</strong> (for <code>hirepulse/website-traffic-generator</code>) or a <strong>Self-Hosted Studio <code>config.json</code></strong> immediately in your browser.</p>
     </div>
   </section>
 
   <section class="section">
     <div class="container builder-grid">
       <form id="config-builder-form" class="panel" onsubmit="return false;">
-        <h2>Run parameters</h2>
+        <h2>Configure Journey &amp; QA Parameters</h2>
         <div class="field">
-          <label for="cb-url">Target URL (owned or authorized QA site)</label>
+          <label for="cb-url">Primary Target URL (owned or authorized QA site)</label>
           <input id="cb-url" name="targetUrl" type="url" value="https://citedcart.com" />
+        </div>
+        <div class="field">
+          <label for="cb-pages">Internal Sub-Pages (comma-separated)</label>
+          <input id="cb-pages" name="pages" type="text" value="/, /tools" />
         </div>
         <div class="field-row">
           <div class="field">
-            <label for="cb-engine-mode">Engine Mode</label>
-            <select id="cb-engine-mode" name="engineMode">
-              <option value="crawlee_autoscaled" selected>crawlee_autoscaled</option>
-              <option value="crawlee_playwright">crawlee_playwright</option>
-              <option value="http_fast">http_fast</option>
+            <label for="cb-exec-mode">Execution Mode</label>
+            <select id="cb-exec-mode" name="executionMode">
+              <option value="browser_journey" selected>browser_journey (Real Browser + GA4)</option>
+              <option value="http_fast">http_fast (Protocol Stress Check)</option>
             </select>
           </div>
           <div class="field">
             <label for="cb-browser">Browser Engine</label>
             <select id="cb-browser" name="browserEngine">
-              <option value="patchright" selected>patchright (stealth Chromium)</option>
-              <option value="chromium">chromium</option>
-              <option value="camoufox">camoufox (Firefox)</option>
+              <option value="patchright" selected>patchright (Zero CDP Leak)</option>
+              <option value="chromium">chromium (Playwright Stealth)</option>
+              <option value="camoufox">camoufox (Anti-FP Firefox)</option>
             </select>
           </div>
         </div>
         <div class="field-row">
           <div class="field">
-            <label for="cb-visits">Visit Count</label>
-            <input id="cb-visits" name="visitCount" type="number" min="1" max="100000" value="25" />
+            <label for="cb-device">Device &amp; Viewport Preset</label>
+            <select id="cb-device" name="devicePreset">
+              <option value="mixed_realistic" selected>mixed_realistic (Desktop + Mobile)</option>
+              <option value="desktopChrome">desktopChrome</option>
+              <option value="iphone14">iphone14</option>
+              <option value="pixel7">pixel7</option>
+              <option value="desktopFirefox">desktopFirefox</option>
+              <option value="desktopSafari">desktopSafari</option>
+              <option value="ipadPro11">ipadPro11</option>
+            </select>
           </div>
           <div class="field">
-            <label for="cb-conc">Concurrency (1–32)</label>
-            <input id="cb-conc" name="concurrency" type="number" min="1" max="32" value="4" />
+            <label for="cb-wave">Traffic Wave Pacing</label>
+            <select id="cb-wave" name="waveMode">
+              <option value="natural_peaks" selected>natural_peaks (Organic Curve)</option>
+              <option value="steady">steady</option>
+              <option value="ramp_up">ramp_up</option>
+              <option value="burst">burst</option>
+              <option value="off">off</option>
+            </select>
           </div>
         </div>
         <div class="field-row">
           <div class="field">
-            <label for="cb-res">Resource Saver Mode</label>
+            <label for="cb-visits">Total Visits (<code>visitCount</code>)</label>
+            <input id="cb-visits" name="visitCount" type="number" min="1" max="50000" value="10" />
+          </div>
+          <div class="field">
+            <label for="cb-conc">Max Concurrency (1–32)</label>
+            <input id="cb-conc" name="concurrency" type="number" min="1" max="32" value="3" />
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="cb-dwell">Page Dwell Time (Seconds)</label>
+            <input id="cb-dwell" name="dwellTimeSecs" type="number" min="1" max="180" value="6" />
+          </div>
+          <div class="field">
+            <label for="cb-res">Resource &amp; Bandwidth Saver</label>
             <select id="cb-res" name="resourceMode">
-              <option value="ultra_lite" selected>ultra_lite (max savings)</option>
-              <option value="lite">lite (balanced)</option>
-              <option value="full">full (all assets)</option>
-              <option value="lightpanda_cdp">lightpanda_cdp (9222)</option>
+              <option value="ultra_lite" selected>ultra_lite (~80% Data Saved)</option>
+              <option value="lite">lite (Balanced)</option>
+              <option value="full">full (All Media)</option>
             </select>
           </div>
+        </div>
+        <div class="field-row">
           <div class="field">
-            <label for="cb-ref">Referrer Mode</label>
+            <label for="cb-ref">Organic Referrer Mode</label>
             <select id="cb-ref" name="referrerMode">
-              <option value="mixed" selected>mixed</option>
+              <option value="mixed" selected>mixed (Search + Social + Direct)</option>
               <option value="google_organic">google_organic</option>
               <option value="search_engines">search_engines</option>
               <option value="social">social</option>
               <option value="direct">direct</option>
             </select>
           </div>
-        </div>
-        <div class="field-row">
           <div class="field">
-            <label for="cb-proxy">Proxy Tier</label>
-            <select id="cb-proxy" name="proxyTier">
-              <option value="datacenter" selected>datacenter (0MB residential)</option>
-              <option value="residential">residential (metered cap)</option>
-              <option value="none">none (direct loopback/local)</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="cb-budget">Residential Budget (MB)</label>
-            <input id="cb-budget" name="byteBudgetMb" type="number" min="50" value="1000" />
-          </div>
-        </div>
-        <div class="field-row">
-          <div class="field">
-            <label for="cb-country">Country Code</label>
+            <label for="cb-country">Geo Country Code (ISO-2)</label>
             <input id="cb-country" name="country" type="text" value="US" maxlength="2" />
-          </div>
-          <div class="field">
-            <label for="cb-ai">AI Provider</label>
-            <select id="cb-ai" name="aiProvider">
-              <option value="hirepulse" selected>hirepulse (Cloud Credits)</option>
-              <option value="ollama_cloud">ollama_cloud (BYOK)</option>
-              <option value="none">none (scripted only)</option>
-            </select>
           </div>
         </div>
         <div class="field">
-          <label for="cb-wpct">AI Worker Percentage (<code>workerPct</code>)</label>
-          <input id="cb-wpct" name="workerPct" type="number" min="0" max="100" value="50" />
+          <label for="cb-query">Custom Search Keyword (<code>searchQuery</code>)</label>
+          <input id="cb-query" name="searchQuery" type="text" value="ecommerce seo visibility audit" />
         </div>
-        <label class="check-field"><input type="checkbox" name="useInbox" /> Include HirePulse Live Email &amp; OTP verification steps</label>
-        <label class="check-field"><input type="checkbox" name="headless" checked /> Run headless browser workers</label>
+        <div class="field-row">
+          <div class="field">
+            <label for="cb-ai-mode">AI Orchestration Mode (<code>aiMode</code>)</label>
+            <select id="cb-ai-mode" name="aiMode">
+              <option value="smart_heuristic" selected>smart_heuristic (Zero Key Needed)</option>
+              <option value="hirepulse">hirepulse (HirePulse Cloud Credits)</option>
+              <option value="openai">openai (BYOK)</option>
+              <option value="gemini">gemini (BYOK)</option>
+              <option value="openrouter">openrouter (BYOK)</option>
+              <option value="groq">groq (BYOK)</option>
+              <option value="ollama_cloud">ollama_cloud (BYOK)</option>
+              <option value="off">off (Scripted Only)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="cb-ai-goal">Plain-English AI Visitor Goal</label>
+            <input id="cb-ai-goal" name="aiGoal" type="text" value="Explore featured products, tools, pricing, or guides" />
+          </div>
+        </div>
+
+        <label class="check-field"><input type="checkbox" name="aiRouteRepair" checked /> Enable AI Self-Healing Selector Repair (<code>aiRouteRepair</code>)</label>
+        <label class="check-field"><input type="checkbox" name="verifyGa4" checked /> Verify live GA4 (<code>/g/collect</code>) &amp; analytics beacons</label>
+        <label class="check-field"><input type="checkbox" name="useApifyProxy" checked /> Enable Apify Proxy / Geo Proxy Pool</label>
+        <label class="check-field"><input type="checkbox" name="sessionPersistence" /> Enable Returning Visitor Persistence (<code>storageState</code> slots)</label>
+        <label class="check-field"><input type="checkbox" name="includeCustomSteps" checked /> Include explicit multi-step QA <code>scenarioSteps</code> array</label>
       </form>
 
-      <div>
-        <div class="code-wrap">
-          <div class="code-head">
-            <span>config.json</span>
-            <button class="copy-btn" type="button" data-copy="generated-config-json">Copy JSON</button>
-          </div>
-          <pre><code id="generated-config-json"></code></pre>
+      <div data-out-group>
+        <div class="out-tabs" role="tablist" aria-label="Export target format">
+          <button class="out-tab" type="button" role="tab" aria-selected="true" data-out-panel="out-apify-box">1. Apify Actor Input JSON</button>
+          <button class="out-tab" type="button" role="tab" aria-selected="false" data-out-panel="out-local-box">2. Local Studio config.json</button>
         </div>
+
+        <div id="out-apify-box" data-out-box>
+          <div class="code-wrap">
+            <div class="code-head">
+              <span>apify-input.json (100% Apify Store Schema Match)</span>
+              <div class="code-actions">
+                <button class="copy-btn" type="button" data-copy="generated-apify-json">Copy Apify JSON</button>
+                <button class="dl-btn" type="button" data-download-target="generated-apify-json" data-filename="apify-input.json">Download .json</button>
+              </div>
+            </div>
+            <pre><code id="generated-apify-json"></code></pre>
+          </div>
+        </div>
+
+        <div id="out-local-box" data-out-box hidden>
+          <div class="code-wrap">
+            <div class="code-head">
+              <span>config.json (Self-Hosted Dashboard &amp; CLI)</span>
+              <div class="code-actions">
+                <button class="copy-btn" type="button" data-copy="generated-config-json">Copy Local JSON</button>
+                <button class="dl-btn" type="button" data-download-target="generated-config-json" data-filename="config.json">Download .json</button>
+              </div>
+            </div>
+            <pre><code id="generated-config-json"></code></pre>
+          </div>
+        </div>
+
         <div class="code-wrap">
           <div class="code-head">
-            <span>PowerShell / Bash Launch</span>
+            <span>Apify CLI &amp; Local Node.js Launch Commands</span>
             <button class="copy-btn" type="button" data-copy="generated-cli">Copy CLI</button>
           </div>
           <pre><code id="generated-cli"></code></pre>
         </div>
+
         <div class="action-row">
-          <a class="btn btn-primary" href="https://github.com/edtool79-collab/ai-organic-traffic-engine">Clone Repo on GitHub</a>
-          <a class="btn btn-secondary" href="https://gethirepulse.xyz/credits">Get HirePulse Credits</a>
+          <a class="btn btn-apify" href="https://apify.com/hirepulse/website-traffic-generator">Paste &amp; Run on Apify Store</a>
+          <a class="btn btn-primary" href="https://github.com/edtool79-collab/ai-organic-traffic-engine">Clone Self-Hosted Repo</a>
           <a class="btn btn-secondary" href="https://tools.citedcart.com/">Audit Target Storefront First</a>
         </div>
       </div>
@@ -216,12 +272,13 @@
       <div class="footer-grid">
         <div>
           <h3>Traffic Engine AI</h3>
-          <p>Self-hosted Playwright, Patchright, Camoufox, and Crawlee browser automation studio with live rrweb replay, GA4 hit verification, bandwidth caps, OTP sweeps, and hybrid AI.</p>
-          <p><a href="https://github.com/edtool79-collab/ai-organic-traffic-engine">GitHub: edtool79-collab/ai-organic-traffic-engine</a></p>
+          <p>Autonomous Synthetic User Journey QA, Website Traffic Simulator &amp; GA4 Verification Studio — available on Apify Cloud and as MIT Self-Hosted Open Source.</p>
+          <p><a href="https://apify.com/hirepulse/website-traffic-generator">Apify Store: hirepulse/website-traffic-generator</a><br /><a href="https://github.com/edtool79-collab/ai-organic-traffic-engine">GitHub: edtool79-collab/ai-organic-traffic-engine</a></p>
         </div>
         <div>
           <h3>Documentation</h3>
           <ul class="footer-list">
+            <li><a href="../config-builder/">Apify &amp; Local JSON Builder</a></li>
             <li><a href="../architecture/">Multi-Agent AI Architecture</a></li>
             <li><a href="../guides/playwright-stealth-crawlee/">Multi-Engine Stealth &amp; Fingerprints</a></li>
             <li><a href="../guides/limit-residential-bandwidth/">Limit Residential Proxy Bandwidth</a></li>
@@ -229,16 +286,16 @@
             <li><a href="../guides/ai-agents-budget/">AI Browser Agents Budget</a></li>
             <li><a href="../guides/ga4-otp-funnel-qa/">GA4 Hit &amp; OTP Verification</a></li>
             <li><a href="../guides/docker-swarm-setup/">Docker Swarm &amp; Lightpanda</a></li>
-            <li><a href="../config-builder/">Interactive config.json Builder</a></li>
           </ul>
         </div>
         <div>
           <h3>HirePulse Platform</h3>
           <ul class="footer-list">
+            <li><a href="https://apify.com/hirepulse/website-traffic-generator">Website Traffic Generator Actor</a></li>
+            <li><a href="https://apify.com/hirepulse">All HirePulse Actors on Apify</a></li>
             <li><a href="https://gethirepulse.xyz/credits">HirePulse Cloud Credits &amp; OTP Inboxes</a></li>
             <li><a href="https://gethirepulse.xyz/">HirePulse MCP &amp; x402 Gateway</a></li>
             <li><a href="https://edtool79-collab.github.io/hirepulse-tools/">HirePulse Data Tools Hub</a></li>
-            <li><a href="https://apify.com/hirepulse">HirePulse Actors on Apify</a></li>
             <li><a href="https://jobs.gethirepulse.xyz/">HirePulse Jobs Radar</a></li>
           </ul>
         </div>
@@ -256,7 +313,7 @@
         </div>
       </div>
       <div class="footer-bottom">
-        <span>MIT Licensed Open-Source Software • Intended strictly for authorized QA, flow verification, and self-hosted testing.</span>
+        <span>MIT Licensed Open-Source &amp; Official Apify Actor • Strictly intended for authorized QA, traffic simulation, load testing &amp; GA4 verification.</span>
         <span>Machine Discovery: <a href="../llms.txt">llms.txt</a> · <a href="../llms-full.txt">llms-full.txt</a> · <a href="../sitemap.xml">sitemap.xml</a></span>
       </div>
     </div>

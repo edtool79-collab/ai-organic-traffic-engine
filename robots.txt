@@ -16,7 +16,11 @@ Allow: /
 User-agent: Google-Extended
 Allow: /
 
+User-agent: Applebot-Extended
+Allow: /
+
 Sitemap: https://edtool79-collab.github.io/ai-organic-traffic-engine/sitemap.xml
-# Machine discovery endpoints
+# Machine discovery & GEO endpoints
 # llms.txt: https://edtool79-collab.github.io/ai-organic-traffic-engine/llms.txt
 # llms-full.txt: https://edtool79-collab.github.io/ai-organic-traffic-engine/llms-full.txt
+# Managed Apify Actor: https://apify.com/hirepulse/website-traffic-generator

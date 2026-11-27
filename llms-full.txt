@@ -1,47 +1,64 @@
-# Traffic Engine AI — Complete Reference (https://edtool79-collab.github.io/ai-organic-traffic-engine/)
+# Traffic Engine AI — Complete Cloud & Self-Hosted Reference (https://edtool79-collab.github.io/ai-organic-traffic-engine/)
 
-Repository: https://github.com/edtool79-collab/ai-organic-traffic-engine
-License: MIT
-Primary Runtime: Node.js LTS (Express dashboard on 127.0.0.1:4310) + Docker Compose (swarm & lightpanda profiles)
+Managed Apify Store Actor: https://apify.com/hirepulse/website-traffic-generator
+Actor Title: Website Traffic Generator (Web, E-Commerce, Blogs, GA4 & More!)
+Pricing Model: PAY_PER_EVENT ($0.003 per completed visit / $3.00 per 1,000 visits + Actor start)
+Open-Source Repository: https://github.com/edtool79-collab/ai-organic-traffic-engine (MIT License)
+Interactive Dual JSON Builder: https://edtool79-collab.github.io/ai-organic-traffic-engine/config-builder/
 
-## Core Dependencies (package.json)
-- crawlee ^3.18.2
-- playwright ^1.58.2
-- patchright ^1.64.3
-- camoufox ^0.5.9
-- rrweb ^2.2.2
-- @lightpanda/browser ^1.2.0 (optional CDP sidecar)
-- fingerprint-generator & fingerprint-injector ^2.1.90
+## 1. Managed Cloud Execution (Apify Store: `hirepulse/website-traffic-generator`)
+Runs multi-engine synthetic user journeys, load tests, and live Google Analytics 4 (`GA4`) hit verification in Apify Cloud with built-in Apify Proxy or user-supplied proxy URLs.
 
-## Quickstart Commands
+### Supported Input Schema Fields (`.actor/input_schema.json`)
+- `targetUrl` (string): Primary website, e-commerce store, SaaS app, or blog URL.
+- `startUrls` (array): Additional URLs visited in round-robin rotation.
+- `pages` (array): Internal sub-paths (e.g., `["/", "/pricing", "/blog"]`).
+- `visitCount` (integer, 1–50000): Total synthetic visits to run.
+- `maxConcurrency` (integer, 1–32): Parallel sessions bounded by container RAM Governor.
+- `dwellTimeSecs` (integer, 1–180): Biometric scroll and reading dwell time per page.
+- `waveMode` (enum): `natural_peaks`, `steady`, `ramp_up`, `burst`, `off`.
+- `aiMode` (enum): `smart_heuristic` (default zero-key autonomous DOM explorer & advisor), `hirepulse` (`gethirepulse.xyz/credits`), `openai`, `gemini`, `openrouter`, `groq`, `ollama_cloud`, or `off`.
+- `aiGoal` (string): Plain-English visitor mission guiding autonomous `ai_explore` actions with in-memory `Playbook Cache` (0 repeat LLM tokens).
+- `aiRouteRepair` (boolean): Self-healing selector recovery when UI classes/IDs change.
+- `aiApiKey` (secret string): Optional encrypted HirePulse Credit Key or BYOK LLM API key.
+- `aiModel` (string): Optional custom model override for BYOK providers.
+- `executionMode` (enum): `browser_journey` (real browser + JS + GA4) | `http_fast` (protocol load check).
+- `browserEngine` (enum): `patchright` (zero CDP leak) | `chromium` (Playwright Stealth) | `camoufox` (Firefox).
+- `devicePreset` (enum): `mixed_realistic`, `desktopChrome`, `iphone14`, `pixel7`, `desktopFirefox`, `desktopSafari`, `ipadPro11`.
+- `sessionPersistence` (boolean): Reuse `storageState` across visits to simulate returning visitors.
+- `referrerMode` (enum): `mixed`, `google_organic`, `search_engines`, `social`, `direct`.
+- `searchQuery` (string): Custom organic keyword injected into Google/Bing/DuckDuckGo/Social referrer URLs.
+- `utmCampaign` (string): Optional UTM campaign tag.
+- `scenarioSteps` (array): Custom journey steps (`goto`, `search_entry`, `human_browse`, `read_article`, `scroll`, `scroll_to`, `click`, `hover`, `fill`, `select`, `press`, `internal_nav`, `scan_products`, `dismiss_overlays`, `wait`, `assert`, `go_back`, `close_tab`, `screenshot`).
+- `verifyGa4` (boolean): Captures outgoing `/g/collect`, GTM, Clarity, Plausible, and PostHog beacons (`ga4Verified`, `ga4MeasurementIds`, `ga4Events`, `consoleErrors`).
+- `resourceMode` (enum): `ultra_lite` (~80% bandwidth saved while keeping JS & GA4), `lite`, `full`.
+- `captureScreenshots` (boolean): Saves viewport PNGs (`VISIT_001.png`...) to Key-Value Store.
+- `countryCode` (string): ISO-2 geo country matching browser locale, timezone, and localized search domains.
+- `proxyConfiguration` (object): Apify Proxy (`{"useApifyProxy": true}`) or custom proxy URLs.
+
+### Cloud Outputs
+1. Default Dataset (`overview` view): Per-visit HTTP status, load latency, device, organic referrer, GA4 verification, JS errors, WAF/challenge status, and route trail.
+2. `SUMMARY_REPORT.html` (Key-Value Store): Dark-mode executive QA dashboard with Avg/P50/P95 latency, GA4 pass rate, and bandwidth savings.
+3. `OUTPUT` (Key-Value Store): Structured JSON run summary for webhooks, CI/CD, Make, n8n, and MCP agents.
+
+## 2. Self-Hosted Open-Source Studio (`edtool79-collab/ai-organic-traffic-engine`)
+Primary Runtime: Node.js LTS (Express dashboard on `127.0.0.1:4310` with live `rrweb` preview) + Docker Compose (`swarm` & `lightpanda` profiles).
+
+### Quickstart Commands
 ```bash
 git clone https://github.com/edtool79-collab/ai-organic-traffic-engine.git
 cd ai-organic-traffic-engine
-npm install
-npm --prefix dashboard install
+npm install && npm --prefix dashboard install
 npx playwright install chromium firefox webkit
 cp config.example.json config.json
-cp .env.example .env.local
 npm start
 ```
 
-## Offline Zero-Spend Verification Suite
-- `npm test` (tests/redaction.js)
-- `node tests/verify-plan.js`
-- `node tests/verify-proxy-resolution.js`
-- `node tests/verify-proxyscore.js`
-- `node tests/verify-residential.js`
-- `node tests/signup-release.js`
-- `node tests/verify-engine.js chromium`
-
-## Hosted Integrations & Connected Ecosystem
-- HirePulse Cloud Credits & Live Inboxes: https://gethirepulse.xyz/credits (supports ai.provider="hirepulse" and src/emailInboxClient.js)
+## 3. Connected Ecosystem
+- Apify Store Profile: https://apify.com/hirepulse
+- Website Traffic Generator Actor: https://apify.com/hirepulse/website-traffic-generator
 - HirePulse Gateway (MCP + x402): https://gethirepulse.xyz/
-- HirePulse Data Tools: https://edtool79-collab.github.io/hirepulse-tools/
-- Apify Store: https://apify.com/hirepulse
-- HirePulse Jobs Radar: https://jobs.gethirepulse.xyz/
+- HirePulse Cloud Credits & OTP Inboxes: https://gethirepulse.xyz/credits
+- HirePulse Data Tools Hub: https://edtool79-collab.github.io/hirepulse-tools/
 - CitedCart Storefront AI Audits: https://citedcart.com/
-- CitedCart Free Tools: https://tools.citedcart.com/
-- CleanTab Lab: https://cleantab-lab.hirepulse-commerce-sandbox.workers.dev/
-- GTA 6 U.S. Launch Clock: https://gta6.gethirepulse.xyz/
-- ModcraftForge: https://www.modcraftforge.com/
+- CitedCart Free SEO Workbench: https://tools.citedcart.com/
